@@ -2,7 +2,7 @@
 // 只有畫面：鎖定畫面、兩頁主畫面、換桌布、換照片小工具。App 點下去還不會開。
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.1.5';
+const VERSION = '0.1.6';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -198,8 +198,31 @@ function build() {
     overlay.querySelectorAll('.bp-dots i').forEach((d, k) => d.classList.toggle('bp-on', k === i));
   }, { passive: true });
 
+  // 點圓點跳頁
+  const goPage = (i) => pages.scrollTo({ left: i * pages.clientWidth, behavior: 'smooth' });
+  overlay.querySelectorAll('.bp-dots i').forEach((d, i) => d.addEventListener('click', () => goPage(i)));
+
+  // 滑鼠拖曳換頁（手指本來就能滑，這是給電腦用的）
+  let drag = null; let dragged = false;
+  pages.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse') return;
+    drag = { x: e.clientX, left: pages.scrollLeft }; dragged = false;
+  });
+  addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x;
+    if (Math.abs(dx) > 6) { dragged = true; pages.style.scrollSnapType = 'none'; pages.scrollLeft = drag.left - dx; }
+  });
+  addEventListener('pointerup', (e) => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x; const from = Math.round(drag.left / pages.clientWidth);
+    drag = null; pages.style.scrollSnapType = '';
+    if (dragged) goPage(Math.max(0, Math.min(PAGES.length - 1, from + (dx < -40 ? 1 : dx > 40 ? -1 : 0))));
+  });
+
   // 點擊
   phone.addEventListener('click', (e) => {
+    if (dragged) { dragged = false; return; }
     const slot = e.target.closest('[data-slot]');
     if (slot) { pickTarget = slot.dataset.slot; file.click(); return; }
     const act = e.target.closest('[data-act]');
