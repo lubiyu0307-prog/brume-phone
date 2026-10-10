@@ -1,0 +1,11 @@
+{
+  "display_name": "Brume Phone",
+  "loading_order": 100,
+  "requires": [],
+  "optional": [],
+  "js": "index.js",
+  "css": "style.css",
+  "author": "lubiyu0307-prog",
+  "version": "0.1.0",
+  "homePage": "https://github.com/lubiyu0307-prog/brume-phone"
+}
