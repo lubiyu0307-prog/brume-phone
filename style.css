@@ -483,6 +483,71 @@
 .bp-ap-ev small { font-size: 11px; color: #a39b8f; }
 .bp-ap-ev u { text-decoration: none; color: #c2bbb0; cursor: pointer; font-size: 12px; }
 
+/* ---------- 脆（Threads 的樣子） ---------- */
+.bp-appscreen:has(.bp-th) { background: #fff; }
+.bp-th { flex: 1; display: flex; flex-direction: column; min-height: 0; background: #fff; color: #000; position: relative; font-family: -apple-system, "Helvetica Neue", "PingFang TC", sans-serif; }
+.bp-th-head { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 50px; padding: 0 6px; }
+.bp-th-head b { text-align: center; font-size: 16px; }
+.bp-th-head .bp-back { color: #000; }
+.bp-th-logo { justify-self: center; width: 32px; height: 32px; color: #000; }
+.bp-th-logo svg { width: 100%; height: 100%; }
+.bp-th-ref { display: grid; place-items: center; cursor: pointer; color: #999; }
+.bp-th-ref svg { width: 21px; height: 21px; }
+.bp-th-ref.spin svg { animation: bp-spin 1s linear infinite; }
+@keyframes bp-spin { to { transform: rotate(360deg); } }
+.bp-th-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.bp-th-compose { display: flex; align-items: center; gap: 10px; padding: 10px 16px 14px; border-bottom: 1px solid #efefef; cursor: pointer; }
+.bp-th-compose > span:not(.bp-th-av) { flex: 1; color: #999; font-size: 15px; }
+.bp-th-compose b { white-space: nowrap; font-size: 14px; color: #fff; background: #000; border-radius: 999px; padding: 7px 14px; opacity: .3; }
+.bp-th-loading { text-align: center; font-size: 13px; color: #999; padding: 14px; }
+.bp-th-empty { text-align: center; font-size: 13px; color: #999; padding: 30px 16px; line-height: 1.7; }
+.bp-th-post, .bp-th-reply { display: flex; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #efefef; cursor: pointer; }
+.bp-th-post.detail { cursor: default; border-bottom: 0; }
+.bp-th-left { display: flex; flex-direction: column; align-items: center; flex: none; }
+.bp-th-av {
+  width: 36px; height: 36px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; flex: none;
+  background: hsl(var(--h, 30) 35% 72%); color: #fff; font-weight: 600; font-size: 15px;
+}
+.bp-th-av.sm { width: 30px; height: 30px; font-size: 13px; }
+.bp-th-av.lg { width: 68px; height: 68px; font-size: 26px; }
+.bp-th-main { flex: 1; min-width: 0; }
+.bp-th-top { display: flex; align-items: center; gap: 4px; }
+.bp-th-top b { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bp-th-top span { color: #999; font-size: 14px; margin-left: 4px; }
+.bp-th-top i { margin-left: auto; color: #999; width: 20px; display: grid; place-items: center; }
+.bp-th-top i svg { width: 18px; height: 18px; }
+.bp-th-badge { font-style: normal; color: #0095f6; font-size: 9px; }
+.bp-th-text { font-size: 15px; line-height: 1.45; margin-top: 2px; white-space: pre-wrap; word-break: break-word; }
+.bp-th-acts { display: flex; gap: 16px; margin-top: 10px; margin-left: -4px; }
+.bp-th-acts span { display: flex; align-items: center; gap: 4px; font-size: 13px; color: #444; cursor: pointer; padding: 2px 4px; border-radius: 99px; }
+.bp-th-acts span.on { color: #ff3040; }
+.bp-th-acts svg { width: 20px; height: 20px; }
+.bp-th-reply { padding-left: 24px; }
+.bp-th-rhead { font-size: 14px; font-weight: 600; padding: 12px 16px 8px; border-top: 1px solid #efefef; border-bottom: 1px solid #efefef; }
+.bp-th-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid #efefef; margin: 0; }
+.bp-th-bar input { flex: 1; height: 38px; border: 0; border-radius: 19px; background: #f3f3f3; padding: 0 14px; font: inherit; font-size: 16px; color: #000; outline: none; }
+.bp-th-bar button { white-space: nowrap; flex: none; border: 0; background: none; font: inherit; font-weight: 600; color: #0095f6; cursor: pointer; }
+.bp-th-tabs { display: grid; grid-template-columns: repeat(5, 1fr); padding: 10px 0 calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid #efefef; }
+.bp-th-tabs span { display: grid; place-items: center; color: #b8b8b8; cursor: pointer; }
+.bp-th-tabs span.on { color: #000; }
+.bp-th-tabs svg { width: 26px; height: 26px; }
+.bp-th-prof { display: flex; justify-content: space-between; align-items: center; padding: 8px 16px 18px; }
+.bp-th-prof b { font-size: 22px; display: block; }
+.bp-th-prof span { font-size: 14px; color: #555; }
+.bp-th-prof u { color: #0095f6; text-decoration: none; margin-left: 6px; cursor: pointer; font-size: 12px; }
+.bp-th-ptab { text-align: center; font-weight: 600; font-size: 14px; padding: 10px; border-bottom: 1.5px solid #000; }
+.bp-th-sheet { position: absolute; inset: 0; z-index: 20; background: rgba(0, 0, 0, .35); display: flex; align-items: flex-end; }
+.bp-th-sheet-card { width: 100%; background: #fff; border-radius: 16px 16px 0 0; padding-bottom: env(safe-area-inset-bottom); }
+.bp-th-sheet-top { display: grid; grid-template-columns: 60px 1fr 60px; align-items: center; padding: 14px 16px; border-bottom: 1px solid #efefef; }
+.bp-th-sheet-top u { text-decoration: none; cursor: pointer; font-size: 15px; }
+.bp-th-sheet-top b { text-align: center; }
+.bp-th-sheet-body { display: flex; gap: 12px; padding: 14px 16px; }
+.bp-th-sheet-body > div { flex: 1; }
+.bp-th-sheet-body b { font-size: 15px; }
+.bp-th-sheet-body textarea { width: 100%; border: 0; outline: none; resize: none; font: inherit; font-size: 16px; margin-top: 4px; color: #000; background: none; }
+.bp-th-sheet-foot { display: flex; justify-content: space-between; align-items: center; padding: 10px 16px 16px; color: #999; font-size: 13px; }
+.bp-th-sheet-foot button { border: 0; border-radius: 999px; padding: 9px 18px; background: #000; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+
 /* ---------- 音樂（Spotify 的樣子） ---------- */
 .bp-appscreen:has(.bp-mu) { background: #121212; }
 .bp-mu { --sp-green: #1ed760; flex: 1; display: flex; flex-direction: column; min-height: 0; background: linear-gradient(180deg, #2a2a2a 0, #121212 220px); color: #fff; position: relative; font-family: -apple-system, "Helvetica Neue", "PingFang TC", sans-serif; }

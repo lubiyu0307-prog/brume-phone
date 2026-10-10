@@ -3,12 +3,13 @@
 
 import { createLine, syncMain } from './line.js';
 import { createNotes, createCalendar } from './apps.js';
+import { createThreads } from './threads.js';
 import { currentChar, ctx } from './st.js';
 import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.5.0';
+const VERSION = '0.6.0';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -232,6 +233,7 @@ function build() {
   // 點擊
   phone.addEventListener('click', (e) => {
     if (dragged) { dragged = false; return; }
+    if (e.target.closest('.bp-appscreen')) return; // App 裡面的點擊由各個 App 自己處理
     const slot = e.target.closest('[data-slot]');
     if (slot) { pickTarget = slot.dataset.slot; file.click(); return; }
     const act = e.target.closest('[data-act]');
@@ -255,6 +257,7 @@ function build() {
       if (open.dataset.open === 'music') { openApp(music); return; }
       if (open.dataset.open === 'notes') { openApp(notes); return; }
       if (open.dataset.open === 'calendar') { openApp(calendar); return; }
+      if (open.dataset.open === 'threads') { openApp(threads); return; }
       say('這個 App 還在做 ☁︎');
       return;
     }
@@ -280,6 +283,7 @@ function build() {
   const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => calDots() });
   const notes = createNotes({ screen: appScreen, say });
   const calendar = createCalendar({ screen: appScreen, say });
+  const threads = createThreads({ screen: appScreen, say });
   // LINE 裡點「他貼了便條／記上行事曆」那行小字，直接跳到那個 App
   appScreen.addEventListener('bp-openapp', (e) => { const app = { notes, calendar }[e.detail]; if (app) openApp(app); });
 
