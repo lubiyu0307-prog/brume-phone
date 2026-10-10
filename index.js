@@ -1,8 +1,10 @@
 // Brume Phone · 介面樣品 v0.1
 // 只有畫面：鎖定畫面、兩頁主畫面、換桌布、換照片小工具。App 點下去還不會開。
 
+import { createLine } from './line.js';
+
 const KEY = 'brume-phone:v1';
-const VERSION = '0.1.6';
+const VERSION = '0.2.0';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -128,6 +130,7 @@ function build() {
         <div class="bp-hint">往上滑或點一下解鎖</div>
       </div>
     </div>
+    <div class="bp-appscreen"></div>
     <div class="bp-close" title="收起手機">${ICON.x}</div>
     <div class="bp-toast"></div>
     <div class="bp-sheet">
@@ -237,6 +240,7 @@ function build() {
     const open = e.target.closest('[data-open]');
     if (open) {
       if (open.dataset.open === 'settings') { sheet.classList.add('bp-show'); return; }
+      if (open.dataset.open === 'line') { openApp(line); return; }
       say('這個 App 還在做 ☁︎');
       return;
     }
@@ -254,6 +258,19 @@ function build() {
     if (pickTarget === 'wall') { applyWall(); say('桌布換好了'); } else rebuild();
   });
 
+  // App 畫面：從右邊滑進來，蓋在主畫面上
+  const appScreen = overlay.querySelector('.bp-appscreen');
+  const openApp = (app) => { app.open(); appScreen.classList.add('bp-show'); phone.classList.add('bp-app-open'); };
+  const closeApp = () => { appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); };
+  appScreen.addEventListener('bp-home', closeApp);
+  const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n) });
+  function setBadge(app, n) {
+    overlay.querySelectorAll(`[data-open="${app}"] .bp-icon`).forEach((ic) => {
+      ic.querySelector('.bp-badge')?.remove();
+      if (n) ic.insertAdjacentHTML('beforeend', `<span class="bp-badge">${n > 99 ? '99+' : n}</span>`);
+    });
+  }
+
   const rebuild = () => {
     pages.innerHTML = PAGES.map((p) => `<div class="bp-page">${p.map(tile).join('')}</div>`).join('');
   };
@@ -262,7 +279,7 @@ function build() {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
   return {
-    open() { fit(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); },
+    open() { fit(); closeApp(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); },
     close,
   };
   function close() { overlay.classList.remove('bp-open'); }
