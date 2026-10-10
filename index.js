@@ -10,7 +10,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.7.0';
+const VERSION = '0.7.1';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -364,27 +364,50 @@ function shrink(fileObj, max) {
   });
 }
 
+// 小手機按鈕。位置記成「離畫面右邊、下面各多遠」，再用實際量到的位置換算成 left/top：
+// 酒館在 <html> 上加了 transform，fixed 會改對 <html> 定位，手機版 <html> 幾乎沒有高度，
+// 只寫 bottom 會把按鈕推到螢幕外面（iPhone 上看不到按鈕就是這樣）
 function launcher(phone) {
   const btn = $(`<div id="bp-launcher" title="Brume Phone">${ICON.phone}</div>`);
   document.documentElement.appendChild(btn);
+  let off = { r: 14, b: 140 };
+  if (state.btn && typeof state.btn.r === 'number') off = state.btn;
+
+  const place = () => {
+    const vv = window.visualViewport;
+    const vw = vv ? vv.width : innerWidth; const vh = vv ? vv.height : innerHeight;
+    const size = btn.offsetWidth || 46;
+    off.r = Math.min(Math.max(off.r, 4), vw - size - 4);
+    off.b = Math.min(Math.max(off.b, 4), vh - size - 4);
+    const want = { left: vw - off.r - size, top: vh - off.b - size };
+    Object.assign(btn.style, { right: 'auto', bottom: 'auto', left: `${want.left}px`, top: `${want.top}px` });
+    // 量一下實際落在哪，差多少補多少（外層有 transform 時，left/top 的原點不是螢幕左上角）
+    const r = btn.getBoundingClientRect();
+    btn.style.left = `${want.left + (want.left - r.left)}px`;
+    btn.style.top = `${want.top + (want.top - r.top)}px`;
+  };
+  place();
+  addEventListener('resize', place);
+  window.visualViewport?.addEventListener('resize', place);
+  setTimeout(place, 1000); // 酒館載完版面可能又動一次
+
   // 可以拖著移位置，短按才開手機
   let start = null; let moved = false;
   btn.addEventListener('pointerdown', (e) => {
-    start = { x: e.clientX, y: e.clientY, r: parseFloat(getComputedStyle(btn).right), b: parseFloat(getComputedStyle(btn).bottom) };
+    start = { x: e.clientX, y: e.clientY, r: off.r, b: off.b };
     moved = false; btn.setPointerCapture(e.pointerId);
   });
   btn.addEventListener('pointermove', (e) => {
     if (!start) return;
     const dx = e.clientX - start.x; const dy = e.clientY - start.y;
     if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
-    if (moved) { btn.style.right = `${start.r - dx}px`; btn.style.bottom = `${start.b - dy}px`; }
+    if (moved) { off = { r: start.r - dx, b: start.b - dy }; place(); }
   });
   btn.addEventListener('pointerup', () => {
     if (!moved) phone.open();
-    else { state.btn = { r: btn.style.right, b: btn.style.bottom }; save(state); }
+    else { state.btn = { ...off }; save(state); }
     start = null;
   });
-  if (state.btn) { btn.style.right = state.btn.r; btn.style.bottom = state.btn.b; }
 }
 
 // 魔杖選單（輸入框左邊那支）裡也放一個入口，手機上按鈕被擋住時從這裡開
@@ -399,20 +422,10 @@ function wandEntry(phone) {
   return true;
 }
 
-// 存下來的按鈕位置如果跑出螢幕外（例如在電腦上拖過），拉回來
-function keepOnScreen(btn) {
-  const r = btn.getBoundingClientRect();
-  if (r.right > innerWidth || r.left < 0 || r.bottom > innerHeight || r.top < 0) {
-    btn.style.right = '14px'; btn.style.bottom = '140px';
-  }
-}
-
 (function init() {
   if (document.getElementById('bp-launcher')) return;
   const phone = build();
   launcher(phone);
-  keepOnScreen(document.getElementById('bp-launcher'));
-  addEventListener('resize', () => keepOnScreen(document.getElementById('bp-launcher')));
   if (!wandEntry(phone)) {
     let n = 0;
     const t = setInterval(() => { if (wandEntry(phone) || ++n > 40) clearInterval(t); }, 500);
