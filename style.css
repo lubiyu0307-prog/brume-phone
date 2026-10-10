@@ -37,15 +37,6 @@
   color: var(--ink); user-select: none; -webkit-user-select: none;
   -webkit-tap-highlight-color: transparent;
 }
-@media (max-width: 500px) {
-  #bp-overlay { bottom: 0; right: 0; }
-  /* 手機上不靠外框置中：外框高度在某些主題下會被算成 0，手機就只剩上半截 */
-  .bp-phone {
-    position: fixed; top: var(--bp-top, 0px); left: 0;
-    width: var(--bp-w, 100vw); height: var(--bp-h, 100dvh);
-    border-radius: 0; box-shadow: none;
-  }
-}
 .bp-wall {
   position: absolute; inset: 0; background-size: cover; background-position: center;
   /* 預設桌布：灰米色海邊黃昏 */
@@ -96,10 +87,13 @@
 .bp-pages::-webkit-scrollbar { display: none; }
 .bp-page {
   flex: 0 0 100%; scroll-snap-align: start; padding: 10px 22px 0;
-  display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 92px;
-  column-gap: 14px; row-gap: 14px; align-content: start;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  /* 六排照剩下的高度分，最矮 80px；真的放不下就讓這一頁可以上下捲 */
+  grid-template-rows: repeat(6, minmax(80px, 1fr)); grid-auto-rows: minmax(80px, 1fr);
+  column-gap: 14px; row-gap: 10px; align-content: start;
+  height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
 }
-.bp-app { display: flex; flex-direction: column; align-items: center; gap: 5px; cursor: pointer; }
+.bp-app { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer; }
 .bp-icon {
   width: 62px; height: 62px; border-radius: 17px; display: grid; place-items: center;
   background: var(--glass); border: 1px solid var(--edge);
@@ -190,3 +184,18 @@
 }
 .bp-sheet button.bp-cancel { background: transparent; color: #8a8378; }
 .bp-ver { text-align: center; font-size: 11px; color: #a39b8f; margin-top: 4px; }
+
+/* ---------- 手機寬度（放最後，才蓋得過上面的規則） ---------- */
+@media (max-width: 500px) {
+  #bp-overlay { bottom: 0; right: 0; }
+  /* 手機上不靠外框置中：外框高度在某些主題下會被算成 0，手機就只剩上半截 */
+  .bp-phone {
+    position: fixed; top: var(--bp-top, 0px); left: 0;
+    width: var(--bp-w, 100vw); height: var(--bp-h, 100dvh);
+    border-radius: 0; box-shadow: none;
+  }
+  /* 真的手機上面已經有狀態列了，不再疊一條假的 */
+  .bp-status { display: none; }
+  .bp-home { padding-top: 12px; }
+  .bp-lock-date { margin-top: 40px; }
+}
