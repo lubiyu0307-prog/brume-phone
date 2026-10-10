@@ -375,6 +375,87 @@
 .bp-line-reacts span.on { background: rgba(6, 199, 85, .18); }
 .bp-line-edit-btns button.ok { background: var(--line-green); }
 
+/* ---------- 音樂（Spotify 的樣子） ---------- */
+.bp-appscreen:has(.bp-mu) { background: #121212; }
+.bp-mu { --sp-green: #1ed760; flex: 1; display: flex; flex-direction: column; min-height: 0; background: linear-gradient(180deg, #2a2a2a 0, #121212 220px); color: #fff; position: relative; font-family: -apple-system, "Helvetica Neue", "PingFang TC", sans-serif; }
+.bp-mu-head { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 48px; padding: 0 6px; }
+.bp-mu-head b { text-align: center; font-size: 15px; }
+.bp-mu-head .bp-back { color: #fff; }
+.bp-mu-head i { display: grid; place-items: center; cursor: pointer; color: #b3b3b3; }
+.bp-mu-head i svg { width: 22px; height: 22px; }
+.bp-down svg { width: 26px; height: 26px; display: block; margin-top: 6px; }
+.bp-mu-scroll { flex: 1; overflow-y: auto; padding: 4px 16px 90px; overscroll-behavior: contain; }
+.bp-mu-hero {
+  display: flex; align-items: flex-end; gap: 12px; justify-content: space-between; padding: 18px 16px; border-radius: 14px;
+  background: linear-gradient(135deg, #3d5a4a, #1f2f27);
+}
+.bp-mu-hero small { font-size: 11px; color: #b3b3b3; letter-spacing: .5px; }
+.bp-mu-hero h2 { margin: 4px 0 6px; font-size: 21px; line-height: 1.25; color: #fff; }
+.bp-mu-hero p { margin: 0; font-size: 12px; color: #c9d4cd; line-height: 1.5; }
+.bp-mu-hero button {
+  flex: none; display: flex; align-items: center; gap: 6px; border: 0; border-radius: 999px; padding: 11px 16px;
+  background: var(--sp-green); color: #000; font: inherit; font-weight: 700; font-size: 14px; cursor: pointer;
+}
+.bp-mu-hero button svg { width: 16px; height: 16px; }
+.bp-mu-hero button:disabled { opacity: .6; }
+.bp-mu h3 { font-size: 18px; margin: 22px 0 10px; color: #fff; }
+.bp-mu h3 small { font-size: 12px; color: #b3b3b3; font-weight: 400; margin-left: 6px; }
+.bp-mu-row { display: flex; align-items: center; gap: 12px; padding: 7px 0; cursor: pointer; }
+.bp-mu-row img { width: 52px; height: 52px; border-radius: 4px; object-fit: cover; background: #282828; flex: none; }
+.bp-mu-row-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.bp-mu-row-mid b { font-size: 15px; font-weight: 500; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bp-mu-row.on .bp-mu-row-mid b { color: var(--sp-green); }
+.bp-mu-row-mid span { font-size: 13px; color: #b3b3b3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bp-mu-row-mid em { font-style: normal; font-size: 12px; color: #9fd8b0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bp-mu-add, .bp-mu-del { flex: none; width: 36px; height: 36px; display: grid; place-items: center; color: #b3b3b3; }
+.bp-mu-add.on { color: var(--sp-green); }
+.bp-mu-add svg { width: 26px; height: 26px; }
+.bp-mu-del svg { width: 20px; height: 20px; }
+.bp-mu-empty { color: #b3b3b3; font-size: 13px; text-align: center; padding: 18px 0; line-height: 1.7; }
+.bp-mu-mini {
+  position: absolute; left: 8px; right: 8px; bottom: calc(8px + env(safe-area-inset-bottom));
+  display: flex; align-items: center; gap: 10px; padding: 7px 10px 7px 7px; border-radius: 8px;
+  background: #3a3d3b; cursor: pointer; box-shadow: 0 6px 20px rgba(0, 0, 0, .4);
+}
+.bp-mu-mini img { width: 40px; height: 40px; border-radius: 4px; object-fit: cover; }
+.bp-mu-mini div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bp-mu-mini b { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bp-mu-mini span { font-size: 12px; color: #b3b3b3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bp-mu-mini i { width: 34px; height: 34px; display: grid; place-items: center; color: #fff; }
+.bp-mu-mini i svg { width: 24px; height: 24px; }
+.bp-mu-now { background: linear-gradient(180deg, #4a4a48 0, #121212 75%); padding-bottom: env(safe-area-inset-bottom); }
+.bp-mu-stage { padding: 18px 26px 10px; }
+.bp-mu-stage img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; box-shadow: 0 14px 40px rgba(0, 0, 0, .5); display: block; }
+.bp-mu-ytslot { width: 100%; aspect-ratio: 16 / 9; border-radius: 8px; background: #000; }
+.bp-mu-meta { padding: 10px 26px 0; display: flex; flex-direction: column; gap: 4px; }
+.bp-mu-meta b { font-size: 21px; }
+.bp-mu-meta span { font-size: 15px; color: #b3b3b3; }
+.bp-mu-meta em { font-style: normal; font-size: 13px; color: #9fd8b0; margin-top: 8px; line-height: 1.6; }
+.bp-mu-bar { margin: 18px 26px 0; height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .25); overflow: hidden; }
+.bp-mu-bar i { display: block; height: 100%; background: #fff; }
+.bp-mu-hint { margin: 10px 26px 0; font-size: 11.5px; color: #8a8a8a; line-height: 1.6; }
+.bp-mu-ctl { display: flex; justify-content: center; align-items: center; gap: 34px; margin-top: auto; padding: 18px 0 30px; }
+.bp-mu-ctl i { width: 40px; height: 40px; display: grid; place-items: center; cursor: pointer; color: #fff; }
+.bp-mu-ctl i svg { width: 30px; height: 30px; }
+.bp-mu-ctl i.big { width: 64px; height: 64px; border-radius: 50%; background: #fff; color: #000; }
+.bp-mu-ctl i.big svg { width: 30px; height: 30px; }
+.bp-mu-sheet { position: absolute; inset: 0; z-index: 20; }
+.bp-mu-sheet-bg { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); }
+.bp-mu-sheet-card { position: absolute; left: 10px; right: 10px; top: 14%; background: #282828; border-radius: 14px; padding: 18px; color: #fff; }
+.bp-mu-sheet-card b { font-size: 17px; }
+.bp-mu-sheet-card p { font-size: 13px; color: #b3b3b3; line-height: 1.6; margin: 10px 0; }
+.bp-mu-sheet-card small { display: block; font-size: 11px; color: #8a8a8a; margin-top: 10px; }
+.bp-mu-key { width: 100%; height: 42px; border: 0; border-radius: 8px; padding: 0 12px; background: #3e3e3e; color: #fff; font-size: 15px; outline: none; }
+.bp-mu-sheet-btns { display: flex; gap: 8px; margin-top: 12px; }
+.bp-mu-sheet-btns button { flex: 1; padding: 11px; border: 0; border-radius: 999px; background: #3e3e3e; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+.bp-mu-sheet-btns button.ok { background: var(--sp-green); color: #000; }
+/* YouTube 的框：平常藏著繼續放，打開正在播放才浮到畫面上 */
+.bp-yt { position: absolute; z-index: 11; left: 0; top: 0; width: 200px; height: 113px; opacity: 0; pointer-events: none; border-radius: 8px; overflow: hidden; }
+.bp-yt.bp-yt-show { opacity: 1; pointer-events: auto; }
+.bp-yt iframe { width: 100%; height: 100%; border: 0; }
+.bp-music-cover img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
+.bp-music-ctl i { display: grid; place-items: center; cursor: pointer; }
+
 /* ---------- 關閉鍵（鎖定畫面、主畫面都看得到） ---------- */
 .bp-close {
   position: absolute; z-index: 12; top: calc(14px + env(safe-area-inset-top)); right: 16px;

@@ -2,9 +2,10 @@
 // 只有畫面：鎖定畫面、兩頁主畫面、換桌布、換照片小工具。App 點下去還不會開。
 
 import { createLine } from './line.js';
+import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.3.1';
+const VERSION = '0.4.0';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -20,6 +21,7 @@ const ICON = {
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   torch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 3h8v4l-2 3v11h-4V10L8 7z"/><path d="M12 13v2"/></svg>',
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
+  pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></svg>',
   prev: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM20 6v12L9.5 12z"/></svg>',
   next: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM4 6v12l10.5-6z"/></svg>',
   add: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
@@ -94,7 +96,7 @@ function musicWidget() {
   return `<div class="bp-widget bp-w2 bp-music" data-open="music">
     <div class="bp-music-cover">${ICON.music}</div>
     <div><div class="bp-music-t">還沒有歌</div><div class="bp-music-a">讓他推薦一首吧</div></div>
-    <div class="bp-music-ctl">${ICON.prev}${ICON.play}${ICON.next}</div></div>`;
+    <div class="bp-music-ctl"><i data-mw="prev">${ICON.prev}</i><i data-mw="toggle">${ICON.play}</i><i data-mw="next">${ICON.next}</i></div></div>`;
 }
 
 function appTile(a) {
@@ -131,6 +133,7 @@ function build() {
       </div>
     </div>
     <div class="bp-appscreen"></div>
+    <div class="bp-yt"></div>
     <div class="bp-close" title="收起手機">${ICON.x}</div>
     <div class="bp-toast"></div>
     <div class="bp-sheet">
@@ -237,10 +240,16 @@ function build() {
       if (a === 'close') sheet.classList.remove('bp-show');
       return;
     }
+    const mw = e.target.closest('[data-mw]');
+    if (mw) {
+      if (mw.dataset.mw === 'toggle') nowPlaying.toggle(); else nowPlaying.skip(mw.dataset.mw === 'next' ? 1 : -1);
+      return;
+    }
     const open = e.target.closest('[data-open]');
     if (open) {
       if (open.dataset.open === 'settings') { sheet.classList.add('bp-show'); return; }
       if (open.dataset.open === 'line') { openApp(line); return; }
+      if (open.dataset.open === 'music') { openApp(music); return; }
       say('這個 App 還在做 ☁︎');
       return;
     }
@@ -260,10 +269,22 @@ function build() {
 
   // App 畫面：從右邊滑進來，蓋在主畫面上
   const appScreen = overlay.querySelector('.bp-appscreen');
-  const openApp = (app) => { app.open(); appScreen.classList.add('bp-show'); phone.classList.add('bp-app-open'); };
-  const closeApp = () => { appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); };
+  const openApp = (app) => { music?.leave(); app.open(); appScreen.classList.add('bp-show'); phone.classList.add('bp-app-open'); };
+  const closeApp = () => { appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); music?.leave(); };
   appScreen.addEventListener('bp-home', closeApp);
   const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n) });
+  const music = createMusic({ screen: appScreen, ytHost: overlay.querySelector('.bp-yt'), say });
+
+  // 主畫面的音樂小工具跟著正在放的歌走
+  nowPlaying.subscribe((p) => {
+    overlay.querySelectorAll('.bp-music').forEach((w) => {
+      const s = p.song;
+      w.querySelector('.bp-music-t').textContent = s ? s.title : '還沒有歌';
+      w.querySelector('.bp-music-a').textContent = s ? s.artist : '讓他推薦一首吧';
+      w.querySelector('.bp-music-cover').innerHTML = s?.cover ? `<img src="${s.cover}" alt="">` : ICON.music;
+      w.querySelector('[data-mw="toggle"]').innerHTML = p.playing ? ICON.pause : ICON.play;
+    });
+  });
   function setBadge(app, n) {
     overlay.querySelectorAll(`[data-open="${app}"] .bp-icon`).forEach((ic) => {
       ic.querySelector('.bp-badge')?.remove();

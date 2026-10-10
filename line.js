@@ -2,10 +2,10 @@
 // 回覆走酒館自己的 generateQuietPrompt，所以模型看得到角色卡、世界書與正文。
 
 import * as store from './store.js';
+import { currentChar, generate } from './st.js';
 
 const OLD_STORE = 'brume-phone:line:'; // v0.2.0 存在 localStorage，第一次打開時搬進 IndexedDB
 
-const ctx = () => window.SillyTavern?.getContext?.();
 const esc = (t) => String(t).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const reEsc = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const pad = (n) => String(n).padStart(2, '0');
@@ -50,20 +50,6 @@ const TAB = {
   news: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 12.5h8M8 16h5"/></svg>',
   wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="13" rx="3"/><path d="M16 12.5h4.5M7 6l8-2.5V6"/></svg>',
 };
-
-/** 現在開著的角色；沒選角色或在群組聊天時回 null */
-function currentChar() {
-  const c = ctx();
-  if (!c || c.groupId || c.characterId === undefined || c.characterId === null) return null;
-  const ch = c.characters?.[c.characterId];
-  if (!ch) return null;
-  return {
-    key: ch.avatar || ch.name,
-    name: ch.name,
-    avatar: ch.avatar ? `/thumbnail?type=avatar&file=${encodeURIComponent(ch.avatar)}` : '',
-    user: c.name1 || '我',
-  };
-}
 
 async function loadThread(key) {
   let t = await store.get('line:' + key).catch(() => null);
@@ -120,18 +106,6 @@ function buildPrompt(ch, msgs) {
     '- 引用她的某一句來回：在回覆最前面獨立一行寫 [[QUOTE|位置]]',
     '- 對她的某則訊息回貼表符：在回覆最後獨立一行寫 [[REACT|位置|表符]]，表符只能是 heart、lol、tear、wow、hug、huh 其中一個，一次最多一個',
   ].join('\n');
-}
-
-async function generate(prompt, image) {
-  const c = ctx();
-  const fn = c?.generateQuietPrompt;
-  if (!fn) throw new Error('找不到酒館的生成功能');
-  // 新版酒館吃物件參數，舊版吃一串位置參數
-  const objectStyle = /^\s*(async\s+)?(function\s*\w*\s*)?\(\s*\{/.test(String(fn));
-  const out = objectStyle
-    ? await fn.call(c, { quietPrompt: prompt, skipWIAN: false, removeReasoning: true, ...(image ? { quietImage: image } : {}) })
-    : await fn.call(c, prompt, false, false, image || null);
-  return String(out || '');
 }
 
 function parseReply(raw, ch) {
