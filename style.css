@@ -375,6 +375,114 @@
 .bp-line-reacts span.on { background: rgba(6, 199, 85, .18); }
 .bp-line-edit-btns button.ok { background: var(--line-green); }
 
+/* ---- LINE 第二批：貼圖、鬧鐘卡、動態、陪睡、記憶書、字卡、里程碑 ---- */
+.bp-line-sticker { width: 130px; height: 130px; object-fit: contain; display: block; }
+.bp-line-bwrap:has(.bp-line-sticker) .bp-line-react { bottom: 0; }
+.bp-tail .bp-line-bwrap:has(.bp-line-sticker)::after { display: none; }
+.bp-line-alarm { display: flex; gap: 12px; align-items: center; background: #fff; border-radius: 16px; padding: 12px 16px; cursor: pointer; min-width: 190px; }
+.bp-line-alarm i { width: 40px; height: 40px; border-radius: 50%; background: #fff3e0; color: #e08a2c; display: grid; place-items: center; flex: none; }
+.bp-line-alarm i svg { width: 24px; height: 24px; }
+.bp-line-alarm div { display: flex; flex-direction: column; }
+.bp-line-alarm b { font-size: 24px; font-weight: 600; color: #111; letter-spacing: .5px; }
+.bp-line-alarm span { font-size: 13px; color: #333; }
+.bp-line-alarm small { font-size: 11px; color: var(--line-green); margin-top: 3px; }
+.bp-line-moment { text-align: center; margin: 10px 0; }
+.bp-line-moment span { display: inline-block; max-width: 85%; font-size: 12px; color: #fff; background: rgba(0, 0, 0, .14); padding: 4px 12px; border-radius: 12px; line-height: 1.5; }
+.bp-line-moment[data-goto] span { cursor: pointer; background: rgba(255, 255, 255, .35); color: #1d2633; }
+.bp-line-stk { background: #fff; border-top: 1px solid #eee; max-height: 220px; overflow-y: auto; padding: 10px; }
+.bp-line-stk[hidden] { display: none; }
+.bp-line-stkgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.bp-line-stkitem { position: relative; aspect-ratio: 1; border-radius: 12px; background: #f5f6f8; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; overflow: hidden; }
+.bp-line-stkitem img { width: 78%; height: 70%; object-fit: contain; }
+.bp-line-stkitem span { font-size: 11px; color: #555; }
+.bp-line-stkitem i { position: absolute; top: 3px; right: 6px; font-style: normal; font-size: 12px; color: #999; }
+.bp-line-stkitem.bp-add { color: #888; border: 1.5px dashed #ccc; background: none; }
+.bp-line-stkitem.bp-add svg { width: 26px; height: 26px; }
+.bp-line-sleep { --line-bg: #1c2433; }
+.bp-line-sleep .bp-line-head, .bp-line-sleep .bp-line-head b, .bp-line-sleep .bp-back, .bp-line-sleep .bp-line-tools i { color: #c9d1e0 !important; }
+.bp-line-sleep .bp-him .bp-line-bub { background: #2c3546; color: #dfe5ef; }
+.bp-line-sleep.bp-him.bp-tail .bp-line-bub::before { background: #2c3546; }
+.bp-line-sleep .bp-him.bp-tail .bp-line-bwrap > .bp-line-bub:first-child::before { background: #2c3546; }
+.bp-line-sleep .bp-me .bp-line-bub { background: #5c7a4c; color: #eef3ea; }
+.bp-line-sleep .bp-me.bp-tail .bp-line-bwrap > .bp-line-bub:first-child::after { background: #5c7a4c; }
+.bp-line-sleep .bp-line-meta { color: #7d879a; }
+.bp-line-sleep .bp-line-bar, .bp-line-sleep .bp-line-quoting { background: #161d29; }
+.bp-line-sleep .bp-line-field { background: #262f40; }
+.bp-line-sleep .bp-line-input { color: #dfe5ef; }
+.bp-line-sleep .bp-line-plus, .bp-line-sleep .bp-line-field i { color: #8f9ab0; }
+.bp-line-sleep .bp-line-qbox { color: #9aa5b8; border-left-color: rgba(255, 255, 255, .25); }
+.bp-line-sleepbar { text-align: center; font-size: 12px; color: #c9d1e0; background: #232c3d; padding: 6px; cursor: pointer; }
+.bp-line-switch { display: flex !important; justify-content: space-between; align-items: center; text-align: left; }
+.bp-line-switch i { width: 44px; height: 26px; border-radius: 13px; background: #d6d8dc; position: relative; flex: none; transition: background .2s; }
+.bp-line-switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .2s; box-shadow: 0 1px 3px rgba(0, 0, 0, .2); }
+.bp-line-switch i.on { background: var(--line-green); }
+.bp-line-switch i.on::after { left: 21px; }
+.bp-line-pop-card:has(.bp-line-list) { max-height: 80%; overflow-y: auto; }
+.bp-line-sub { background: #fff; position: relative; }
+.bp-line-subhead { background: #fff !important; }
+.bp-line-subbody { flex: 1; overflow-y: auto; padding: 8px 16px 20px; }
+.bp-line-subhint { font-size: 12.5px; color: #8b8f97; line-height: 1.7; margin: 6px 0 12px; }
+.bp-line-subhint u { color: var(--line-green); cursor: pointer; }
+.bp-line-wide { width: 100%; padding: 11px; border: 0; border-radius: 12px; background: var(--line-green); color: #fff; font: inherit; font-weight: 600; cursor: pointer; margin-bottom: 12px; }
+.bp-line-mem { display: flex; align-items: center; gap: 6px; padding: 12px 2px; border-bottom: 1px solid #f0f0f0; font-size: 14px; color: #222; }
+.bp-line-mem span { flex: 1; line-height: 1.5; }
+.bp-line-mem i { color: #aaa; cursor: pointer; display: grid; place-items: center; width: 28px; height: 28px; }
+.bp-line-mem i svg { width: 17px; height: 17px; }
+.bp-line-card { position: relative; background: #fbf8f2; border-radius: 14px; padding: 18px 18px 14px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0, 0, 0, .06); }
+.bp-line-card p { margin: 0 0 10px; font-size: 16px; line-height: 1.7; color: #2c2a26; font-family: "Noto Serif TC", "Songti TC", serif; white-space: pre-wrap; }
+.bp-line-card small { font-size: 12px; color: #9a9389; }
+.bp-line-card i { position: absolute; top: 10px; right: 10px; color: #c2bbb0; cursor: pointer; }
+.bp-line-card i svg { width: 16px; height: 16px; }
+.bp-line-edit p.soft { color: #8b8f97; line-height: 1.6; }
+.bp-line-ms { position: absolute; inset: 0; z-index: 25; display: grid; place-items: center; background: rgba(20, 24, 33, .35); animation: bp-fade .3s; }
+.bp-line-ms div { background: #fff; border-radius: 22px; padding: 26px 34px; text-align: center; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 20px 50px rgba(0, 0, 0, .25); animation: bp-pop .5s cubic-bezier(.2, 1.4, .4, 1); }
+.bp-line-ms i { font-style: normal; font-size: 30px; color: #f2b84b; }
+.bp-line-ms b { font-size: 20px; color: #222; }
+.bp-line-ms span { font-size: 12px; color: #999; }
+@keyframes bp-fade { from { opacity: 0; } }
+@keyframes bp-pop { from { transform: scale(.6); opacity: 0; } }
+.bp-cal-grid .bp-ev { position: relative; }
+.bp-cal-grid .bp-ev::after { content: ""; position: absolute; left: 50%; bottom: -1px; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: #fff; }
+
+/* ---------- 便條（冰箱門）與行事曆 ---------- */
+.bp-ap { flex: 1; display: flex; flex-direction: column; min-height: 0; background: #f6f3ee; color: #3a362f; }
+.bp-ap-head { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 48px; padding: 0 6px; }
+.bp-ap-head b { text-align: center; font-size: 16px; }
+.bp-ap-scroll { flex: 1; overflow-y: auto; padding: 6px 16px 20px; }
+.bp-ap-empty { text-align: center; color: #9a9389; font-size: 13px; line-height: 1.8; margin-top: 40px; }
+.bp-ap-hint { font-size: 12px; color: #a39b8f; margin: 8px 2px; }
+.bp-ap-fridge { background: linear-gradient(180deg, #e9ecef, #dde1e5); }
+.bp-ap-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding-top: 10px; }
+.bp-ap-note { position: relative; padding: 18px 12px 10px; min-height: 110px; transform: rotate(var(--r)); box-shadow: 0 4px 10px rgba(0, 0, 0, .12); cursor: pointer; display: flex; flex-direction: column; }
+.bp-ap-note.him { background: #fff1a8; }
+.bp-ap-note.me { background: #ffd9df; }
+.bp-ap-note p { margin: 0; flex: 1; font-size: 14.5px; line-height: 1.55; color: #3a362f; word-break: break-word; }
+.bp-ap-note small { font-size: 11px; color: #8a7f6c; margin-top: 8px; }
+.bp-ap-note.done p { text-decoration: line-through; opacity: .5; }
+.bp-ap-note .pin { position: absolute; top: -6px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #f28b82, #c5453b); box-shadow: 0 2px 3px rgba(0, 0, 0, .25); }
+.bp-ap-note u { position: absolute; top: 4px; right: 7px; text-decoration: none; font-size: 12px; color: #b3a98f; }
+.bp-ap-add { display: flex; gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom)); background: rgba(255, 255, 255, .7); margin: 0; }
+.bp-ap-add.inline { padding: 8px 0; background: none; }
+.bp-ap-add input { flex: 1; height: 38px; border: 0; border-radius: 10px; padding: 0 12px; background: #fff; font: inherit; font-size: 16px; color: #333; outline: none; }
+.bp-ap-add button { border: 0; border-radius: 10px; padding: 0 16px; background: #8a7f6c; color: #fff; font: inherit; cursor: pointer; }
+.bp-ap-month { display: flex; justify-content: space-between; align-items: center; padding: 6px 4px 10px; }
+.bp-ap-month b { font-family: "Playfair Display", Georgia, serif; font-size: 18px; }
+.bp-ap-month i { font-style: normal; font-size: 26px; padding: 0 12px; cursor: pointer; color: #8a7f6c; }
+.bp-ap-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; background: #fff; border-radius: 16px; padding: 10px 6px; }
+.bp-ap-grid span { position: relative; height: 38px; line-height: 38px; font-size: 14px; border-radius: 12px; cursor: pointer; }
+.bp-ap-grid .dow { font-size: 11px; color: #a39b8f; height: 24px; line-height: 24px; cursor: default; }
+.bp-ap-grid .today { font-weight: 700; color: #b5503d; }
+.bp-ap-grid .sel { background: #3a362f; color: #fff; }
+.bp-ap-grid span i { position: absolute; left: 50%; bottom: 4px; width: 5px; height: 5px; margin-left: -2.5px; border-radius: 50%; background: #c98b5a; }
+.bp-ap-grid .sel i { background: #fff; }
+.bp-ap-cal h4 { font-size: 14px; margin: 18px 2px 8px; color: #6b655c; }
+.bp-ap-ev { display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 12px; padding: 11px 12px; margin-bottom: 8px; border-left: 4px solid #c98b5a; }
+.bp-ap-ev.me { border-left-color: #e59aa6; }
+.bp-ap-ev em { font-style: normal; font-size: 12px; color: #8a7f6c; width: 38px; }
+.bp-ap-ev span { flex: 1; font-size: 14.5px; }
+.bp-ap-ev small { font-size: 11px; color: #a39b8f; }
+.bp-ap-ev u { text-decoration: none; color: #c2bbb0; cursor: pointer; font-size: 12px; }
+
 /* ---------- 音樂（Spotify 的樣子） ---------- */
 .bp-appscreen:has(.bp-mu) { background: #121212; }
 .bp-mu { --sp-green: #1ed760; flex: 1; display: flex; flex-direction: column; min-height: 0; background: linear-gradient(180deg, #2a2a2a 0, #121212 220px); color: #fff; position: relative; font-family: -apple-system, "Helvetica Neue", "PingFang TC", sans-serif; }

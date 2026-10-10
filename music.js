@@ -268,6 +268,7 @@ export function createMusic({ screen, ytHost, say }) {
   }
 
   screen.addEventListener('click', (e) => {
+    if (!screen.querySelector('.bp-mu')) return; // 不是音樂的畫面
     const t = e.target;
     const add = t.closest('[data-add]');
     if (add) {

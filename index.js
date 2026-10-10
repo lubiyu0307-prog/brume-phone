@@ -1,11 +1,14 @@
 // Brume Phone · 介面樣品 v0.1
 // 只有畫面：鎖定畫面、兩頁主畫面、換桌布、換照片小工具。App 點下去還不會開。
 
-import { createLine } from './line.js';
+import { createLine, syncMain } from './line.js';
+import { createNotes, createCalendar } from './apps.js';
+import { currentChar, ctx } from './st.js';
+import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.4.0';
+const VERSION = '0.5.0';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -250,6 +253,8 @@ function build() {
       if (open.dataset.open === 'settings') { sheet.classList.add('bp-show'); return; }
       if (open.dataset.open === 'line') { openApp(line); return; }
       if (open.dataset.open === 'music') { openApp(music); return; }
+      if (open.dataset.open === 'notes') { openApp(notes); return; }
+      if (open.dataset.open === 'calendar') { openApp(calendar); return; }
       say('這個 App 還在做 ☁︎');
       return;
     }
@@ -272,7 +277,27 @@ function build() {
   const openApp = (app) => { music?.leave(); app.open(); appScreen.classList.add('bp-show'); phone.classList.add('bp-app-open'); };
   const closeApp = () => { appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); music?.leave(); };
   appScreen.addEventListener('bp-home', closeApp);
-  const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n) });
+  const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => calDots() });
+  const notes = createNotes({ screen: appScreen, say });
+  const calendar = createCalendar({ screen: appScreen, say });
+  // LINE 裡點「他貼了便條／記上行事曆」那行小字，直接跳到那個 App
+  appScreen.addEventListener('bp-openapp', (e) => { const app = { notes, calendar }[e.detail]; if (app) openApp(app); });
+
+  // 主畫面日曆小工具：有安排的日子底下點一個小點
+  async function calDots() {
+    const c = currentChar();
+    const evs = c ? await data.cal.all(c.key) : [];
+    const now = new Date(); const pre = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-`;
+    const has = new Set(evs.filter((x) => x.date.startsWith(pre)).map((x) => +x.date.slice(8)));
+    overlay.querySelectorAll('.bp-cal-grid span:not(.bp-dow)').forEach((sp) => sp.classList.toggle('bp-ev', has.has(+sp.textContent)));
+  }
+  data.onChange((kind) => { if (kind === 'cal') calDots(); });
+  calDots();
+
+  // 換角色時：日曆小點、正文同步都跟著換
+  const st = ctx();
+  st?.eventSource?.on?.(st.eventTypes?.CHAT_CHANGED || st.event_types?.CHAT_CHANGED || 'chat_id_changed', () => { calDots(); syncMain(); });
+  syncMain();
   const music = createMusic({ screen: appScreen, ytHost: overlay.querySelector('.bp-yt'), say });
 
   // 主畫面的音樂小工具跟著正在放的歌走
@@ -294,13 +319,14 @@ function build() {
 
   const rebuild = () => {
     pages.innerHTML = PAGES.map((p) => `<div class="bp-page">${p.map(tile).join('')}</div>`).join('');
+    calDots();
   };
 
   // 點外框外面也能收起來
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
   return {
-    open() { fit(); closeApp(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); },
+    open() { fit(); closeApp(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); },
     close,
   };
   function close() { overlay.classList.remove('bp-open'); }

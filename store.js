@@ -44,8 +44,8 @@ export async function del(key) {
   });
 }
 
-/** 圖片縮到長邊 max 再轉成 JPEG dataURL */
-export function shrink(file, max, q = 0.82) {
+/** 圖片縮到長邊 max 再轉成 dataURL（預設 JPEG；貼圖要留透明背景就傳 image/png） */
+export function shrink(file, max, q = 0.82, type = 'image/jpeg') {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -54,7 +54,7 @@ export function shrink(file, max, q = 0.82) {
       c.width = Math.round(img.width * s); c.height = Math.round(img.height * s);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(img.src);
-      resolve(c.toDataURL('image/jpeg', q));
+      resolve(c.toDataURL(type, q));
     };
     img.onerror = reject;
     img.src = URL.createObjectURL(file);

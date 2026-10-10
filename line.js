@@ -2,7 +2,8 @@
 // 回覆走酒館自己的 generateQuietPrompt，所以模型看得到角色卡、世界書與正文。
 
 import * as store from './store.js';
-import { currentChar, generate } from './st.js';
+import { currentChar, generate, ctx } from './st.js';
+import * as data from './data.js';
 
 const OLD_STORE = 'brume-phone:line:'; // v0.2.0 存在 localStorage，第一次打開時搬進 IndexedDB
 
@@ -30,7 +31,14 @@ const IC = {
   smile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.5c1.8 2 5.2 2 7 0"/><circle cx="9.3" cy="10" r=".9" fill="currentColor" stroke="none"/><circle cx="14.7" cy="10" r=".9" fill="currentColor" stroke="none"/></svg>',
   send: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4 21 12 3.4 3.6l.1 6.5L15 12l-11.5 1.9z"/></svg>',
   photo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><circle cx="9" cy="10.5" r="1.8"/><path d="m21 16-5-5-8 9"/></svg>',
+  save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M6 3.5h12v17l-6-4-6 4z"/></svg>',
+  alarm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M4.5 5 7 3M19.5 5 17 3"/></svg>',
 };
+
+const ALARM_KEY = 'brume-phone:alarm-shortcut';
+const alarmShortcut = () => { try { return localStorage.getItem(ALARM_KEY) || 'Brume 設鬧鐘'; } catch { return 'Brume 設鬧鐘'; } };
+const MS_MSGS = [50, 100, 300, 520, 1000, 1314, 2000, 3000, 5000, 10000];
+const MS_DAYS = [7, 30, 50, 100, 200, 365, 520, 730, 1000];
 
 // 聊天列表的時間：今天顯示時刻，昨天顯示「昨天」，更早顯示日期
 function listTime(ts) {
@@ -72,10 +80,31 @@ function herPositions(msgs) {
 }
 
 function msgText(m) {
+  if (m.sticker) return `［貼圖：${m.sticker.tag}］`;
+  if (m.alarm) return `［鬧鐘卡 ${m.alarm.time}「${m.alarm.label}」］`;
+  if (m.moment) return `（動態：${m.moment}）`;
   return m.img ? `［照片］${m.text ? ' ' + m.text : ''}` : m.text;
 }
 
-function buildPrompt(ch, msgs) {
+// 正文那邊要看的：最近的 LINE 與記憶書（「讓正文知道」打開時才送）
+export async function syncMain() {
+  const c = ctx(); const ch = currentChar();
+  if (!c?.setExtensionPrompt) return;
+  const off = () => c.setExtensionPrompt('brume-phone-line', '', 1, 4);
+  if (!ch) return off();
+  const t = await loadThread(ch.key);
+  if (!t.sync) return off();
+  const mem = await data.memory.all(ch.key);
+  const recent = t.msgs.filter((m) => !m.err).slice(-20).map((m) => `${m.me ? ch.user : ch.name}：${msgText(m)}`).join('\n');
+  const text = [
+    `[手機 LINE] ${ch.name} 跟 ${ch.user} 平常也會用 LINE 聊天，下面是最近聊的（${ch.name} 記得這些，可以自然提到，不用每次都提）：`,
+    recent || '（還沒聊）',
+    mem.length ? `\n${ch.name} 記得的事：\n${mem.map((x) => '- ' + x.text).join('\n')}` : '',
+  ].join('\n');
+  c.setExtensionPrompt('brume-phone-line', text, 1, 4);
+}
+
+function buildPrompt(ch, msgs, x = {}) {
   const now = new Date();
   const when = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}（週${WEEK[now.getDay()]}）${pad(now.getHours())}:${pad(now.getMinutes())}`;
   const pos = herPositions(msgs);
@@ -92,6 +121,10 @@ function buildPrompt(ch, msgs) {
     '[Brume Phone · LINE]',
     `現在不是在寫劇情正文。${ch.name} 正在用手機的 LINE 跟 ${ch.user} 傳訊息。`,
     `現在時間：${when}（現實時間）`,
+    x.sleep ? `\n【陪睡模式】${ch.user} 躺在床上準備睡了，要你陪她入睡。講話輕、短、慢，像在耳邊說；不問問題、不開新話題、不要讓她更清醒。她說晚安就溫柔收尾。` : '',
+    x.memory?.length ? `\n${ch.name} 記得的事：\n${x.memory.map((m) => '- ' + m.text).join('\n')}` : '',
+    x.notes?.length ? `\n她冰箱上的便條（你貼過的也在裡面）：\n${x.notes.map((n) => `- ${n.text}${n.date ? `（${n.date}）` : ''}${n.done ? '（已完成）' : ''}`).join('\n')}` : '',
+    x.cal?.length ? `\n你們共用的行事曆（之後的）：\n${x.cal.map((e) => `- ${e.date} ${e.title}`).join('\n')}` : '',
     '',
     `最近的 LINE 對話（舊→新；${ch.user} 名字後面的［數字］是她那則訊息的位置，0 是最新的）：`,
     log || '（還沒有對話）',
@@ -105,14 +138,25 @@ function buildPrompt(ch, msgs) {
     '想做的話可以加這些小動作（不用每次都做）：',
     '- 引用她的某一句來回：在回覆最前面獨立一行寫 [[QUOTE|位置]]',
     '- 對她的某則訊息回貼表符：在回覆最後獨立一行寫 [[REACT|位置|表符]]，表符只能是 heart、lol、tear、wow、hug、huh 其中一個，一次最多一個',
-  ].join('\n');
+    x.stickerTags?.length ? `- 傳貼圖：在回覆最後獨立一行寫 [[STICKER|tag]]，tag 只能是：${x.stickerTags.join('、')}。一次最多一張` : '',
+    '- 她明確請你設鬧鐘或提醒時（例如「明天六點叫我」），先答應，再在最後獨立一行寫 [[ALARM|HH:MM|鬧鐘名稱]]，24 小時制，名稱是你留給她的一句話，10 字內、不用 emoji。她沒要求就不要寫',
+    '- 想在她冰箱上貼便條（叮嚀、提醒、想說的話）：最後獨立一行寫 [[NOTE|內容]] 或 [[NOTE|內容|YYYY-MM-DD]]，20 字內。偶爾才貼，貼了就在訊息裡順口提一下',
+    '- 對話裡真的約好的事、重要的日子，可以記上行事曆：最後獨立一行寫 [[CAL|YYYY-MM-DD|標題]]，標題 12 字內。行事曆上已經有的不要再記',
+    '- 想讓她知道你正在做什麼（不是對她說話，像「他去洗澡了」那種旁白小字）：寫 [[MOMENT|一句話]]。很偶爾才用',
+  ].filter((l) => l !== '').join('\n');
 }
 
 function parseReply(raw, ch) {
   let text = raw.replace(/<think>[\s\S]*?<\/think>/gi, '');
-  let quote = null; let react = null;
+  let quote = null; let react = null; let alarm = null; let sticker = null;
+  const notes = []; const cals = []; const moments = [];
   text = text.replace(/\[\[QUOTE\|(\d+)\]\]/i, (_, p) => { quote = +p; return ''; });
   text = text.replace(/\[\[REACT\|(\d+)\|(\w+)\]\]/i, (_, p, id) => { if (REACTS[id]) react = { pos: +p, id }; return ''; });
+  text = text.replace(/\[\[ALARM\|(\d{1,2}:\d{2})\|([^\]]*)\]\]/i, (_, t, l) => { alarm = { time: t.padStart(5, '0'), label: l.trim() }; return ''; });
+  text = text.replace(/\[\[STICKER\|([^\]]+)\]\]|\[貼圖\|([^\]]+)\]/i, (_, a, b) => { sticker = (a || b).trim(); return ''; });
+  text = text.replace(/\[\[NOTE\|([^|\]]+)(?:\|(\d{4}-\d{2}-\d{2}))?\]\]/gi, (_, t, d) => { notes.push({ text: t.trim(), ...(d ? { date: d } : {}) }); return ''; });
+  text = text.replace(/\[\[CAL\|(\d{4}-\d{2}-\d{2})\|([^\]]+)\]\]/gi, (_, d, t) => { cals.push({ date: d, title: t.trim() }); return ''; });
+  text = text.replace(/\[\[MOMENT\|([^\]]+)\]\]/gi, (_, t) => { moments.push(t.trim()); return ''; });
   text = text.replace(/\[\[[^\]]*\]\]/g, '');
   const namePrefix = new RegExp(`^(${reEsc(ch.name)}|${reEsc(ch.user)})\\s*[:：]\\s*`);
   const lines = text
@@ -120,10 +164,10 @@ function parseReply(raw, ch) {
     .map((l) => l.trim().replace(namePrefix, '').replace(/^[「『"]+|[」』"]+$/g, '').trim())
     .filter((l) => l && !/^[-*_]{3,}$/.test(l))
     .slice(0, 6);
-  return { lines, quote, react };
+  return { lines, quote, react, alarm, sticker, notes, cals, moments };
 }
 
-export function createLine({ screen, say, onUnread }) {
+export function createLine({ screen, say, onUnread, onData }) {
   let ch = null;
   let thread = null;
   let bg = null;
@@ -132,6 +176,9 @@ export function createLine({ screen, say, onUnread }) {
   let timer = null;
   let quoting = null;
   let renderToken = 0;
+  let stickerOpen = false;
+  let pendingSticker = null;
+  let msQueue = [];
 
   const save = () => ch && saveThread(ch.key, thread);
   const find = (id) => thread.msgs.find((m) => m.id === id);
@@ -152,7 +199,11 @@ export function createLine({ screen, say, onUnread }) {
     const [t, b] = await Promise.all([loadThread(ch.key), store.get('linebg:' + ch.key).catch(() => null)]);
     if (token !== renderToken) return;
     thread = t; bg = b;
-    if (view === 'list') renderList(); else renderRoom();
+    if (view === 'list') renderList();
+    else if (view === 'memory') renderMemory();
+    else if (view === 'cards') renderCards();
+    else if (view === 'stickers') renderStickers();
+    else renderRoom();
   }
 
   function avatar(cls = '') {
@@ -164,7 +215,7 @@ export function createLine({ screen, say, onUnread }) {
   function renderList() {
     const last = [...thread.msgs].reverse().find((m) => !m.err);
     const n = unreadCount();
-    const lastText = last ? (last.img && !last.text ? (last.me ? '妳傳送了照片' : `${ch.name}傳送了照片`) : last.text) : '';
+    const lastText = !last ? '' : last.sticker ? (last.me ? '妳傳送了貼圖' : `${ch.name}傳送了貼圖`) : last.alarm ? '鬧鐘' : (last.moment || last.notice) ? (last.moment || last.notice) : last.img && !last.text ? (last.me ? '妳傳送了照片' : `${ch.name}傳送了照片`) : last.text;
     screen.innerHTML = `<div class="bp-line bp-line-listv">
       <div class="bp-line-lhead"><span class="bp-back" data-line="home">‹</span><b>聊天</b>
         <span class="bp-line-tools"><i>${IC.search}</i></span></div>
@@ -192,7 +243,11 @@ export function createLine({ screen, say, onUnread }) {
 
   function bubble(m) {
     const react = m.me ? m.hisReact : m.myReact;
-    const body = m.img
+    const body = m.sticker
+      ? `<img class="bp-line-sticker" src="${m.sticker.img}" alt="${esc(m.sticker.tag)}">`
+      : m.alarm
+      ? `<div class="bp-line-alarm" data-alarm="${m.id}"><i>${IC.alarm}</i><div><b>${esc(m.alarm.time)}</b><span>${esc(m.alarm.label)}</span><small>點一下設定鬧鐘</small></div></div>`
+      : m.img
       ? `<img class="bp-line-img" src="${m.img}" alt="">${m.text ? `<div class="bp-line-bub">${esc(m.text)}</div>` : ''}`
       : `<div class="bp-line-bub">${quoteBox(m)}${esc(m.text)}</div>`;
     return `<div class="bp-line-bwrap" data-id="${m.id}">${body}${react ? `<span class="bp-line-react">${REACTS[react]}</span>` : ''}</div>`;
@@ -207,7 +262,10 @@ export function createLine({ screen, say, onUnread }) {
       if (day !== lastDay) { out += `<div class="bp-line-day"><span>${day}</span></div>`; lastDay = day; prevHim = false; prevMe = false; }
       const prev = prevHim; const prevMine = prevMe;
       prevHim = !m.me && !m.err; prevMe = !!m.me;
-      if (m.me) {
+      if (m.moment || m.notice) {
+        out += `<div class="bp-line-moment${m.notice ? ' bp-notice' : ''}"${m.goto ? ` data-goto="${m.goto}"` : ''}><span>${esc(m.moment || m.notice)}</span></div>`;
+        prevHim = false; prevMe = false;
+      } else if (m.me) {
         out += `<div class="bp-line-msg bp-me${prevMine ? ' bp-cont' : ' bp-tail'}"><div class="bp-line-meta">${m.ts <= readUpTo ? '已讀<br>' : ''}${hm(m.ts)}</div>${bubble(m)}</div>`;
       } else if (m.err) {
         out += `<div class="bp-line-sys">${esc(m.text)}　<u data-line="retry">再試一次</u></div>`;
@@ -222,10 +280,11 @@ export function createLine({ screen, say, onUnread }) {
 
   function renderRoom() {
     thread.seen = Date.now(); save(); onUnread?.(0);
-    screen.innerHTML = `<div class="bp-line bp-line-roomv">
+    screen.innerHTML = `<div class="bp-line bp-line-roomv${thread.sleep ? ' bp-line-sleep' : ''}">
       <div class="bp-line-head"><span class="bp-back" data-line="list">‹</span><b>${esc(ch.name)}</b>
         <span class="bp-line-tools"><i data-line="search">${IC.search}</i><i data-line="more">${IC.more}</i></span></div>
-      <div class="bp-line-body"${bg ? ` style="background-image:url('${bg}')"` : ''}>
+      ${thread.sleep ? '<div class="bp-line-sleepbar" data-line="sleep">🌙 陪睡模式中・點這裡結束</div>' : ''}
+      <div class="bp-line-body"${bg && !thread.sleep ? ` style="background-image:url('${bg}')"` : ''}>
         <div class="bp-line-log">${bubbles()}</div>
       </div>
       <div class="bp-line-quoting" hidden></div>
@@ -233,11 +292,14 @@ export function createLine({ screen, say, onUnread }) {
         <i class="bp-line-plus" data-line="photo">${IC.plus}</i>
         <i class="bp-line-plus bp-hide-typing" data-line="photo">${IC.camera}</i>
         <i class="bp-line-plus bp-hide-typing" data-line="photo">${IC.photo}</i>
-        <span class="bp-line-field"><input class="bp-line-input" placeholder="Aa" enterkeyhint="send" autocomplete="off"><i>${IC.smile}</i></span>
+        <span class="bp-line-field"><input class="bp-line-input" placeholder="Aa" enterkeyhint="send" autocomplete="off"><i data-line="stickers">${IC.smile}</i></span>
         <button type="submit" aria-label="傳送">${IC.send}</button></form>
+      <div class="bp-line-stk" hidden></div>
       <input class="bp-line-file" type="file" accept="image/*" hidden>
       <div class="bp-line-pop"></div></div>`;
     showQuoting();
+    stickerOpen = false;
+    showMilestone();
     const log = screen.querySelector('.bp-line-log'); log.scrollTop = log.scrollHeight;
   }
 
@@ -284,6 +346,7 @@ export function createLine({ screen, say, onUnread }) {
         ${m.text ? btn('edit', 'edit', '編輯') : ''}
         ${canRegen ? btn('regen', 'regen', '重新生成') : ''}
         ${m.me && m.text ? btn('resend', 'resend', '改了再傳') : ''}
+        ${m.text ? btn('keep', 'save', '收藏') : ''}
         ${btn('del', 'del', '刪除')}
       </div>`, 'bp-sheet-mode');
   }
@@ -297,8 +360,21 @@ export function createLine({ screen, say, onUnread }) {
     const ta = card.querySelector('textarea'); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
   }
 
+  function askSheet(title, value, action, id = '', hint = '', rows = 3) {
+    const card = pop(`<div class="bp-line-edit"><b>${title}</b>
+      <textarea rows="${rows}">${esc(value)}</textarea>${hint ? `<p class="soft">${hint}</p>` : ''}
+      <div class="bp-line-edit-btns"><button data-line="unpop">取消</button><button class="ok" data-line="${action}" data-id="${id}">好</button></div></div>`, 'bp-center-mode');
+    const ta = card.querySelector('textarea'); ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+  }
+
   function moreMenu() {
     pop(`<div class="bp-line-list">
+      <button data-line="sync" class="bp-line-switch">讓正文知道 LINE 聊了什麼<i class="${thread.sync ? 'on' : ''}"></i></button>
+      <button data-line="sleep">${thread.sleep ? '結束陪睡模式' : '🌙 陪睡模式'}</button>
+      <button data-line="memory">記憶書</button>
+      <button data-line="cards">收藏的字卡</button>
+      <button data-line="stickermgr">管理貼圖</button>
+      <button data-line="alarmset">鬧鐘捷徑設定</button>
       <button data-line="search">搜尋對話</button>
       <button data-line="bg">換聊天背景</button>
       ${bg ? '<button data-line="bgreset">拿掉聊天背景</button>' : ''}
@@ -328,12 +404,106 @@ export function createLine({ screen, say, onUnread }) {
     el.classList.add('bp-flash'); setTimeout(() => el.classList.remove('bp-flash'), 1600);
   }
 
+  // ---------- 其他頁：記憶書、字卡、貼圖管理 ----------
+  function subHead(title, extra = '') {
+    return `<div class="bp-line-head bp-line-subhead"><span class="bp-back" data-line="room">‹</span><b>${title}</b><span class="bp-line-tools">${extra}</span></div>`;
+  }
+
+  async function renderMemory() {
+    const mem = await data.memory.all(ch.key);
+    screen.innerHTML = `<div class="bp-line bp-line-sub">${subHead('記憶書')}
+      <div class="bp-line-subbody">
+        <p class="bp-line-subhint">${esc(ch.name)}從 LINE 裡記住的事。每聊三十則會自己整理一次，也可以手動整理；不對的可以改或刪。</p>
+        <button class="bp-line-wide" data-line="summarize">現在整理一次</button>
+        ${mem.length ? mem.map((m) => `<div class="bp-line-mem"><span>${esc(m.text)}</span><i data-memedit="${m.id}">${IC.edit}</i><i data-memdel="${m.id}">${IC.del}</i></div>`).join('') : '<p class="bp-line-subhint">還沒有記憶。</p>'}
+      </div><div class="bp-line-pop"></div></div>`;
+  }
+
+  async function renderCards() {
+    const cs = await data.cards.all(ch.key);
+    screen.innerHTML = `<div class="bp-line bp-line-sub">${subHead('收藏的字卡')}
+      <div class="bp-line-subbody">
+        ${cs.length ? cs.map((c) => `<div class="bp-line-card"><p>${esc(c.text)}</p><small>—— ${esc(c.who)}・${new Date(c.ts).getMonth() + 1}/${new Date(c.ts).getDate()}</small><i data-carddel="${c.id}">${IC.del}</i></div>`).join('') : '<p class="bp-line-subhint">長按喜歡的那句話，選「收藏」，就會存成字卡放在這裡。</p>'}
+      </div></div>`;
+  }
+
+  async function renderStickers() {
+    const ss = await data.stickers.all();
+    screen.innerHTML = `<div class="bp-line bp-line-sub">${subHead('管理貼圖')}
+      <div class="bp-line-subbody">
+        <p class="bp-line-subhint">貼圖所有角色共用。每張要取一個標籤（例如「抱抱」「生氣」），他會照標籤挑來貼。</p>
+        <div class="bp-line-stkgrid">
+          ${ss.map((x) => `<div class="bp-line-stkitem"><img src="${x.img}" alt=""><span>${esc(x.tag)}</span><i data-stkdel="${x.id}">✕</i></div>`).join('')}
+          <div class="bp-line-stkitem bp-add" data-line="stkadd">${IC.plus}<span>新增</span></div>
+        </div>
+      </div>
+      <input class="bp-line-file" type="file" accept="image/*" hidden>
+      <div class="bp-line-pop"></div></div>`;
+  }
+
+  async function toggleStickers() {
+    const panel = screen.querySelector('.bp-line-stk');
+    if (!panel) return;
+    stickerOpen = !stickerOpen;
+    panel.hidden = !stickerOpen;
+    if (!stickerOpen) return;
+    const ss = await data.stickers.all();
+    panel.innerHTML = ss.length
+      ? `<div class="bp-line-stkgrid">${ss.map((x) => `<div class="bp-line-stkitem" data-stksend="${x.id}"><img src="${x.img}" alt=""></div>`).join('')}</div>`
+      : '<p class="bp-line-subhint">還沒有貼圖。<u data-line="stickermgr">去新增</u></p>';
+  }
+
+  // 里程碑：第 N 則訊息、認識第 N 天
+  function checkMilestones() {
+    const msgs = thread.msgs.filter((m) => !m.err && !m.notice && !m.moment);
+    if (!msgs.length) return;
+    thread.ms ||= [];
+    const n = msgs.length;
+    const days = Math.floor((Date.now() - msgs[0].ts) / 864e5) + 1;
+    for (const k of MS_MSGS) if (n >= k && !thread.ms.includes('m' + k)) { thread.ms.push('m' + k); if (n - k < 5) msQueue.push(`第 ${k} 則訊息`); }
+    for (const k of MS_DAYS) if (days >= k && !thread.ms.includes('d' + k)) { thread.ms.push('d' + k); if (days - k < 2) msQueue.push(`認識第 ${k} 天`); }
+    showMilestone();
+  }
+  function showMilestone() {
+    const room = screen.querySelector('.bp-line-roomv');
+    if (!room || !msQueue.length || room.querySelector('.bp-line-ms')) return;
+    const text = msQueue.shift();
+    room.insertAdjacentHTML('beforeend', `<div class="bp-line-ms" data-line="msclose"><div><i>✦</i><b>${text}</b><span>${esc(ch.user)} 和 ${esc(ch.name)}</span></div></div>`);
+    setTimeout(() => { room.querySelector('.bp-line-ms')?.remove(); showMilestone(); }, 3600);
+  }
+
+  // 記憶書整理：從最近的對話挑出值得記的事
+  async function summarize(manual) {
+    if (!ch) return;
+    const who = ch; const t = thread;
+    const mem = await data.memory.all(who.key);
+    const recent = t.msgs.filter((m) => !m.err).slice(-40).map((m) => `${m.me ? who.user : who.name}：${msgText(m)}`).join('\n');
+    if (!recent) { if (manual) say('還沒有對話可以整理'); return; }
+    if (manual) say('整理中⋯');
+    try {
+      const raw = await generate([
+        '[Brume Phone · 記憶書]',
+        `現在不是在寫劇情正文。請從下面這段 LINE 對話裡，挑出 ${who.name} 應該長久記住的事：${who.user} 說過的喜好、近況、約定、發生的事。`,
+        mem.length ? `已經記過的（不要重複）：\n${mem.map((m) => '- ' + m.text).join('\n')}` : '',
+        '', recent, '',
+        '每條一行、20 字內，用第三人稱寫，最多 3 條。沒有值得記的就只輸出「無」。不要編號、不要其他文字。',
+      ].filter(Boolean).join('\n'));
+      const lines = raw.split('\n').map((l) => l.replace(/^\s*[-*\d.、]+\s*/, '').trim()).filter((l) => l && l !== '無' && l.length <= 60).slice(0, 3);
+      for (const l of lines) await data.memory.add(who.key, l);
+      t.memAt = t.msgs.length; saveThread(who.key, t);
+      if (manual) { say(lines.length ? `記下了 ${lines.length} 件事` : '這段沒有新的要記'); if (view === 'memory') renderMemory(); }
+      syncMain();
+    } catch (e) { if (manual) say(`整理失敗：${e.message || e}`); }
+  }
+
   // ---------- 送出、回覆 ----------
   function send(msg) {
     thread.msgs = thread.msgs.filter((m) => !m.err);
     thread.msgs.push({ id: uid(), me: true, ts: Date.now(), ...msg, ...(quoting ? { quote: quoting } : {}) });
     quoting = null; showQuoting();
-    save(); refreshLog();
+    if (stickerOpen) toggleStickers();
+    checkMilestones();
+    save(); refreshLog(); syncMain();
     scheduleReply();
   }
 
@@ -358,8 +528,12 @@ export function createLine({ screen, say, onUnread }) {
       // 這一輪她傳的最後一張照片給模型看（酒館一次只吃一張圖）
       let image = null;
       for (let i = t.msgs.length - 1; i >= 0 && t.msgs[i].me; i--) if (t.msgs[i].img) { image = t.msgs[i].img; break; }
-      out = parseReply(await generate(buildPrompt(who, t.msgs), image), who);
-      if (!out.lines.length) throw new Error('他沒有回出字來');
+      const today = data.today();
+      const [notes, cal, memory, stks] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key), data.stickers.all()]);
+      const extra = { sleep: t.sleep, notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => x.tag))] };
+      out = parseReply(await generate(buildPrompt(who, t.msgs, extra), image), who);
+      out.stickerObj = out.sticker ? stks.find((x) => x.tag === out.sticker) : null;
+      if (!out.lines.length && !out.stickerObj && !out.alarm && !out.moments.length) throw new Error('他沒有回出字來');
     } catch (e) {
       busy = false;
       t.msgs.push({ id: uid(), me: false, err: true, text: `沒有回覆（${e.message || e}）`, ts: Date.now() });
@@ -378,8 +552,26 @@ export function createLine({ screen, say, onUnread }) {
       if (view === 'room' && currentChar()?.key === who.key) { t.seen = Date.now(); refreshLog(); }
       else onUnread?.(unreadCount());
     }
+    // 文字之後：貼圖、鬧鐘卡、動態、便條與行事曆
+    const extras = [];
+    if (out.stickerObj) extras.push({ sticker: { tag: out.stickerObj.tag, img: out.stickerObj.img } });
+    if (out.alarm) extras.push({ alarm: out.alarm });
+    for (const mo of out.moments) extras.push({ moment: mo });
+    for (const n of out.notes) { await data.notes.add(who.key, { ...n, by: 'him' }); extras.push({ notice: `📌 ${who.name}在便條上寫了：${n.text}`, goto: 'notes' }); }
+    for (const c of out.cals) { await data.cal.add(who.key, { ...c, by: 'him' }); extras.push({ notice: `📅 ${who.name}記上行事曆：${c.date.slice(5).replace('-', '/')} ${c.title}`, goto: 'calendar' }); }
+    for (const x of extras) {
+      if (x.sticker || x.alarm) { busy = 'typing'; if (view === 'room') refreshLog(); await sleep(700); }
+      t.msgs.push({ id: uid(), me: false, text: '', ts: Date.now(), ...x });
+      saveThread(who.key, t);
+      if (view === 'room') refreshLog();
+    }
+    if (out.notes.length || out.cals.length) onData?.();
     busy = false;
     if (view === 'room') refreshLog();
+    if (thread === t) checkMilestones();
+    syncMain();
+    // 每多聊三十則，記憶書自己整理一次
+    if (t.msgs.length - (t.memAt || 0) >= 30) summarize(false);
     // 回覆期間她又傳了新的，就再回一輪
     if (t.msgs[t.msgs.length - 1]?.me) scheduleReply();
   }
@@ -403,7 +595,11 @@ export function createLine({ screen, say, onUnread }) {
   });
 
   // ---------- 點擊 ----------
+  // 這個畫面幾個 App 共用，不是 LINE 的畫面就不要動
+  const mine = () => !!screen.querySelector('.bp-line');
+
   screen.addEventListener('click', async (e) => {
+    if (!mine()) return;
     if (pressed) { pressed = false; return; }
     const react = e.target.closest('[data-react]');
     if (react) {
@@ -425,8 +621,28 @@ export function createLine({ screen, say, onUnread }) {
         save(); refreshLog(); reply();
       }
       if (a === 'del') { thread.msgs = thread.msgs.filter((x) => x.id !== id); save(); unpop(); refreshLog(); }
+      if (a === 'keep') askSheet('收藏成字卡', m.text, 'dokeep', id, '可以刪到只剩想留下的那一段。', 4);
       return;
     }
+    const stk = e.target.closest('[data-stksend]');
+    if (stk) { const x = (await data.stickers.all()).find((y) => y.id === stk.dataset.stksend); if (x) send({ text: '', sticker: { tag: x.tag, img: x.img } }); return; }
+    const stkDel = e.target.closest('[data-stkdel]');
+    if (stkDel) { await data.stickers.remove(stkDel.dataset.stkdel); renderStickers(); return; }
+    const memEdit = e.target.closest('[data-memedit]');
+    if (memEdit) { const m = (await data.memory.all(ch.key)).find((x) => x.id === memEdit.dataset.memedit); if (m) askSheet('改這條記憶', m.text, 'domemedit', m.id); return; }
+    const memDel = e.target.closest('[data-memdel]');
+    if (memDel) { await data.memory.remove(ch.key, memDel.dataset.memdel); syncMain(); renderMemory(); return; }
+    const cardDel = e.target.closest('[data-carddel]');
+    if (cardDel) { await data.cards.remove(ch.key, cardDel.dataset.carddel); renderCards(); return; }
+    const alarm = e.target.closest('[data-alarm]');
+    if (alarm) {
+      const m = find(alarm.dataset.alarm);
+      const url = `shortcuts://run-shortcut?name=${encodeURIComponent(alarmShortcut())}&input=text&text=${encodeURIComponent(`${m.alarm.time}|${m.alarm.label}`)}`;
+      location.href = url;
+      return;
+    }
+    const go = e.target.closest('[data-goto]');
+    if (go) { screen.dispatchEvent(new CustomEvent('bp-openapp', { bubbles: true, detail: go.dataset.goto })); return; }
     const jumpTo = e.target.closest('[data-jump]');
     if (jumpTo) { jump(jumpTo.dataset.jump); return; }
     const a = e.target.closest('[data-line]')?.dataset.line;
@@ -437,6 +653,41 @@ export function createLine({ screen, say, onUnread }) {
     if (a === 'retry') { thread.msgs = thread.msgs.filter((m) => !m.err); save(); refreshLog(); reply(); }
     if (a === 'unquote') { quoting = null; showQuoting(); }
     if (a === 'unpop') unpop();
+    if (a === 'stickers') toggleStickers();
+    if (a === 'sync') {
+      thread.sync = !thread.sync; save(); unpop(); await syncMain();
+      say(thread.sync ? '打開了，正文會知道 LINE 聊了什麼' : '關掉了，正文不會看到 LINE');
+    }
+    if (a === 'sleep') { thread.sleep = !thread.sleep; save(); unpop(); renderRoom(); say(thread.sleep ? '陪睡模式，他會講話輕一點' : '陪睡模式結束了'); }
+    if (a === 'memory') { unpop(); view = 'memory'; renderMemory(); }
+    if (a === 'cards') { unpop(); view = 'cards'; renderCards(); }
+    if (a === 'stickermgr') { unpop(); view = 'stickers'; renderStickers(); }
+    if (a === 'summarize') summarize(true);
+    if (a === 'msclose') e.target.closest('.bp-line-ms')?.remove();
+    if (a === 'stkadd') { const f = screen.querySelector('.bp-line-file'); f.dataset.for = 'sticker'; f.click(); }
+    if (a === 'alarmset') askSheet('鬧鐘捷徑的名字', alarmShortcut(), 'doalarmset', '', '點鬧鐘卡時，會叫 iPhone 的「捷徑」App 跑這個名字的捷徑。<br>做法：捷徑 App → 新增捷徑 → 加「分割文字」（自訂：|）→「從清單取得項目」第一項當時間、最後一項當名稱 →「製作鬧鐘」。捷徑的名字要跟這裡一樣。', 1);
+    if (a === 'dokeep') {
+      const text = screen.querySelector('.bp-line-edit textarea').value.trim();
+      const m = find(e.target.closest('[data-id]').dataset.id);
+      if (text && m) { await data.cards.add(ch.key, { text, who: m.me ? ch.user : ch.name }); say('收進字卡了'); }
+      unpop();
+    }
+    if (a === 'domemedit') {
+      const text = screen.querySelector('.bp-line-edit textarea').value.trim();
+      const id = e.target.closest('[data-id]').dataset.id;
+      if (text) await data.memory.update(ch.key, id, text); else await data.memory.remove(ch.key, id);
+      syncMain(); renderMemory();
+    }
+    if (a === 'dostktag') {
+      const tag = screen.querySelector('.bp-line-edit textarea').value.trim();
+      if (!tag) return;
+      await data.stickers.add({ tag, img: pendingSticker }); pendingSticker = null; renderStickers();
+    }
+    if (a === 'doalarmset') {
+      const v = screen.querySelector('.bp-line-edit textarea').value.trim();
+      try { if (v) localStorage.setItem(ALARM_KEY, v); } catch { /* 存不了就用預設 */ }
+      unpop(); say('記住了');
+    }
     if (a === 'more') moreMenu();
     if (a === 'search') searchPanel();
     if (a === 'photo') { screen.querySelector('.bp-line-file').dataset.for = 'msg'; screen.querySelector('.bp-line-file').click(); }
@@ -462,9 +713,14 @@ export function createLine({ screen, say, onUnread }) {
   });
 
   screen.addEventListener('change', async (e) => {
-    if (!e.target.classList.contains('bp-line-file')) return;
+    if (!mine() || !e.target.classList.contains('bp-line-file')) return;
     const f = e.target.files[0]; e.target.value = '';
     if (!f || !ch) return;
+    if (e.target.dataset.for === 'sticker') {
+      pendingSticker = await store.shrink(f, 320, 0.85, 'image/png');
+      askSheet('這張貼圖的標籤', '', 'dostktag', '', '一兩個字就好，像「抱抱」「哭哭」「生氣」。他會照標籤挑。', 1);
+      return;
+    }
     if (e.target.dataset.for === 'bg') {
       bg = await store.shrink(f, 1290);
       await store.set('linebg:' + ch.key, bg).catch(() => say('背景存不下'));
@@ -481,8 +737,10 @@ export function createLine({ screen, say, onUnread }) {
   });
 
   screen.addEventListener('submit', (e) => {
+    if (!mine()) return;
     e.preventDefault();
     const inp = screen.querySelector('.bp-line-input');
+    if (!inp) return;
     const text = inp.value.trim();
     if (!text || !ch) return;
     inp.value = ''; inp.closest('.bp-line-bar').classList.remove('bp-typing-now');
