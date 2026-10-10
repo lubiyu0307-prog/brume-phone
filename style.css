@@ -777,7 +777,7 @@
   #bp-overlay { bottom: 0; right: 0; }
   /* 手機上不靠外框置中：外框高度在某些主題下會被算成 0，手機就只剩上半截 */
   .bp-phone {
-    position: fixed; top: var(--bp-top, 0px); left: 0;
+    position: fixed; top: var(--bp-top, 0px); left: var(--bp-left, 0px);
     width: var(--bp-w, 100vw); height: var(--bp-h, 100dvh);
     border-radius: 0; box-shadow: none;
   }

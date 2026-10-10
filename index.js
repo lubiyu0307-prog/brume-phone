@@ -10,7 +10,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.7.1';
+const VERSION = '0.7.2';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -159,16 +159,27 @@ function build() {
   // 掛在 <html> 底下，不放進 <body>：手機版酒館和一些主題會在 body 裡加 transform／filter，
   // 那會把 position:fixed 關在一個小框裡（v0.1.1 在 iPhone 上只剩半截就是這樣）
   document.documentElement.appendChild(overlay);
+  // 鋪滿看得到的範圍。外層如果有 transform（酒館的 <html>、Claude App 的預覽框都有），
+  // fixed 的原點就不是螢幕左上角，所以放好之後量一次實際位置，差多少補多少
   const fit = () => {
     const vv = window.visualViewport;
-    overlay.style.setProperty('--bp-h', `${Math.round(vv ? vv.height : innerHeight)}px`);
-    overlay.style.setProperty('--bp-w', `${Math.round(vv ? vv.width : innerWidth)}px`);
-    overlay.style.top = `${Math.round(vv ? vv.offsetTop : 0)}px`;
-    overlay.style.setProperty('--bp-top', `${Math.round(vv ? vv.offsetTop : 0)}px`);
-    overlay.style.left = `${Math.round(vv ? vv.offsetLeft : 0)}px`;
+    const W = Math.round(vv ? vv.width : innerWidth); const H = Math.round(vv ? vv.height : innerHeight);
+    const X = Math.round(vv ? vv.offsetLeft : 0); const Y = Math.round(vv ? vv.offsetTop : 0);
+    overlay.style.setProperty('--bp-w', `${W}px`); overlay.style.setProperty('--bp-h', `${H}px`);
+    overlay.style.left = `${X}px`; overlay.style.top = `${Y}px`;
+    overlay.style.setProperty('--bp-left', `${X}px`); overlay.style.setProperty('--bp-top', `${Y}px`);
+    if (!overlay.classList.contains('bp-open')) return; // 沒打開時量不到
+    const o = overlay.getBoundingClientRect();
+    overlay.style.left = `${2 * X - o.left}px`; overlay.style.top = `${2 * Y - o.top}px`;
+    const ph = overlay.querySelector('.bp-phone');
+    if (getComputedStyle(ph).position === 'fixed') {
+      const r = ph.getBoundingClientRect();
+      overlay.style.setProperty('--bp-left', `${2 * X - r.left}px`); overlay.style.setProperty('--bp-top', `${2 * Y - r.top}px`);
+    }
   };
   fit();
   addEventListener('resize', fit);
+  addEventListener('scroll', fit, { passive: true }); // 外層有 transform 時，網頁一捲手機會跟著跑
   window.visualViewport?.addEventListener('resize', fit);
 
   const phone = overlay.querySelector('.bp-phone');
@@ -342,7 +353,7 @@ function build() {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
   return {
-    open() { fit(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); },
+    open() { closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); },
     close,
   };
   function close() { overlay.classList.remove('bp-open'); }
@@ -388,6 +399,7 @@ function launcher(phone) {
   };
   place();
   addEventListener('resize', place);
+  addEventListener('scroll', place, { passive: true });
   window.visualViewport?.addEventListener('resize', place);
   setTimeout(place, 1000); // 酒館載完版面可能又動一次
 
