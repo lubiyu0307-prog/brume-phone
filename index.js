@@ -2,7 +2,7 @@
 // 只有畫面：鎖定畫面、兩頁主畫面、換桌布、換照片小工具。App 點下去還不會開。
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.1.4';
+const VERSION = '0.1.5';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -21,6 +21,7 @@ const ICON = {
   prev: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zM20 6v12L9.5 12z"/></svg>',
   next: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zM4 6v12l10.5-6z"/></svg>',
   add: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  x: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>',
   wifi: '<svg viewBox="0 0 16 12" fill="currentColor"><path d="M8 9.5a1.3 1.3 0 1 1 0 2.6 1.3 1.3 0 0 1 0-2.6zM3.8 7.2a6 6 0 0 1 8.4 0l-1.2 1.2a4.3 4.3 0 0 0-6 0zM1.2 4.6a9.6 9.6 0 0 1 13.6 0l-1.2 1.2a7.9 7.9 0 0 0-11.2 0z"/></svg>',
   battery: '<svg viewBox="0 0 27 12" fill="none" stroke="currentColor"><rect x=".5" y=".5" width="23" height="11" rx="3.2" opacity=".5"/><rect x="2" y="2" width="15" height="8" rx="2" fill="currentColor" stroke="none"/><path d="M25 4.2v3.6" stroke-width="1.4" stroke-linecap="round" opacity=".5"/></svg>',
 };
@@ -127,6 +128,7 @@ function build() {
         <div class="bp-hint">往上滑或點一下解鎖</div>
       </div>
     </div>
+    <div class="bp-close" title="收起手機">${ICON.x}</div>
     <div class="bp-toast"></div>
     <div class="bp-sheet">
       <h3>設定</h3>
@@ -215,7 +217,7 @@ function build() {
       say('這個 App 還在做 ☁︎');
       return;
     }
-    if (e.target.closest('.bp-homebar')) close();
+    if (e.target.closest('.bp-homebar') || e.target.closest('.bp-close')) close();
   });
 
   // 選照片：縮到 1080 寬再存，免得塞爆瀏覽器空間
