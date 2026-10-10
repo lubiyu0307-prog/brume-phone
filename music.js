@@ -51,7 +51,7 @@ async function itunes(term) {
 }
 
 /** 他說的歌真的存在嗎？存在就回傳整理好的歌，查不到回 null（模型很會編歌） */
-async function verify(title, artist) {
+export async function verify(title, artist) {
   let res = await itunes(`${title} ${artist}`).catch(() => []);
   if (!res.length) res = await itunes(title).catch(() => []);
   const nt = norm(title); const na = norm(artist);

@@ -4,12 +4,13 @@
 import { createLine, syncMain } from './line.js';
 import { createNotes, createCalendar } from './apps.js';
 import { createThreads } from './threads.js';
+import { createHisPhone } from './hisphone.js';
 import { currentChar, ctx, lite } from './st.js';
 import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.6.1';
+const VERSION = '0.7.0';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -23,6 +24,7 @@ const ICON = {
   calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
   notes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="4.5" y="3.5" width="15" height="17" rx="3"/><path d="M8 9h8M8 12.5h8M8 16h5"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
+  swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>',
   torch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 3h8v4l-2 3v11h-4V10L8 7z"/><path d="M12 13v2"/></svg>',
   play: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13l10.5-6.5z"/></svg>',
   pause: '<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6.5" y="5" width="4" height="14" rx="1"/><rect x="13.5" y="5" width="4" height="14" rx="1"/></svg>',
@@ -132,11 +134,12 @@ function build() {
           <div class="bp-weather"><b>☁︎ 24°</b><br>多雲<br>高 27° 低 21°</div>
           <div class="bp-lock-chips"><div class="bp-round">${ICON.music}</div></div>
         </div>
-        <div class="bp-lock-tools"><div class="bp-round">${ICON.torch}</div><div class="bp-round">${ICON.camera}</div></div>
+        <div class="bp-lock-tools"><div class="bp-round bp-swap" data-act="his" title="偷看他的手機">${ICON.swap}</div><div class="bp-round">${ICON.camera}</div></div>
         <div class="bp-hint">往上滑或點一下解鎖</div>
       </div>
     </div>
     <div class="bp-appscreen"></div>
+    <div class="bp-his"></div>
     <div class="bp-yt"></div>
     <div class="bp-close" title="收起手機">${ICON.x}</div>
     <div class="bp-toast"></div>
@@ -144,6 +147,7 @@ function build() {
       <h3>設定</h3>
       <button data-act="lite" class="bp-switchrow">省 token 模式<i></i></button>
       <p class="bp-sheet-note">開著：只送角色卡、被叫到的世界書和正文最後幾則，比正文一次少很多。關掉：送整份預設和整段正文，跟正文一樣貴，但他看得最完整。傳照片給他時一律走完整的。</p>
+      <button data-act="his">偷看他的手機</button>
       <button data-act="wall">換桌布</button>
       <button data-act="wall-reset">用回預設桌布</button>
       <button data-act="photos-reset">清掉小工具照片</button>
@@ -201,6 +205,7 @@ function build() {
   lock.addEventListener('pointerup', (e) => {
     if (y0 === null) return;
     const dy = y0 - e.clientY; y0 = null;
+    if (e.target.closest('[data-act]')) return; // 點的是鎖定畫面上的按鈕，不是要解鎖
     if (dy > 40 || Math.abs(dy) < 8) { lock.classList.add('bp-gone'); phone.classList.remove('bp-locked'); }
   });
 
@@ -237,7 +242,7 @@ function build() {
   // 點擊
   phone.addEventListener('click', (e) => {
     if (dragged) { dragged = false; return; }
-    if (e.target.closest('.bp-appscreen')) return; // App 裡面的點擊由各個 App 自己處理
+    if (e.target.closest('.bp-appscreen, .bp-his')) return; // App 裡面的點擊由各個 App 自己處理
     const slot = e.target.closest('[data-slot]');
     if (slot) { pickTarget = slot.dataset.slot; file.click(); return; }
     const act = e.target.closest('[data-act]');
@@ -247,6 +252,7 @@ function build() {
       if (a === 'wall-reset') { delete state.wall; save(state); applyWall(); say('用回預設桌布了'); }
       if (a === 'photos-reset') { state.photos = {}; save(state); rebuild(); say('照片清掉了'); }
       if (a === 'close') sheet.classList.remove('bp-show');
+      if (a === 'his') { sheet.classList.remove('bp-show'); his.open(); }
       if (a === 'lite') { lite.set(!lite.get()); showLite(); say(lite.get() ? '省 token 模式開了' : '改用完整模式'); }
       return;
     }
@@ -289,6 +295,7 @@ function build() {
   const notes = createNotes({ screen: appScreen, say });
   const calendar = createCalendar({ screen: appScreen, say });
   const threads = createThreads({ screen: appScreen, say });
+  const his = createHisPhone({ host: overlay.querySelector('.bp-his'), say, onExit: () => say('還給他了，他沒發現') });
   // LINE 裡點「他貼了便條／記上行事曆」那行小字，直接跳到那個 App
   appScreen.addEventListener('bp-openapp', (e) => { const app = { notes, calendar }[e.detail]; if (app) openApp(app); });
 
@@ -335,7 +342,7 @@ function build() {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
   return {
-    open() { fit(); closeApp(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); },
+    open() { fit(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); },
     close,
   };
   function close() { overlay.classList.remove('bp-open'); }
