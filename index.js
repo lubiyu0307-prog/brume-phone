@@ -2,6 +2,7 @@
 // 只有畫面：鎖定畫面、兩頁主畫面、換桌布、換照片小工具。App 點下去還不會開。
 
 const KEY = 'brume-phone:v1';
+const VERSION = '0.1.3';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -133,6 +134,7 @@ function build() {
       <button data-act="wall-reset">用回預設桌布</button>
       <button data-act="photos-reset">清掉小工具照片</button>
       <button class="bp-cancel" data-act="close">完成</button>
+      <div class="bp-ver">Brume Phone v${VERSION}</div>
     </div>
     <input type="file" accept="image/*" hidden>
   </div></div>`);
@@ -144,6 +146,7 @@ function build() {
     overlay.style.setProperty('--bp-h', `${Math.round(vv ? vv.height : innerHeight)}px`);
     overlay.style.setProperty('--bp-w', `${Math.round(vv ? vv.width : innerWidth)}px`);
     overlay.style.top = `${Math.round(vv ? vv.offsetTop : 0)}px`;
+    overlay.style.setProperty('--bp-top', `${Math.round(vv ? vv.offsetTop : 0)}px`);
     overlay.style.left = `${Math.round(vv ? vv.offsetLeft : 0)}px`;
   };
   fit();
