@@ -267,7 +267,34 @@ function launcher(phone) {
   if (state.btn) { btn.style.right = state.btn.r; btn.style.bottom = state.btn.b; }
 }
 
+// 魔杖選單（輸入框左邊那支）裡也放一個入口，手機上按鈕被擋住時從這裡開
+function wandEntry(phone) {
+  const menu = document.getElementById('extensionsMenu');
+  if (!menu) return false;
+  if (document.getElementById('bp-wand')) return true;
+  const item = $(`<div id="bp-wand" class="list-group-item flex-container flexGap5 interactable" tabindex="0">
+    <div class="fa-solid fa-mobile-screen extensionsMenuExtensionButton"></div><span>Brume Phone</span></div>`);
+  item.addEventListener('click', () => { menu.style.display = 'none'; phone.open(); });
+  menu.appendChild(item);
+  return true;
+}
+
+// 存下來的按鈕位置如果跑出螢幕外（例如在電腦上拖過），拉回來
+function keepOnScreen(btn) {
+  const r = btn.getBoundingClientRect();
+  if (r.right > innerWidth || r.left < 0 || r.bottom > innerHeight || r.top < 0) {
+    btn.style.right = '14px'; btn.style.bottom = '140px';
+  }
+}
+
 (function init() {
   if (document.getElementById('bp-launcher')) return;
-  launcher(build());
+  const phone = build();
+  launcher(phone);
+  keepOnScreen(document.getElementById('bp-launcher'));
+  addEventListener('resize', () => keepOnScreen(document.getElementById('bp-launcher')));
+  if (!wandEntry(phone)) {
+    let n = 0;
+    const t = setInterval(() => { if (wandEntry(phone) || ++n > 40) clearInterval(t); }, 500);
+  }
 })();

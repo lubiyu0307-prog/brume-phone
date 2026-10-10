@@ -2,7 +2,7 @@
 
 /* ---------- 入口按鈕 ---------- */
 #bp-launcher {
-  position: fixed; right: 14px; bottom: 96px; z-index: 30000;
+  position: fixed; right: 14px; bottom: 140px; z-index: 30000;
   width: 46px; height: 46px; border-radius: 15px;
   display: grid; place-items: center; cursor: pointer;
   background: rgba(240, 236, 230, .55); color: #5c574f;
