@@ -4,12 +4,12 @@
 import { createLine, syncMain } from './line.js';
 import { createNotes, createCalendar } from './apps.js';
 import { createThreads } from './threads.js';
-import { currentChar, ctx } from './st.js';
+import { currentChar, ctx, lite } from './st.js';
 import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.6.0';
+const VERSION = '0.6.1';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -142,6 +142,8 @@ function build() {
     <div class="bp-toast"></div>
     <div class="bp-sheet">
       <h3>設定</h3>
+      <button data-act="lite" class="bp-switchrow">省 token 模式<i></i></button>
+      <p class="bp-sheet-note">開著：只送角色卡、被叫到的世界書和正文最後幾則，比正文一次少很多。關掉：送整份預設和整段正文，跟正文一樣貴，但他看得最完整。傳照片給他時一律走完整的。</p>
       <button data-act="wall">換桌布</button>
       <button data-act="wall-reset">用回預設桌布</button>
       <button data-act="photos-reset">清掉小工具照片</button>
@@ -208,6 +210,8 @@ function build() {
     overlay.querySelectorAll('.bp-dots i').forEach((d, k) => d.classList.toggle('bp-on', k === i));
   }, { passive: true });
 
+  const showLite = () => sheet.querySelector('[data-act="lite"] i').classList.toggle('on', lite.get());
+
   // 點圓點跳頁
   const goPage = (i) => pages.scrollTo({ left: i * pages.clientWidth, behavior: 'smooth' });
   overlay.querySelectorAll('.bp-dots i').forEach((d, i) => d.addEventListener('click', () => goPage(i)));
@@ -243,6 +247,7 @@ function build() {
       if (a === 'wall-reset') { delete state.wall; save(state); applyWall(); say('用回預設桌布了'); }
       if (a === 'photos-reset') { state.photos = {}; save(state); rebuild(); say('照片清掉了'); }
       if (a === 'close') sheet.classList.remove('bp-show');
+      if (a === 'lite') { lite.set(!lite.get()); showLite(); say(lite.get() ? '省 token 模式開了' : '改用完整模式'); }
       return;
     }
     const mw = e.target.closest('[data-mw]');
@@ -252,7 +257,7 @@ function build() {
     }
     const open = e.target.closest('[data-open]');
     if (open) {
-      if (open.dataset.open === 'settings') { sheet.classList.add('bp-show'); return; }
+      if (open.dataset.open === 'settings') { showLite(); sheet.classList.add('bp-show'); return; }
       if (open.dataset.open === 'line') { openApp(line); return; }
       if (open.dataset.open === 'music') { openApp(music); return; }
       if (open.dataset.open === 'notes') { openApp(notes); return; }

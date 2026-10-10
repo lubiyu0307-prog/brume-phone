@@ -664,6 +664,12 @@
   display: block; width: 100%; margin: 8px 0; padding: 13px; border: 0; border-radius: 14px;
   background: rgba(255, 255, 255, .8); color: #4b463f; font-size: 15px; font-family: inherit;
 }
+.bp-switchrow { display: flex !important; justify-content: space-between; align-items: center; }
+.bp-switchrow i { width: 44px; height: 26px; border-radius: 13px; background: #d6d1c8; position: relative; transition: background .2s; }
+.bp-switchrow i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .2s; }
+.bp-switchrow i.on { background: #8fb98a; }
+.bp-switchrow i.on::after { left: 21px; }
+.bp-sheet-note { font-size: 11.5px; color: #8a8378; line-height: 1.6; margin: 0 4px 6px; }
 .bp-sheet button.bp-cancel { background: transparent; color: #8a8378; }
 .bp-ver { text-align: center; font-size: 11px; color: #a39b8f; margin-top: 4px; }
 
