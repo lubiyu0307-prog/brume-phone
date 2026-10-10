@@ -313,6 +313,7 @@ export function createMusic({ screen, ytHost, say }) {
       const shown = screen.querySelector('.bp-mu-meta b')?.textContent;
       const modeShown = !!screen.querySelector('.bp-mu-ytslot') ? 'yt' : (screen.querySelector('.bp-mu-bar') ? 'preview' : null);
       if (shown !== player.song.title || modeShown !== player.mode) renderNow();
+      else if (!player.mode && player.error) { const h = screen.querySelector('.bp-mu-hint'); if (h) h.textContent = player.error; }
     } else {
       const m = screen.querySelector('.bp-mu-mini');
       const fresh = mini();
