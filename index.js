@@ -136,7 +136,19 @@ function build() {
     </div>
     <input type="file" accept="image/*" hidden>
   </div></div>`);
-  document.body.appendChild(overlay);
+  // 掛在 <html> 底下，不放進 <body>：手機版酒館和一些主題會在 body 裡加 transform／filter，
+  // 那會把 position:fixed 關在一個小框裡（v0.1.1 在 iPhone 上只剩半截就是這樣）
+  document.documentElement.appendChild(overlay);
+  const fit = () => {
+    const vv = window.visualViewport;
+    overlay.style.setProperty('--bp-h', `${Math.round(vv ? vv.height : innerHeight)}px`);
+    overlay.style.setProperty('--bp-w', `${Math.round(vv ? vv.width : innerWidth)}px`);
+    overlay.style.top = `${Math.round(vv ? vv.offsetTop : 0)}px`;
+    overlay.style.left = `${Math.round(vv ? vv.offsetLeft : 0)}px`;
+  };
+  fit();
+  addEventListener('resize', fit);
+  window.visualViewport?.addEventListener('resize', fit);
 
   const phone = overlay.querySelector('.bp-phone');
   const lock = overlay.querySelector('.bp-lock');
@@ -222,7 +234,7 @@ function build() {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
   return {
-    open() { lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); },
+    open() { fit(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); },
     close,
   };
   function close() { overlay.classList.remove('bp-open'); }
@@ -246,7 +258,7 @@ function shrink(fileObj, max) {
 
 function launcher(phone) {
   const btn = $(`<div id="bp-launcher" title="Brume Phone">${ICON.phone}</div>`);
-  document.body.appendChild(btn);
+  document.documentElement.appendChild(btn);
   // 可以拖著移位置，短按才開手機
   let start = null; let moved = false;
   btn.addEventListener('pointerdown', (e) => {

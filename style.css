@@ -2,7 +2,7 @@
 
 /* ---------- 入口按鈕 ---------- */
 #bp-launcher {
-  position: fixed; right: 14px; bottom: 140px; z-index: 30000;
+  position: fixed; right: 14px; bottom: 140px; z-index: 2147482999;
   width: 46px; height: 46px; border-radius: 15px;
   display: grid; place-items: center; cursor: pointer;
   background: rgba(240, 236, 230, .55); color: #5c574f;
@@ -16,7 +16,9 @@
 /* ---------- 外框 ---------- */
 #bp-overlay, #bp-overlay *, #bp-overlay *::before, #bp-overlay *::after { box-sizing: border-box; }
 #bp-overlay {
-  position: fixed; inset: 0; z-index: 30001;
+  position: fixed; top: 0; left: 0; z-index: 2147483000;
+  width: var(--bp-w, 100vw); height: var(--bp-h, 100vh);
+  transform: none; filter: none; isolation: isolate;
   display: none; align-items: center; justify-content: center;
   background: rgba(20, 18, 16, .45);
 }
@@ -28,7 +30,7 @@
   --ink: #fbfaf7;
   --ink-soft: rgba(255, 255, 255, .78);
   position: relative; overflow: hidden;
-  width: min(390px, 100vw); height: min(844px, 100dvh);
+  width: min(390px, var(--bp-w, 100vw)); height: min(844px, calc(var(--bp-h, 100vh) - 40px));
   border-radius: 46px;
   box-shadow: 0 0 0 10px #1d1c1a, 0 30px 60px rgba(0, 0, 0, .45);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Helvetica Neue", sans-serif;
@@ -36,7 +38,7 @@
   -webkit-tap-highlight-color: transparent;
 }
 @media (max-width: 500px) {
-  .bp-phone { width: 100vw; height: 100dvh; border-radius: 0; box-shadow: none; }
+  .bp-phone { width: var(--bp-w, 100vw); height: var(--bp-h, 100vh); border-radius: 0; box-shadow: none; }
 }
 .bp-wall {
   position: absolute; inset: 0; background-size: cover; background-position: center;
@@ -46,7 +48,7 @@
 .bp-status {
   position: absolute; top: 0; left: 0; right: 0; height: 50px; z-index: 5;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 14px 30px 0; font-size: 15px; font-weight: 600; letter-spacing: .2px;
+  padding: calc(14px + env(safe-area-inset-top)) 30px 0; font-size: 15px; font-weight: 600; letter-spacing: .2px;
   text-shadow: 0 1px 3px rgba(0, 0, 0, .15);
 }
 .bp-status .bp-sys { display: flex; gap: 6px; align-items: center; }
@@ -79,7 +81,7 @@
 .bp-hint { text-align: center; font-size: 12px; color: var(--ink-soft); margin-top: 14px; }
 
 /* ---------- 主畫面 ---------- */
-.bp-home { position: absolute; inset: 0; z-index: 2; overflow: hidden; padding-top: 54px; display: flex; flex-direction: column; transition: opacity .35s, transform .35s; }
+.bp-home { position: absolute; inset: 0; z-index: 2; overflow: hidden; padding-top: calc(54px + env(safe-area-inset-top)); display: flex; flex-direction: column; transition: opacity .35s, transform .35s; }
 .bp-locked .bp-home { opacity: 0; transform: scale(.94); pointer-events: none; }
 .bp-pages {
   flex: 1; display: flex; overflow-x: auto; overflow-y: hidden;
