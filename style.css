@@ -212,7 +212,7 @@
   position: absolute; bottom: -10px; font-size: 13px; line-height: 1; padding: 3px 5px; border-radius: 10px;
   background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
 }
-.bp-me .bp-line-react { left: -8px; }
+.bp-me .bp-line-react { right: -6px; }
 .bp-him .bp-line-react { right: -8px; }
 .bp-line-msg:has(.bp-line-react) { margin-bottom: 14px; }
 .bp-line-qbox {
@@ -305,6 +305,75 @@
 .bp-line-bar button {
   width: 38px; height: 38px; border: 0; border-radius: 50%; background: #8fb98a; color: #fff; font-size: 15px; cursor: pointer;
 }
+
+
+/* ---- 真的 LINE 的樣子 ---- */
+.bp-line { --line-green: #06c755; --line-bub: #8de055; --line-bg: #8cabd8; font-family: -apple-system, "Helvetica Neue", "PingFang TC", sans-serif; }
+.bp-appscreen:has(.bp-line) { background: #fff; }
+.bp-line-listv { background: #fff; }
+.bp-line-lhead { display: grid; grid-template-columns: 36px 1fr auto; align-items: center; height: 50px; padding: 0 8px 0 4px; }
+.bp-line-lhead b { font-size: 22px; font-weight: 700; color: #111; }
+.bp-line-lsearch {
+  margin: 4px 14px 8px; height: 36px; border-radius: 10px; background: #f2f3f5; color: #9a9ea6;
+  display: flex; align-items: center; gap: 6px; padding: 0 10px; font-size: 15px;
+}
+.bp-line-lsearch svg { width: 17px; height: 17px; }
+.bp-line-rows { flex: 1; overflow-y: auto; }
+.bp-line-row { padding: 10px 16px; }
+.bp-line-row-name { font-size: 16px; font-weight: 600; color: #111; }
+.bp-line-row-last { color: #8b8f97; font-size: 13.5px; }
+.bp-line-row-time { color: #a6a9b0; }
+.bp-line-badge { background: var(--line-green); font-weight: 600; }
+.bp-line-av { background: #c9d2de; }
+.bp-line-tabs {
+  display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid #ececec; background: #fff;
+  padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+}
+.bp-line-tabs span { display: flex; flex-direction: column; align-items: center; gap: 2px; color: #b4b7bd; font-size: 10px; }
+.bp-line-tabs span.on { color: #111; }
+.bp-line-tabs svg { width: 25px; height: 25px; }
+.bp-line-tabs i { font-style: normal; }
+
+.bp-line-roomv { background: var(--line-bg); }
+.bp-line-roomv .bp-line-head { background: var(--line-bg); border-bottom: 0; color: #1d2633; }
+.bp-line-roomv .bp-line-head b { color: #1d2633; }
+.bp-line-roomv .bp-back, .bp-line-roomv .bp-line-tools i { color: #1d2633; }
+.bp-line-day span { background: rgba(0, 0, 0, .15); color: #fff; font-size: 11.5px; padding: 3px 10px; }
+.bp-line-meta { color: #f4f7fb; font-size: 10.5px; text-shadow: none; }
+.bp-line-bub { border-radius: 19px; font-size: 15.5px; padding: 8px 13px; line-height: 1.42; }
+.bp-me .bp-line-bub { background: var(--line-bub); color: #000; border-bottom-right-radius: 19px; }
+.bp-him .bp-line-bub { background: #fff; color: #000; border-bottom-left-radius: 19px; }
+.bp-line-av.sm { width: 36px; height: 36px; }
+.bp-line-msg { margin: 4px 0; }
+.bp-line-msg.bp-tail { margin-top: 10px; }
+/* 一串的第一則有小尾巴 */
+.bp-tail .bp-line-bwrap > .bp-line-bub:first-child, .bp-tail > .bp-line-bub.bp-typing { position: relative; }
+.bp-him.bp-tail .bp-line-bwrap > .bp-line-bub:first-child::before, .bp-him.bp-tail > .bp-line-bub.bp-typing::before {
+  content: ""; position: absolute; top: 0; left: -6px; width: 14px; height: 14px; background: #fff;
+  clip-path: path("M14 0 L0 0 Q8 2 10 10 Z");
+}
+.bp-me.bp-tail .bp-line-bwrap > .bp-line-bub:first-child::after {
+  content: ""; position: absolute; top: 0; right: -6px; width: 14px; height: 14px; background: var(--line-bub);
+  clip-path: path("M0 0 L14 0 Q6 2 4 10 Z");
+}
+.bp-line-qbox { color: #444; border-left-color: rgba(0, 0, 0, .25); }
+.bp-line-sys { color: #fff; }
+.bp-line-bar {
+  background: #fff; gap: 4px; padding: 7px 8px calc(7px + env(safe-area-inset-bottom)); border-top: 0;
+}
+.bp-line-plus { color: #3d4249; width: 34px; }
+.bp-line-plus svg { width: 25px; height: 25px; }
+.bp-line-bar.bp-typing-now .bp-hide-typing { display: none; }
+.bp-line-field { flex: 1; display: flex; align-items: center; background: #f2f3f5; border-radius: 19px; padding-right: 8px; min-width: 0; }
+.bp-line-field .bp-line-input { background: none; height: 36px; border-radius: 19px; padding: 0 12px; }
+.bp-line-field i { color: #5d636b; display: grid; place-items: center; }
+.bp-line-field i svg { width: 22px; height: 22px; }
+.bp-line-bar button { width: 34px; height: 34px; background: none; color: var(--line-green); display: none; padding: 0; }
+.bp-line-bar.bp-typing-now button { display: grid; place-items: center; }
+.bp-line-bar button svg { width: 25px; height: 25px; }
+.bp-line-quoting { background: #f2f3f5; }
+.bp-line-reacts span.on { background: rgba(6, 199, 85, .18); }
+.bp-line-edit-btns button.ok { background: var(--line-green); }
 
 /* ---------- 關閉鍵（鎖定畫面、主畫面都看得到） ---------- */
 .bp-close {

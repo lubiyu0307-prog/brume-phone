@@ -26,7 +26,29 @@ const IC = {
   search: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg>',
   more: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',
   plus: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 8h3l1.6-2.5h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  smile: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M8.5 14.5c1.8 2 5.2 2 7 0"/><circle cx="9.3" cy="10" r=".9" fill="currentColor" stroke="none"/><circle cx="14.7" cy="10" r=".9" fill="currentColor" stroke="none"/></svg>',
+  send: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4 21 12 3.4 3.6l.1 6.5L15 12l-11.5 1.9z"/></svg>',
   photo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><circle cx="9" cy="10.5" r="1.8"/><path d="m21 16-5-5-8 9"/></svg>',
+};
+
+// 聊天列表的時間：今天顯示時刻，昨天顯示「昨天」，更早顯示日期
+function listTime(ts) {
+  const d = new Date(ts); const now = new Date();
+  const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const diff = (day(now) - day(d)) / 864e5;
+  if (diff === 0) return hm(ts);
+  if (diff === 1) return '昨天';
+  if (diff < 7) return `星期${WEEK[d.getDay()]}`;
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+
+const TAB = {
+  home: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M4 10.5 12 4l8 6.5V20H4z"/><path d="M10 20v-5h4v5"/></svg>',
+  chat: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3.5c-5 0-9 3.2-9 7.2 0 3.6 3.2 6.6 7.5 7.1l-.5 2.4c-.1.4.3.7.7.5 3.3-1.9 7.3-4.7 8.6-6.7.9-1 1.7-2.1 1.7-3.3 0-4-4-7.2-9-7.2z"/></svg>',
+  voom: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="4" width="17" height="16" rx="4"/><path d="M10 9v6l5-3z"/></svg>',
+  news: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M8 9h8M8 12.5h8M8 16h5"/></svg>',
+  wallet: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><rect x="3.5" y="6" width="17" height="13" rx="3"/><path d="M16 12.5h4.5M7 6l8-2.5V6"/></svg>',
 };
 
 /** 現在開著的角色；沒選角色或在群組聊天時回 null */
@@ -168,14 +190,23 @@ export function createLine({ screen, say, onUnread }) {
   function renderList() {
     const last = [...thread.msgs].reverse().find((m) => !m.err);
     const n = unreadCount();
-    screen.innerHTML = `<div class="bp-line">
-      <div class="bp-line-head"><span class="bp-back" data-line="home">‹</span><b>聊天</b><span></span></div>
-      <div class="bp-line-row" data-line="room">
-        ${avatar()}
-        <div class="bp-line-row-mid"><div class="bp-line-row-name">${esc(ch.name)}</div>
-          <div class="bp-line-row-last">${last ? esc(last.img && !last.text ? (last.me ? '妳傳了一張照片' : '傳了一張照片') : last.text) : '傳個訊息給他吧'}</div></div>
-        <div class="bp-line-row-end"><div class="bp-line-row-time">${last ? hm(last.ts) : ''}</div>
-          ${n ? `<span class="bp-line-badge">${n}</span>` : ''}</div>
+    const lastText = last ? (last.img && !last.text ? (last.me ? '妳傳送了照片' : `${ch.name}傳送了照片`) : last.text) : '';
+    screen.innerHTML = `<div class="bp-line bp-line-listv">
+      <div class="bp-line-lhead"><span class="bp-back" data-line="home">‹</span><b>聊天</b>
+        <span class="bp-line-tools"><i>${IC.search}</i></span></div>
+      <div class="bp-line-lsearch">${IC.search}<span>搜尋</span></div>
+      <div class="bp-line-rows">
+        <div class="bp-line-row" data-line="room">
+          ${avatar()}
+          <div class="bp-line-row-mid"><div class="bp-line-row-name">${esc(ch.name)}</div>
+            <div class="bp-line-row-last">${esc(lastText)}</div></div>
+          <div class="bp-line-row-end"><div class="bp-line-row-time">${last ? listTime(last.ts) : ''}</div>
+            ${n ? `<span class="bp-line-badge">${n}</span>` : ''}</div>
+        </div>
+      </div>
+      <div class="bp-line-tabs">
+        <span>${TAB.home}<i>主頁</i></span><span class="on">${TAB.chat}<i>聊天</i></span>
+        <span>${TAB.voom}<i>VOOM</i></span><span>${TAB.news}<i>新聞</i></span><span>${TAB.wallet}<i>錢包</i></span>
       </div></div>`;
   }
 
@@ -196,21 +227,22 @@ export function createLine({ screen, say, onUnread }) {
   function bubbles() {
     let out = ''; let lastDay = '';
     const readUpTo = thread.readTs || 0;
-    let prevHim = false;
+    let prevHim = false; let prevMe = false;
     for (const m of thread.msgs) {
       const d = new Date(m.ts); const day = `${d.getMonth() + 1}/${d.getDate()}（${WEEK[d.getDay()]}）`;
-      if (day !== lastDay) { out += `<div class="bp-line-day"><span>${day}</span></div>`; lastDay = day; prevHim = false; }
-      const prev = prevHim; prevHim = !m.me && !m.err;
+      if (day !== lastDay) { out += `<div class="bp-line-day"><span>${day}</span></div>`; lastDay = day; prevHim = false; prevMe = false; }
+      const prev = prevHim; const prevMine = prevMe;
+      prevHim = !m.me && !m.err; prevMe = !!m.me;
       if (m.me) {
-        out += `<div class="bp-line-msg bp-me"><div class="bp-line-meta">${m.ts <= readUpTo ? '已讀<br>' : ''}${hm(m.ts)}</div>${bubble(m)}</div>`;
+        out += `<div class="bp-line-msg bp-me${prevMine ? ' bp-cont' : ' bp-tail'}"><div class="bp-line-meta">${m.ts <= readUpTo ? '已讀<br>' : ''}${hm(m.ts)}</div>${bubble(m)}</div>`;
       } else if (m.err) {
         out += `<div class="bp-line-sys">${esc(m.text)}　<u data-line="retry">再試一次</u></div>`;
       } else {
         // 跟 LINE 一樣：連續好幾則只有第一則有頭像
-        out += `<div class="bp-line-msg bp-him${prev ? ' bp-cont' : ''}">${prev ? '<span class="bp-line-av sm bp-ghost"></span>' : avatar('sm')}${bubble(m)}<div class="bp-line-meta">${hm(m.ts)}</div></div>`;
+        out += `<div class="bp-line-msg bp-him${prev ? ' bp-cont' : ' bp-tail'}">${prev ? '<span class="bp-line-av sm bp-ghost"></span>' : avatar('sm')}${bubble(m)}<div class="bp-line-meta">${hm(m.ts)}</div></div>`;
       }
     }
-    if (busy === 'typing') out += `<div class="bp-line-msg bp-him">${prevHim ? '<span class="bp-line-av sm bp-ghost"></span>' : avatar('sm')}<div class="bp-line-bub bp-typing"><i></i><i></i><i></i></div></div>`;
+    if (busy === 'typing') out += `<div class="bp-line-msg bp-him${prevHim ? ' bp-cont' : ' bp-tail'}">${prevHim ? '<span class="bp-line-av sm bp-ghost"></span>' : avatar('sm')}<div class="bp-line-bub bp-typing"><i></i><i></i><i></i></div></div>`;
     return out;
   }
 
@@ -224,9 +256,11 @@ export function createLine({ screen, say, onUnread }) {
       </div>
       <div class="bp-line-quoting" hidden></div>
       <form class="bp-line-bar">
-        <i class="bp-line-plus" data-line="photo">${IC.photo}</i>
-        <input class="bp-line-input" placeholder="輸入訊息" enterkeyhint="send" autocomplete="off">
-        <button type="submit" aria-label="傳送">➤</button></form>
+        <i class="bp-line-plus" data-line="photo">${IC.plus}</i>
+        <i class="bp-line-plus bp-hide-typing" data-line="photo">${IC.camera}</i>
+        <i class="bp-line-plus bp-hide-typing" data-line="photo">${IC.photo}</i>
+        <span class="bp-line-field"><input class="bp-line-input" placeholder="Aa" enterkeyhint="send" autocomplete="off"><i>${IC.smile}</i></span>
+        <button type="submit" aria-label="傳送">${IC.send}</button></form>
       <input class="bp-line-file" type="file" accept="image/*" hidden>
       <div class="bp-line-pop"></div></div>`;
     showQuoting();
@@ -466,12 +500,18 @@ export function createLine({ screen, say, onUnread }) {
     }
   });
 
+  // 打字時 LINE 會把左邊的相機、相片收起來，讓輸入框變長
+  screen.addEventListener('input', (e) => {
+    if (!e.target.classList.contains('bp-line-input')) return;
+    e.target.closest('.bp-line-bar').classList.toggle('bp-typing-now', !!e.target.value);
+  });
+
   screen.addEventListener('submit', (e) => {
     e.preventDefault();
     const inp = screen.querySelector('.bp-line-input');
     const text = inp.value.trim();
     if (!text || !ch) return;
-    inp.value = '';
+    inp.value = ''; inp.closest('.bp-line-bar').classList.remove('bp-typing-now');
     send({ text });
     inp.focus({ preventScroll: true });
   });
