@@ -629,6 +629,58 @@
 .bp-music-cover img { width: 100%; height: 100%; object-fit: cover; border-radius: 12px; }
 .bp-music-ctl i { display: grid; place-items: center; cursor: pointer; }
 
+/* ---------- 通知（鎖定畫面、按鈕紅點、網頁上方橫幅） ---------- */
+.bp-notifs { width: 100%; padding: 0 12px; margin-top: 22px; display: flex; flex-direction: column; gap: 8px; }
+.bp-notif {
+  display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 20px; cursor: pointer;
+  background: rgba(255, 255, 255, .32); border: 1px solid rgba(255, 255, 255, .45); color: #2b2824;
+  backdrop-filter: blur(22px) saturate(1.4); -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  animation: bp-notif-in .45s cubic-bezier(.2, .9, .3, 1.2);
+}
+.bp-notif i { width: 34px; height: 34px; border-radius: 9px; background: #06c755; color: #fff; display: grid; place-items: center; flex: none; }
+.bp-notif i svg { width: 22px; height: 22px; }
+.bp-notif div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.bp-notif b { font-size: 14px; }
+.bp-notif span { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bp-notif small { font-size: 11px; color: rgba(43, 40, 36, .6); align-self: flex-start; }
+.bp-notif-more { text-align: center; font-size: 12px; color: rgba(255, 255, 255, .85); }
+@keyframes bp-notif-in { from { opacity: 0; transform: translateY(-10px) scale(.97); } }
+#bp-launcher[data-n]:not([data-n=""])::after {
+  content: attr(data-n); position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px;
+  border-radius: 10px; background: #e0604c; color: #fff; font: 700 12px/20px -apple-system, sans-serif; text-align: center;
+  border: 1.5px solid #fff;
+}
+#bp-banner {
+  position: fixed; z-index: 2147482998; left: 0; top: 10px; width: min(360px, calc(100vw - 24px));
+  display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 20px; cursor: pointer;
+  background: rgba(250, 248, 244, .92); color: #2b2824; box-shadow: 0 10px 30px rgba(0, 0, 0, .25);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif;
+  opacity: 0; pointer-events: none; transform: translateY(-16px); transition: opacity .3s, transform .35s cubic-bezier(.2, .9, .3, 1.2);
+}
+#bp-banner.bp-show { opacity: 1; pointer-events: auto; transform: none; }
+#bp-banner i { width: 34px; height: 34px; border-radius: 9px; background: #06c755; color: #fff; display: grid; place-items: center; flex: none; }
+#bp-banner i svg { width: 22px; height: 22px; }
+#bp-banner div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+#bp-banner b { font-size: 14px; }
+#bp-banner span { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* 設定裡的分段選擇 */
+.bp-setrow { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 4px; font-size: 14px; color: #4b463f; }
+.bp-seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: rgba(0, 0, 0, .06); border-radius: 12px; padding: 3px; }
+.bp-seg b { text-align: center; font-weight: 500; font-size: 13px; padding: 8px 0; border-radius: 9px; cursor: pointer; }
+.bp-seg b.on { background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); font-weight: 700; }
+.bp-sheet { max-height: 88%; overflow-y: auto; }
+
+/* 關係升級的提醒 */
+.bp-hintsheet { position: absolute; inset: 0; z-index: 18; display: grid; place-items: center; background: rgba(30, 28, 25, .35); padding: 24px; }
+.bp-hintsheet > div { background: #faf8f4; color: #3a362f; border-radius: 22px; padding: 22px; display: flex; flex-direction: column; gap: 10px; text-align: center; box-shadow: 0 20px 50px rgba(0, 0, 0, .25); }
+.bp-hintsheet b { font-size: 17px; }
+.bp-hintsheet span { font-size: 13.5px; color: #6b655c; line-height: 1.6; }
+.bp-hintsheet > div > div { display: flex; gap: 8px; margin-top: 6px; }
+.bp-hintsheet button { flex: 1; padding: 11px; border: 0; border-radius: 12px; background: #ebe7e0; color: #4b463f; font: inherit; cursor: pointer; }
+.bp-hintsheet button.ok { background: #8fb98a; color: #fff; }
+
 /* ---------- 他的手機 ---------- */
 .bp-his { position: absolute; inset: 0; z-index: 10; display: none; }
 .bp-his.bp-show { display: flex; }

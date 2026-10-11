@@ -5,12 +5,14 @@ import { createLine, syncMain } from './line.js';
 import { createNotes, createCalendar } from './apps.js';
 import { createThreads } from './threads.js';
 import { createHisPhone } from './hisphone.js';
+import { createLife, settings as lifeSet, LEVELS } from './life.js';
+import * as stage from './stage.js';
 import { currentChar, ctx, lite } from './st.js';
 import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.7.2';
+const VERSION = '0.8.0';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -129,6 +131,7 @@ function build() {
     <div class="bp-lock">
       <div class="bp-lock-date"></div>
       <div class="bp-lock-time"></div>
+      <div class="bp-notifs"></div>
       <div class="bp-lock-bottom">
         <div class="bp-lock-row">
           <div class="bp-weather"><b>☁︎ 24°</b><br>多雲<br>高 27° 低 21°</div>
@@ -145,6 +148,11 @@ function build() {
     <div class="bp-toast"></div>
     <div class="bp-sheet">
       <h3>設定</h3>
+      <div class="bp-setrow"><span>你們的關係</span><div class="bp-seg" data-seg="stage">${stage.STAGES.map((x) => `<b data-act="stage" data-v="${x.id}">${x.name}</b>`).join('')}</div></div>
+      <p class="bp-sheet-note">有些功能等關係到了才打開：曖昧開始他會主動找妳，交往之後可以偷看他的手機、有陪睡模式，同居之後有冰箱門。劇情裡關係往前一步時，手機會問妳要不要改。</p>
+      <div class="bp-setrow"><span>他主動的程度</span><div class="bp-seg" data-seg="level">${Object.entries(LEVELS).map(([k, v]) => `<b data-act="level" data-v="${k}">${v.name}</b>`).join('')}</div></div>
+      <button data-act="bridge" class="bp-switchrow">劇情接手機<i></i></button>
+      <p class="bp-sheet-note">開著：正文裡你們分開、約好下次的時候，他之後會自己傳 LINE 或發脆，過幾分鐘手機才響。</p>
       <button data-act="lite" class="bp-switchrow">省 token 模式<i></i></button>
       <p class="bp-sheet-note">開著：只送角色卡、被叫到的世界書和正文最後幾則，比正文一次少很多。關掉：送整份預設和整段正文，跟正文一樣貴，但他看得最完整。傳照片給他時一律走完整的。</p>
       <button data-act="his">偷看他的手機</button>
@@ -227,6 +235,13 @@ function build() {
   }, { passive: true });
 
   const showLite = () => sheet.querySelector('[data-act="lite"] i').classList.toggle('on', lite.get());
+  async function showSettings() {
+    showLite();
+    const c = currentChar(); const cur = c ? await stage.get(c.key) : 'meet';
+    sheet.querySelectorAll('[data-act="stage"]').forEach((b) => b.classList.toggle('on', b.dataset.v === cur));
+    sheet.querySelectorAll('[data-act="level"]').forEach((b) => b.classList.toggle('on', b.dataset.v === lifeSet.get().level));
+    sheet.querySelector('[data-act="bridge"] i').classList.toggle('on', lifeSet.get().bridge);
+  }
 
   // 點圓點跳頁
   const goPage = (i) => pages.scrollTo({ left: i * pages.clientWidth, behavior: 'smooth' });
@@ -251,7 +266,7 @@ function build() {
   });
 
   // 點擊
-  phone.addEventListener('click', (e) => {
+  phone.addEventListener('click', async (e) => {
     if (dragged) { dragged = false; return; }
     if (e.target.closest('.bp-appscreen, .bp-his')) return; // App 裡面的點擊由各個 App 自己處理
     const slot = e.target.closest('[data-slot]');
@@ -263,7 +278,17 @@ function build() {
       if (a === 'wall-reset') { delete state.wall; save(state); applyWall(); say('用回預設桌布了'); }
       if (a === 'photos-reset') { state.photos = {}; save(state); rebuild(); say('照片清掉了'); }
       if (a === 'close') sheet.classList.remove('bp-show');
-      if (a === 'his') { sheet.classList.remove('bp-show'); his.open(); }
+      if (a === 'his') {
+        const c = currentChar(); const cur = c ? await stage.get(c.key) : 'meet';
+        if (!stage.unlocked(cur, 'his')) { say(`${stage.needFor('his')}之後才能偷看他的手機`); return; }
+        sheet.classList.remove('bp-show'); his.open();
+      }
+      if (a === 'stage') { const c = currentChar(); if (!c) { say('先在酒館選一個角色'); return; } await stage.set(c.key, act.dataset.v); showSettings(); life.refreshPrompt(); syncMain(); say(`關係改成「${stage.name(act.dataset.v)}」了`); }
+      if (a === 'level') { lifeSet.set({ level: act.dataset.v }); showSettings(); }
+      if (a === 'bridge') { lifeSet.set({ bridge: !lifeSet.get().bridge }); showSettings(); life.refreshPrompt(); }
+      if (a === 'notif') { lock.classList.add('bp-gone'); phone.classList.remove('bp-locked'); openLineRoom(); }
+      if (a === 'hint-yes') { const h = overlay.querySelector('.bp-hintsheet'); await stage.set(h.dataset.key, h.dataset.v); h.remove(); life.refreshPrompt(); syncMain(); say(`關係改成「${stage.name(h.dataset.v)}」了`); }
+      if (a === 'hint-no') overlay.querySelector('.bp-hintsheet')?.remove();
       if (a === 'lite') { lite.set(!lite.get()); showLite(); say(lite.get() ? '省 token 模式開了' : '改用完整模式'); }
       return;
     }
@@ -274,10 +299,14 @@ function build() {
     }
     const open = e.target.closest('[data-open]');
     if (open) {
-      if (open.dataset.open === 'settings') { showLite(); sheet.classList.add('bp-show'); return; }
+      if (open.dataset.open === 'settings') { showSettings(); sheet.classList.add('bp-show'); return; }
       if (open.dataset.open === 'line') { openApp(line); return; }
       if (open.dataset.open === 'music') { openApp(music); return; }
-      if (open.dataset.open === 'notes') { openApp(notes); return; }
+      if (open.dataset.open === 'notes') {
+        const c = currentChar(); const cur = c ? await stage.get(c.key) : 'meet';
+        if (!stage.unlocked(cur, 'notes')) { say(`冰箱門要${stage.needFor('notes')}之後才有`); return; }
+        openApp(notes); return;
+      }
       if (open.dataset.open === 'calendar') { openApp(calendar); return; }
       if (open.dataset.open === 'threads') { openApp(threads); return; }
       say('這個 App 還在做 ☁︎');
@@ -300,13 +329,60 @@ function build() {
   // App 畫面：從右邊滑進來，蓋在主畫面上
   const appScreen = overlay.querySelector('.bp-appscreen');
   const openApp = (app) => { music?.leave(); app.open(); appScreen.classList.add('bp-show'); phone.classList.add('bp-app-open'); };
-  const closeApp = () => { appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); music?.leave(); };
+  const closeApp = () => { appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); music?.leave(); refreshNotices?.(); };
   appScreen.addEventListener('bp-home', closeApp);
   const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => calDots() });
   const notes = createNotes({ screen: appScreen, say });
   const calendar = createCalendar({ screen: appScreen, say });
   const threads = createThreads({ screen: appScreen, say });
   const his = createHisPhone({ host: overlay.querySelector('.bp-his'), say, onExit: () => say('還給他了，他沒發現') });
+  const openLineRoom = () => { openApp(line); line.openRoom(); };
+
+  // ---------- 手機響：紅點、鎖定畫面通知、網頁上方的橫幅 ----------
+  const banner = $(`<div id="bp-banner"><i>${ICON.line}</i><div><b></b><span></span></div></div>`);
+  document.documentElement.appendChild(banner);
+  let bannerTimer;
+  banner.addEventListener('click', () => { banner.classList.remove('bp-show'); api.open(); lock.classList.add('bp-gone'); phone.classList.remove('bp-locked'); openLineRoom(); });
+  function showBanner(n) {
+    banner.querySelector('b').textContent = n.app === 'threads' ? `脆・${n.who}` : n.who;
+    banner.querySelector('span').textContent = n.text;
+    banner.classList.add('bp-show');
+    const vv = window.visualViewport; const vw = vv ? vv.width : innerWidth;
+    const w = banner.offsetWidth; const want = { left: (vw - w) / 2, top: 10 };
+    Object.assign(banner.style, { left: `${want.left}px`, top: `${want.top}px` });
+    const r = banner.getBoundingClientRect();
+    Object.assign(banner.style, { left: `${2 * want.left - r.left}px`, top: `${2 * want.top - r.top}px` });
+    clearTimeout(bannerTimer); bannerTimer = setTimeout(() => banner.classList.remove('bp-show'), 5000);
+  }
+  async function refreshNotices() {
+    const list = await line.unseen();
+    setBadge('line', list.length);
+    document.getElementById('bp-launcher')?.setAttribute('data-n', list.length ? String(Math.min(list.length, 99)) : '');
+    const hhmm = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+    overlay.querySelector('.bp-notifs').innerHTML = list.slice(-3).reverse().map((m) => `<div class="bp-notif" data-act="notif">
+      <i>${ICON.line}</i><div><b>${m.who}</b><span>${String(m.text || (m.sticker ? '傳了貼圖' : '')).replace(/</g, '&lt;')}</span></div><small>${hhmm(m.ts)}</small></div>`).join('')
+      + (list.length > 3 ? `<div class="bp-notif-more">還有 ${list.length - 3} 則</div>` : '');
+  }
+  const life = createLife({
+    line, say,
+    onNotify: (n) => {
+      refreshNotices();
+      const inLine = overlay.classList.contains('bp-open') && appScreen.querySelector('.bp-line-roomv');
+      if (inLine) return;
+      if (overlay.classList.contains('bp-open')) say(`${n.who}：${n.text}`); else showBanner(n);
+    },
+    onStageHint: (key, v) => {
+      overlay.querySelector('.bp-hintsheet')?.remove();
+      phone.insertAdjacentHTML('beforeend', `<div class="bp-hintsheet" data-key="${key}" data-v="${v}"><div>
+        <b>劇情裡，你們好像${v === 'married' ? '結婚了' : v === 'living' ? '住在一起了' : v === 'dating' ? '在一起了' : '有點曖昧了'}</b>
+        <span>要把關係改成「${stage.name(v)}」嗎？會打開${v === 'living' ? '冰箱門' : v === 'dating' ? '偷看他的手機、陪睡模式' : v === 'flirt' ? '他主動找妳' : '新的東西'}。</span>
+        <div><button data-act="hint-no">先不要</button><button data-act="hint-yes" class="ok">好</button></div></div></div>`);
+      if (!overlay.classList.contains('bp-open')) showBanner({ who: '小手機', text: '你們的關係好像變了，打開手機看看' });
+    },
+  });
+  setInterval(refreshNotices, 30000);
+  setTimeout(refreshNotices, 1500);
+
   // LINE 裡點「他貼了便條／記上行事曆」那行小字，直接跳到那個 App
   appScreen.addEventListener('bp-openapp', (e) => { const app = { notes, calendar }[e.detail]; if (app) openApp(app); });
 
@@ -352,11 +428,12 @@ function build() {
   // 點外框外面也能收起來
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
-  return {
-    open() { closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); },
+  const api = {
+    open() { life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); },
     close,
   };
-  function close() { overlay.classList.remove('bp-open'); }
+  return api;
+  function close() { overlay.classList.remove('bp-open'); refreshNotices(); }
 }
 
 function shrink(fileObj, max) {
