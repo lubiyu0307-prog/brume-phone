@@ -77,7 +77,8 @@ async function ytFind(song) {
   const key = localStorage.getItem(YT_KEY);
   if (!key) return null;
   const q = encodeURIComponent(`${song.title} ${song.artist}`);
-  const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=1&q=${q}&key=${encodeURIComponent(key)}`);
+  // 酒館整頁是 Referrer-Policy: no-referrer；金鑰若限制成「網站」，沒帶來源會被 403，這裡自己帶
+  const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=1&q=${q}&key=${encodeURIComponent(key)}`, { referrerPolicy: 'strict-origin-when-cross-origin' });
   if (!r.ok) throw new Error(r.status === 403 ? 'YouTube 金鑰不能用或額度用完了' : 'YouTube 找不到');
   const it = (await r.json()).items?.[0];
   return it?.id?.videoId || null;
@@ -126,7 +127,9 @@ async function playSong(song, queue) {
   if (player.song !== song) return; // 中途換歌了
   if (vid && player.ytHost) {
     player.mode = 'yt';
-    player.ytHost.innerHTML = `<iframe src="https://www.youtube.com/embed/${vid}?autoplay=1&playsinline=1&enablejsapi=1&rel=0" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+    // YouTube 嵌入沒收到來源會擋（錯誤 153），酒館整頁又不送來源，所以 iframe 自己指定
+    const origin = encodeURIComponent(location.origin);
+    player.ytHost.innerHTML = `<iframe src="https://www.youtube.com/embed/${vid}?autoplay=1&playsinline=1&enablejsapi=1&rel=0&origin=${origin}" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
     player.playing = true;
   } else if (song.preview) {
     player.mode = 'preview';
