@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.10.4';
+const VERSION = '0.11.0';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -412,9 +412,14 @@ function build() {
   const banner = $(`<div id="bp-banner"><i>${ICON.line}</i><div><b></b><span></span></div></div>`);
   document.documentElement.appendChild(banner);
   let bannerTimer;
-  banner.addEventListener('click', () => { banner.classList.remove('bp-show'); api.open(); lock.classList.add('bp-gone'); phone.classList.remove('bp-locked'); openLineRoom(); });
+  let bannerApp = 'line';
+  banner.addEventListener('click', () => {
+    banner.classList.remove('bp-show'); api.open(); lock.classList.add('bp-gone'); phone.classList.remove('bp-locked');
+    if (bannerApp === 'calendar') openApp(calendar); else if (bannerApp === 'notes') openApp(notes); else openLineRoom();
+  });
   function showBanner(n) {
-    banner.querySelector('b').textContent = n.app === 'threads' ? `脆・${n.who}` : n.who;
+    bannerApp = n.app || 'line';
+    banner.querySelector('b').textContent = n.app === 'threads' ? `脆・${n.who}` : n.app === 'calendar' ? `行事曆・${n.who}` : n.app === 'notes' ? `便條・${n.who}` : n.who;
     banner.querySelector('span').textContent = n.text;
     banner.classList.add('bp-show');
     const vv = window.visualViewport; const vw = vv ? vv.width : innerWidth;
@@ -434,7 +439,7 @@ function build() {
       + (list.length > 3 ? `<div class="bp-notif-more">還有 ${list.length - 3} 則</div>` : '');
   }
   const life = createLife({
-    line, say,
+    line, say, onData: () => calDots(),
     onNotify: (n) => {
       refreshNotices();
       const inLine = overlay.classList.contains('bp-open') && appScreen.querySelector('.bp-line-roomv');
