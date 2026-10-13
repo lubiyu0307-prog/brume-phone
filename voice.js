@@ -7,8 +7,8 @@
 import { ctx } from './st.js';
 
 const KEY = 'brume-phone:gemini-key';
-// 3.8 是現在的；舊的 2.5 留著當備援（新模型沒開放或額度用完時）
-const MODELS = ['gemini-3.8-flash-tts', 'gemini-2.5-flash-preview-tts'];
+// 只用 3.8：換別的模型等於換一個人講話（10/13 比比聽出來的）。叫不到就讓電話改用裝置聲音
+const MODELS = ['gemini-3.8-flash-tts'];
 
 export const geminiKey = {
   get() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } },
