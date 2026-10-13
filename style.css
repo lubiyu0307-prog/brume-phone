@@ -1063,3 +1063,8 @@
   content: ""; position: absolute; inset: 0; z-index: 40; pointer-events: none;
   background: rgba(255, 160, 80, .13); mix-blend-mode: multiply;
 }
+
+/* 電話：他的聲音 */
+.bp-ca-vpick { display: flex; align-items: center; gap: 8px; margin: 10px 16px 0; font-size: 13px; color: inherit; opacity: .9; }
+.bp-ca-vpick select { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 8px; border: 1px solid #0002; background: #fff9; font: inherit; }
+.bp-ca-vpick button { padding: 6px 12px; border-radius: 999px; border: 0; background: #0000000f; font: inherit; cursor: pointer; }

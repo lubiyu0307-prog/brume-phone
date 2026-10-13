@@ -60,6 +60,17 @@ async function liteContext(c, prompt) {
   ].filter(Boolean).join('\n\n');
 }
 
+// 角色卡常常規定每一樓都要附狀態欄（<khdata>、<UpdateVariable>⋯），模型在手機裡也照附。
+// 手機只要說出口的字：任何 <標籤>…</標籤> 的區塊都拿掉，沒閉合的就從開頭標籤剪到最後。
+const INLINE = /^(?:b|i|u|s|em|strong|br|span|small|p)$/i;
+export function stripBlocks(text) {
+  let t = String(text || '').replace(/<think>[\s\S]*?<\/think>/gi, '');
+  t = t.replace(/<([A-Za-z][\w-]*)\b[^>]*>[\s\S]*?<\/\1>/g, (all, n) => (INLINE.test(n) ? all : ''));
+  t = t.replace(/<([A-Za-z][\w-]*)\b[^>]*>[\s\S]*$/, (all, n) => (INLINE.test(n) ? all : ''));
+  t = t.replace(/<\/?([A-Za-z][\w-]*)\b[^>]*\/?>/g, (all, n) => (INLINE.test(n) ? all : ''));
+  return t.trim();
+}
+
 /**
  * 叫模型寫東西。省 token 模式走 generateRaw（只帶角色卡、世界書、正文最後幾則）；
  * 關掉或有附圖時走 generateQuietPrompt（整份預設＋整段正文，跟正文一樣貴）。image 是 dataURL，酒館一次只吃一張
@@ -69,7 +80,7 @@ export async function generate(prompt, image) {
   if (!c) throw new Error('找不到酒館');
   if (lite.get() && !image && c.generateRaw) {
     const out = await c.generateRaw({ systemPrompt: await liteContext(c, prompt), prompt });
-    return String(out || '').replace(/<think>[\s\S]*?<\/think>/gi, '');
+    return stripBlocks(out);
   }
   const fn = c.generateQuietPrompt;
   if (!fn) throw new Error('找不到酒館的生成功能');
@@ -78,7 +89,7 @@ export async function generate(prompt, image) {
   const out = objectStyle
     ? await fn.call(c, { quietPrompt: prompt, skipWIAN: false, removeReasoning: true, ...(image ? { quietImage: image } : {}) })
     : await fn.call(c, prompt, false, false, image || null);
-  return String(out || '').replace(/<think>[\s\S]*?<\/think>/gi, '');
+  return stripBlocks(out);
 }
 
 /** 叫酒館的生圖（Image Generation 擴充）。回傳圖片網址；沒接生圖或失敗回空字串 */

@@ -9,6 +9,14 @@ const pad = (n) => String(n).padStart(2, '0');
 const dur = (s) => `${pad(Math.floor(s / 60))}:${pad(s % 60)}`;
 const VOICE_KEY = 'brume-phone:voice';
 const voiceOn = () => { try { return localStorage.getItem(VOICE_KEY) !== '0'; } catch { return true; } };
+// 他的聲音：每個角色各記一個；沒選過就用第一個台灣中文的聲音
+const VOICE_NAME = (k) => 'brume-phone:voice-name:' + k;
+const zhVoices = () => (window.speechSynthesis ? speechSynthesis.getVoices() : []).filter((x) => /zh[-_]TW/i.test(x.lang));
+function pickVoice(key) {
+  const vs = zhVoices(); let name = '';
+  try { name = localStorage.getItem(VOICE_NAME(key)) || ''; } catch { /* 沒有就用預設 */ }
+  return vs.find((x) => x.name === name) || vs[0] || null;
+}
 
 const IC = {
   phone: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6.6 10.8a15.1 15.1 0 0 0 6.6 6.6l2.2-2.2a1 1 0 0 1 1-.25 11.4 11.4 0 0 0 3.6.57 1 1 0 0 1 1 1V20a1 1 0 0 1-1 1A17 17 0 0 1 3 4a1 1 0 0 1 1-1h3.5a1 1 0 0 1 1 1c0 1.25.2 2.45.57 3.57a1 1 0 0 1-.25 1z"/></svg>',
@@ -23,7 +31,7 @@ export function createCall({ screen, say }) {
     if (!voiceOn() || !window.speechSynthesis) return;
     const u = new SpeechSynthesisUtterance(text.replace(/[（(][^）)]*[）)]/g, ''));
     u.lang = 'zh-TW'; u.rate = 1;
-    const v = speechSynthesis.getVoices().find((x) => /zh[-_]TW/i.test(x.lang)); if (v) u.voice = v;
+    const v = ch && pickVoice(ch.key); if (v) u.voice = v;
     speechSynthesis.speak(u);
   };
 
@@ -38,7 +46,9 @@ export function createCall({ screen, say }) {
       <h4>最近通話</h4>
       ${log.length ? [...log].reverse().slice(0, 30).map((c) => `<div class="bp-ca-log" data-open="${c.ts}"><b>${esc(ch.name)}</b><span>${c.lines?.length ? `${dur(c.dur)}・${esc(c.lines[c.lines.length - 1].text).slice(0, 18)}` : '未接通'}</span><small>${new Date(c.ts).getMonth() + 1}/${new Date(c.ts).getDate()} ${pad(new Date(c.ts).getHours())}:${pad(new Date(c.ts).getMinutes())}</small></div>`).join('') : '<p class="bp-ca-empty">還沒有通話紀錄。</p>'}
       <label class="bp-ca-voice"><input type="checkbox" ${voiceOn() ? 'checked' : ''}> 用手機內建的聲音唸出他說的話</label>
+      ${zhVoices().length ? `<div class="bp-ca-vpick"><span>他的聲音</span><select data-ca-voice>${zhVoices().map((x) => `<option value="${esc(x.name)}"${pickVoice(ch.key)?.name === x.name ? ' selected' : ''}>${esc(x.name.replace(/\s*\(.*\)$/, ''))}</option>`).join('')}</select><button data-ca="tryvoice">試聽</button></div>` : ''}
     </div>`;
+    if (window.speechSynthesis && !zhVoices().length) speechSynthesis.onvoiceschanged = () => { if (screen.querySelector('.bp-ca-list')) list(); };
   }
 
   function room() {
@@ -61,6 +71,7 @@ export function createCall({ screen, say }) {
         `現在不是在寫劇情正文。${who.user} 打電話給 ${who.name}，兩人正在講電話。照他的個性、你們現在的關係、最近的劇情和現在的時間說話。`,
         '- 這是說出口的話：口語、自然，一次 1～3 句，可以有停頓（⋯）',
         '- 不寫動作、旁白、表情描寫，只寫他說的話',
+        '- 不要輸出狀態欄、資料區塊或任何 <標籤>，電話裡只有聲音',
         first ? `- 他剛接起電話，先開口（例如「喂？」之後接一兩句）` : '',
         '', '通話到目前：', call.lines.map((l) => `${l.me ? who.user : who.name}：${l.text}`).join('\n') || '（剛接通）',
       ].filter(Boolean).join('\n'));
@@ -108,9 +119,15 @@ export function createCall({ screen, say }) {
     if (a === 'list') list();
     if (a === 'dial') dial();
     if (a === 'hang') hang();
+    if (a === 'tryvoice') { const keep = voiceOn(); if (!keep) { say('先打開「用手機內建的聲音唸」'); return; } speechSynthesis.cancel(); speak(`喂？我是${ch.name}。`); }
     if (a === 'voice') { try { localStorage.setItem(VOICE_KEY, voiceOn() ? '0' : '1'); } catch { /* 存不了 */ } if (!voiceOn() && window.speechSynthesis) speechSynthesis.cancel(); room(); }
   });
   screen.addEventListener('change', (e) => {
+    if (mine() && e.target.matches('[data-ca-voice]') && ch) {
+      try { localStorage.setItem(VOICE_NAME(ch.key), e.target.value); } catch { /* 存不了 */ }
+      if (voiceOn() && window.speechSynthesis) { speechSynthesis.cancel(); speak(`喂？我是${ch.name}。`); }
+      return;
+    }
     if (!mine() || !e.target.closest('.bp-ca-voice')) return;
     try { localStorage.setItem(VOICE_KEY, e.target.checked ? '1' : '0'); } catch { /* 存不了 */ }
   });
