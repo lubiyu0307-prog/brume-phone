@@ -17,7 +17,26 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.11.0';
+const VERSION = '0.11.1';
+
+// ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
+const DBG_KEY = 'brume-phone:dbg';
+const dbgT0 = Date.now();
+function dbg(tag, extra) {
+  try {
+    const vv = window.visualViewport; const ov = document.getElementById('bp-overlay'); const ph = ov?.querySelector('.bp-phone');
+    const r = (el) => { if (!el) return null; const b = el.getBoundingClientRect(); return [Math.round(b.top), Math.round(b.height)]; };
+    const row = {
+      t: new Date().toTimeString().slice(0, 8), ms: Date.now() - dbgT0, tag, ...(extra ? { x: extra } : {}),
+      vv: vv ? [Math.round(vv.width), Math.round(vv.height), Math.round(vv.offsetTop), Math.round(vv.pageTop || 0)] : null,
+      win: [innerWidth, innerHeight, Math.round(scrollY)], open: !!ov?.classList.contains('bp-open'), ov: r(ov), ph: r(ph),
+      html: getComputedStyle(document.documentElement).position, act: document.activeElement?.className?.toString().slice(0, 30) || document.activeElement?.tagName,
+    };
+    const a = JSON.parse(localStorage.getItem(DBG_KEY) || '[]'); a.push(row);
+    localStorage.setItem(DBG_KEY, JSON.stringify(a.slice(-80)));
+  } catch { /* 記不了就算了 */ }
+}
+dbg('boot', VERSION);
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -167,6 +186,7 @@ function build() {
       <button data-act="wall">換桌布</button>
       <button data-act="wall-reset">用回預設桌布</button>
       <button data-act="photos-reset">清掉小工具照片</button>
+      <button data-act="dbg">複製除錯紀錄（給格看）</button>
       <button class="bp-cancel" data-act="close">完成</button>
       <div class="bp-ver">Brume Phone v${VERSION}</div>
     </div>
@@ -204,12 +224,16 @@ function build() {
     requestAnimationFrame(() => requestAnimationFrame(fit));
     clearTimeout(fitTimer); fitTimer = setTimeout(fit, 350);
   };
-  addEventListener('resize', refit);
-  addEventListener('scroll', fit, { passive: true }); // 外層有 transform 時，網頁一捲手機會跟著跑
-  window.visualViewport?.addEventListener('resize', refit);
-  window.visualViewport?.addEventListener('scroll', fit);
-  overlay.addEventListener('focusin', refit);
-  overlay.addEventListener('focusout', () => setTimeout(refit, 50));
+  let vpChanged = 0; // 畫面剛動過的時間：這段時間內點到外框不算「點外面」
+  const seen = (tag, f) => (e) => { vpChanged = Date.now(); if (overlay.classList.contains('bp-open')) { dbg(tag); setTimeout(() => dbg(tag + '+400'), 400); } f(e); };
+  addEventListener('resize', seen('resize', refit));
+  addEventListener('scroll', seen('scroll', fit), { passive: true }); // 外層有 transform 時，網頁一捲手機會跟著跑
+  window.visualViewport?.addEventListener('resize', seen('vv-resize', refit));
+  window.visualViewport?.addEventListener('scroll', seen('vv-scroll', fit));
+  overlay.addEventListener('focusin', seen('focusin', refit));
+  overlay.addEventListener('focusout', seen('focusout', () => setTimeout(refit, 50)));
+  addEventListener('pagehide', () => dbg('pagehide'));
+  document.addEventListener('visibilitychange', () => dbg('visibility', document.visibilityState));
 
   const phone = overlay.querySelector('.bp-phone');
   const lock = overlay.querySelector('.bp-lock');
@@ -324,6 +348,14 @@ function build() {
       if (a === 'wall-reset') { delete state.wall; save(state); applyWall(); say('用回預設桌布了'); }
       if (a === 'photos-reset') { state.photos = {}; save(state); rebuild(); say('照片清掉了'); }
       if (a === 'close') sheet.classList.remove('bp-show');
+      if (a === 'dbg') {
+        let txt = ''; try { txt = localStorage.getItem(DBG_KEY) || '[]'; } catch { /* 讀不到 */ }
+        txt = `Brume Phone v${VERSION} ${navigator.userAgent}\n${txt}`;
+        try { await navigator.clipboard.writeText(txt); say('複製好了，貼給格'); } catch {
+          sheet.insertAdjacentHTML('beforeend', '<textarea class="bp-dbgbox" readonly></textarea>');
+          const box = sheet.querySelector('.bp-dbgbox'); box.value = txt; box.select(); say('自動複製不行，全選這格長按複製');
+        }
+      }
       if (a === 'his') {
         const c = currentChar(); const cur = c ? await stage.get(c.key) : 'meet';
         if (!stage.unlocked(cur, 'his')) { say(`${stage.needFor('his')}之後才能偷看他的手機`); return; }
@@ -377,7 +409,7 @@ function build() {
       say('這個 App 還在做 ☁︎');
       return;
     }
-    if (e.target.closest('.bp-homebar') || e.target.closest('.bp-close')) close();
+    if (e.target.closest('.bp-homebar')) close('homebar'); else if (e.target.closest('.bp-close')) close('x');
   });
 
   // 選照片：縮到 1080 寬再存，免得塞爆瀏覽器空間
@@ -524,14 +556,20 @@ function build() {
 
   // 點外框外面也能收起來
   // 剛拖完放開在手機外面時不算「點外面」，不然一拖就收起來了
-  overlay.addEventListener('click', (e) => { if (e.target === overlay && Date.now() - lastDragEnd > 400) close(); });
+  overlay.addEventListener('click', (e) => {
+    if (e.target !== overlay || Date.now() - lastDragEnd < 400) return;
+    // 鍵盤剛彈出／收起、畫面還在動，或正在打字：不收手機，先把鍵盤收掉
+    const typing = overlay.contains(document.activeElement) && /^(INPUT|TEXTAREA)$/.test(document.activeElement.tagName);
+    if (typing || Date.now() - vpChanged < 1000) { dbg('outside-ignored'); if (typing) document.activeElement.blur(); return; }
+    close('outside');
+  });
 
   const api = {
-    open() { store.refresh(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); },
+    open() { store.refresh(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); dbg('open'); },
     close,
   };
   return api;
-  function close() { overlay.classList.remove('bp-open'); refreshNotices(); }
+  function close(why = 'api') { dbg('close', why); overlay.classList.remove('bp-open'); refreshNotices(); }
 }
 
 function shrink(fileObj, max) {
