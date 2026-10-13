@@ -3,6 +3,7 @@
 
 import * as store from './store.js';
 import { currentChar, generate } from './st.js';
+import * as voice from './voice.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pad = (n) => String(n).padStart(2, '0');
@@ -27,13 +28,39 @@ const IC = {
 export function createCall({ screen, say }) {
   let ch = null; let log = []; let call = null; let timer = null;
   const mine = () => !!screen.querySelector('.bp-ca');
-  const speak = (text) => {
+  const deviceSpeak = (text) => {
     if (!voiceOn() || !window.speechSynthesis) return;
     const u = new SpeechSynthesisUtterance(text.replace(/[（(][^）)]*[）)]/g, ''));
     u.lang = 'zh-TW'; u.rate = 1;
     const v = ch && pickVoice(ch.key); if (v) u.voice = v;
     speechSynthesis.speak(u);
   };
+  // 卡片指定了 Gemini 聲音、也接得到 Gemini，就用它；念不出來（沒額度、沒權限）就退回裝置聲音
+  let warned = false;
+  const speak = (text) => {
+    if (!voiceOn()) return;
+    if (!voice.route()) { deviceSpeak(text); return; }
+    voice.say(text, (e) => {
+      if (!warned) { warned = true; say(`${ch?.name || '他'}的聲音暫時出不來（${e.message || e}），先用手機內建的聲音`); }
+      deviceSpeak(text);
+    });
+  };
+  const stopVoice = () => { voice.stop(); if (window.speechSynthesis) speechSynthesis.cancel(); };
+
+  // 聲音那一塊：卡片有指定 Gemini 聲音才出現
+  function voiceBox() {
+    const v = voice.cardVoice();
+    if (!v) return '';
+    const how = voice.route();
+    const viaTavern = how === 'tavern';
+    return `<div class="bp-ca-gem">
+      <p>${esc(ch.name)}的聲音：<b>${esc(v.name)}</b>（角色卡指定）${how ? `<u data-ca="trygem">試聽</u>` : ''}</p>
+      ${viaTavern ? '<small>用酒館的 AI Studio 連線念，不用另外設定。</small>' : `
+      <small>${how ? '用妳貼的 AI Studio 金鑰念。' : '酒館不是接 AI Studio（例如 Vertex、Claude）時，貼一把 AI Studio 金鑰就能聽到他的聲音；沒貼就用手機內建的聲音。'}到 aistudio.google.com/apikey 按「建立 API 金鑰」就有，金鑰只存在這台裝置。</small>
+      <form class="bp-ca-key" data-ca-keyform><input type="password" placeholder="${geminiSet() ? '已經貼好了（重貼會換掉）' : '貼上 AI Studio 金鑰'}" autocomplete="off"><button>${geminiSet() ? '更換' : '儲存'}</button>${geminiSet() ? '<u data-ca="delkey">拿掉</u>' : ''}</form>`}
+    </div>`;
+  }
+  const geminiSet = () => !!voice.geminiKey.get();
 
   async function list() {
     ch = currentChar();
@@ -46,7 +73,8 @@ export function createCall({ screen, say }) {
       <h4>最近通話</h4>
       ${log.length ? [...log].reverse().slice(0, 30).map((c) => `<div class="bp-ca-log" data-open="${c.ts}"><b>${esc(ch.name)}</b><span>${c.lines?.length ? `${dur(c.dur)}・${esc(c.lines[c.lines.length - 1].text).slice(0, 18)}` : '未接通'}</span><small>${new Date(c.ts).getMonth() + 1}/${new Date(c.ts).getDate()} ${pad(new Date(c.ts).getHours())}:${pad(new Date(c.ts).getMinutes())}</small></div>`).join('') : '<p class="bp-ca-empty">還沒有通話紀錄。</p>'}
       <label class="bp-ca-voice"><input type="checkbox" ${voiceOn() ? 'checked' : ''}> 用手機內建的聲音唸出他說的話</label>
-      ${zhVoices().length ? `<div class="bp-ca-vpick"><span>他的聲音</span><select data-ca-voice>${zhVoices().map((x) => `<option value="${esc(x.name)}"${pickVoice(ch.key)?.name === x.name ? ' selected' : ''}>${esc(x.name.replace(/\s*\(.*\)$/, ''))}</option>`).join('')}</select><button data-ca="tryvoice">試聽</button></div>` : ''}
+      ${voiceBox()}
+      ${!voice.route() && zhVoices().length ? `<div class="bp-ca-vpick"><span>他的聲音</span><select data-ca-voice>${zhVoices().map((x) => `<option value="${esc(x.name)}"${pickVoice(ch.key)?.name === x.name ? ' selected' : ''}>${esc(x.name.replace(/\s*\(.*\)$/, ''))}</option>`).join('')}</select><button data-ca="tryvoice">試聽</button></div>` : ''}
     </div>`;
     if (window.speechSynthesis && !zhVoices().length) speechSynthesis.onvoiceschanged = () => { if (screen.querySelector('.bp-ca-list')) list(); };
   }
@@ -83,8 +111,8 @@ export function createCall({ screen, say }) {
 
   async function dial() {
     call = { ts: Date.now(), lines: [], start: 0 };
-    room();
-    if (window.speechSynthesis) speechSynthesis.cancel();
+    room(); warned = false;
+    stopVoice();
     await new Promise((r) => setTimeout(r, 1800 + Math.random() * 1500));
     if (!call) return;
     call.start = Date.now();
@@ -95,7 +123,7 @@ export function createCall({ screen, say }) {
 
   async function hang() {
     clearInterval(timer);
-    if (window.speechSynthesis) speechSynthesis.cancel();
+    stopVoice();
     if (call) {
       log.push({ ts: call.ts, dur: call.start ? Math.floor((Date.now() - call.start) / 1000) : 0, lines: call.lines });
       log = log.slice(-50);
@@ -119,13 +147,15 @@ export function createCall({ screen, say }) {
     if (a === 'list') list();
     if (a === 'dial') dial();
     if (a === 'hang') hang();
-    if (a === 'tryvoice') { const keep = voiceOn(); if (!keep) { say('先打開「用手機內建的聲音唸」'); return; } speechSynthesis.cancel(); speak(`喂？我是${ch.name}。`); }
-    if (a === 'voice') { try { localStorage.setItem(VOICE_KEY, voiceOn() ? '0' : '1'); } catch { /* 存不了 */ } if (!voiceOn() && window.speechSynthesis) speechSynthesis.cancel(); room(); }
+    if (a === 'trygem') { stopVoice(); warned = false; speak(`喂？我是${ch.name}。`); }
+    if (a === 'delkey') { voice.geminiKey.set(''); list(); say('拿掉了，改用手機內建的聲音'); }
+    if (a === 'tryvoice') { const keep = voiceOn(); if (!keep) { say('先打開「用手機內建的聲音唸」'); return; } speechSynthesis.cancel(); deviceSpeak(`喂？我是${ch.name}。`); }
+    if (a === 'voice') { try { localStorage.setItem(VOICE_KEY, voiceOn() ? '0' : '1'); } catch { /* 存不了 */ } if (!voiceOn()) stopVoice(); room(); }
   });
   screen.addEventListener('change', (e) => {
     if (mine() && e.target.matches('[data-ca-voice]') && ch) {
       try { localStorage.setItem(VOICE_NAME(ch.key), e.target.value); } catch { /* 存不了 */ }
-      if (voiceOn() && window.speechSynthesis) { speechSynthesis.cancel(); speak(`喂？我是${ch.name}。`); }
+      if (voiceOn() && window.speechSynthesis) { speechSynthesis.cancel(); deviceSpeak(`喂？我是${ch.name}。`); }
       return;
     }
     if (!mine() || !e.target.closest('.bp-ca-voice')) return;
@@ -134,6 +164,8 @@ export function createCall({ screen, say }) {
   screen.addEventListener('submit', (e) => {
     if (!mine()) return;
     e.preventDefault();
+    const kf = e.target.closest('[data-ca-keyform]');
+    if (kf) { const v = kf.querySelector('input').value.trim(); if (v) { voice.geminiKey.set(v); list(); say('存好了，按「試聽」聽聽看'); } return; }
     const inp = screen.querySelector('.bp-ca-bar input'); const text = inp?.value.trim();
     if (!text || !call?.start || call.thinking) return;
     call.lines.push({ me: true, text }); hisTurn(false);
