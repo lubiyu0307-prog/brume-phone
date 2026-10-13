@@ -147,7 +147,7 @@ export function createCall({ screen, say }) {
     if (a === 'list') list();
     if (a === 'dial') dial();
     if (a === 'hang') hang();
-    if (a === 'trygem') { stopVoice(); warned = false; speak(`喂？我是${ch.name}。`); }
+    if (a === 'trygem') { stopVoice(); warned = false; speak(`喂？是我，${ch.name}。妳那邊現在方便講電話嗎？`); }
     if (a === 'delkey') { voice.geminiKey.set(''); list(); say('拿掉了，改用手機內建的聲音'); }
     if (a === 'tryvoice') { const keep = voiceOn(); if (!keep) { say('先打開「用手機內建的聲音唸」'); return; } speechSynthesis.cancel(); deviceSpeak(`喂？我是${ch.name}。`); }
     if (a === 'voice') { try { localStorage.setItem(VOICE_KEY, voiceOn() ? '0' : '1'); } catch { /* 存不了 */ } if (!voiceOn()) stopVoice(); room(); }

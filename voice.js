@@ -75,7 +75,9 @@ async function synthKey(text, voice, model) {
 export async function synth(text) {
   const how = route(); const v = cardVoice();
   if (!how || !v) return null;
-  const said = v.style ? `${v.style}\n${text}` : text;
+  // 口氣說明跟台詞直接接在一起，句子一短模型就分不清，會把說明也念出來（10/13 比比聽到阿愷在念 prompt）。
+  // 照官方的寫法用標題隔開：導演筆記只是說明，逐字稿才是要念的
+  const said = v.style ? `### DIRECTOR'S NOTES（只是說明，不要念出來）\n${v.style}\n\n#### TRANSCRIPT（只念這一段）\n${text}` : text;
   let err;
   for (const model of MODELS) {
     try { return await (how === 'tavern' ? synthTavern : synthKey)(said, v.name, model); }
