@@ -91,7 +91,7 @@
   /* 六排照剩下的高度分，最矮 80px；真的放不下就讓這一頁可以上下捲 */
   grid-template-rows: repeat(6, minmax(80px, 1fr)); grid-auto-rows: minmax(80px, 1fr);
   column-gap: 14px; row-gap: 10px; align-content: start;
-  height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: none;
+  height: 100%; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: none; /* 只擋上下，左右要讓外層接到才能換頁 */
 }
 .bp-app { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; cursor: pointer; }
 .bp-icon {
@@ -143,8 +143,8 @@
 .bp-music-ctl { display: flex; gap: 18px; align-items: center; }
 .bp-music-ctl svg { width: 18px; height: 18px; }
 
-.bp-dots { display: flex; justify-content: center; gap: 12px; padding: 6px 0 10px; }
-.bp-dots i { cursor: pointer; width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .45); }
+.bp-dots { display: flex; justify-content: center; gap: 2px; padding: 0 0 4px; }
+.bp-dots i { cursor: pointer; box-sizing: content-box; padding: 6px; background-clip: content-box !important; width: 7px; height: 7px; border-radius: 50%; background: rgba(255, 255, 255, .45); }
 .bp-dots i.bp-on { background: rgba(255, 255, 255, .95); }
 .bp-dock {
   margin: 0 12px 10px; padding: 14px 18px; border-radius: 34px;

@@ -16,7 +16,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.9.1';
+const VERSION = '0.9.2';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -262,6 +262,20 @@ function build() {
   // 點圓點跳頁
   const goPage = (i) => pages.scrollTo({ left: i * pages.clientWidth, behavior: 'smooth' });
   overlay.querySelectorAll('.bp-dots i').forEach((d, i) => d.addEventListener('click', () => goPage(i)));
+  const curPage = () => Math.round(pages.scrollLeft / pages.clientWidth);
+
+  // 滑鼠滾輪也能換頁：上下滾而且這一頁本身不用捲的時候，往下＝下一頁
+  let wheelLock = 0;
+  pages.addEventListener('wheel', (e) => {
+    if (Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return; // 觸控板左右滑交給瀏覽器
+    const page = pages.children[curPage()];
+    if (page && page.scrollHeight > page.clientHeight + 2) return; // 這頁還能上下捲
+    e.preventDefault();
+    if (Date.now() - wheelLock < 600 || Math.abs(e.deltaY) < 8) return;
+    wheelLock = Date.now();
+    goPage(Math.max(0, Math.min(PAGES.length - 1, curPage() + (e.deltaY > 0 ? 1 : -1))));
+  }, { passive: false });
+  let lastDragEnd = 0;
 
   // 滑鼠拖曳換頁（手指本來就能滑，這是給電腦用的）
   let drag = null; let dragged = false;
@@ -277,7 +291,7 @@ function build() {
   addEventListener('pointerup', (e) => {
     if (!drag) return;
     const dx = e.clientX - drag.x; const from = Math.round(drag.left / pages.clientWidth);
-    drag = null; pages.style.scrollSnapType = '';
+    drag = null; pages.style.scrollSnapType = ''; if (dragged) lastDragEnd = Date.now();
     if (dragged) goPage(Math.max(0, Math.min(PAGES.length - 1, from + (dx < -40 ? 1 : dx > 40 ? -1 : 0))));
   });
 
@@ -454,7 +468,8 @@ function build() {
   };
 
   // 點外框外面也能收起來
-  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  // 剛拖完放開在手機外面時不算「點外面」，不然一拖就收起來了
+  overlay.addEventListener('click', (e) => { if (e.target === overlay && Date.now() - lastDragEnd > 400) close(); });
 
   const api = {
     open() { applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); },
