@@ -1077,3 +1077,8 @@
 .bp-ca-key { display: flex; gap: 6px; align-items: center; margin-top: 8px; }
 .bp-ca-key input { flex: 1; min-width: 0; padding: 6px 8px; border-radius: 8px; border: 1px solid #0002; background: #fff9; font: inherit; }
 .bp-ca-key button { padding: 6px 12px; border-radius: 999px; border: 0; background: #0000000f; font: inherit; cursor: pointer; }
+
+/* iPhone 點到字小於 16px 的輸入框會整頁放大，放大之後手機就被推出畫面外。
+   小手機裡所有打字的地方一律 16px，之後新增的也自動套到。 */
+#bp-overlay input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
+#bp-overlay textarea { font-size: 16px !important; }
