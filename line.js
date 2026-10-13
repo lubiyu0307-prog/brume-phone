@@ -2,7 +2,7 @@
 // 回覆走酒館自己的 generateQuietPrompt，所以模型看得到角色卡、世界書與正文。
 
 import * as store from './store.js';
-import { currentChar, generate, ctx } from './st.js';
+import { currentChar, generate, ctx, writeLore } from './st.js';
 import * as data from './data.js';
 import * as stage from './stage.js';
 
@@ -37,6 +37,8 @@ const IC = {
 };
 
 const ALARM_KEY = 'brume-phone:alarm-shortcut';
+const LORE_KEY = 'brume-phone:lore';
+const loreOn = () => { try { return localStorage.getItem(LORE_KEY) === '1'; } catch { return false; } };
 const alarmShortcut = () => { try { return localStorage.getItem(ALARM_KEY) || 'Brume 設鬧鐘'; } catch { return 'Brume 設鬧鐘'; } };
 const MS_MSGS = [50, 100, 300, 520, 1000, 1314, 2000, 3000, 5000, 10000];
 const MS_DAYS = [7, 30, 50, 100, 200, 365, 520, 730, 1000];
@@ -425,6 +427,8 @@ export function createLine({ screen, say, onUnread, onData }) {
       <div class="bp-line-subbody">
         <p class="bp-line-subhint">${esc(ch.name)}從 LINE 裡記住的事。每聊三十則會自己整理一次，也可以手動整理；不對的可以改或刪。</p>
         <button class="bp-line-wide" data-line="summarize">現在整理一次</button>
+        <button class="bp-line-switch bp-line-lore" data-line="lore">同步寫進酒館的世界書<i class="${loreOn() ? 'on' : ''}"></i></button>
+        <p class="bp-line-subhint">打開之後，新整理出來的記憶會寫成這個聊天綁的世界書條目（沒有就寫角色卡綁的那本），正文跟 Memory Books 的記憶放在一起。條目名稱會標「📱 Brume Phone」。${loreOn() ? '<br><u data-line="loreall">把現在這些也寫進去</u>' : ''}</p>
         ${mem.length ? mem.map((m) => `<div class="bp-line-mem"><span>${esc(m.text)}</span><i data-memedit="${m.id}">${IC.edit}</i><i data-memdel="${m.id}">${IC.del}</i></div>`).join('') : '<p class="bp-line-subhint">還沒有記憶。</p>'}
       </div><div class="bp-line-pop"></div></div>`;
   }
@@ -497,10 +501,16 @@ export function createLine({ screen, say, onUnread, onData }) {
         `現在不是在寫劇情正文。請從下面這段 LINE 對話裡，挑出 ${who.name} 應該長久記住的事：${who.user} 說過的喜好、近況、約定、發生的事。`,
         mem.length ? `已經記過的（不要重複）：\n${mem.map((m) => '- ' + m.text).join('\n')}` : '',
         '', recent, '',
-        '每條一行、20 字內，用第三人稱寫，最多 3 條。沒有值得記的就只輸出「無」。不要編號、不要其他文字。',
+        '每條一行，格式：記憶內容｜關鍵字1,關鍵字2。記憶 20 字內、用第三人稱寫；關鍵字是之後聊到時會出現的詞。最多 3 條。沒有值得記的就只輸出「無」。不要編號、不要其他文字。',
       ].filter(Boolean).join('\n'));
-      const lines = raw.split('\n').map((l) => l.replace(/^\s*[-*\d.、]+\s*/, '').trim()).filter((l) => l && l !== '無' && l.length <= 60).slice(0, 3);
-      for (const l of lines) await data.memory.add(who.key, l);
+      const items = raw.split('\n').map((l) => l.replace(/^\s*[-*\d.、]+\s*/, '').trim()).filter((l) => l && l !== '無')
+        .map((l) => { const [text, keys = ''] = l.split(/[｜|]/); return { text: text.trim(), keys: keys.split(/[,，、]/).map((k) => k.trim()).filter(Boolean).slice(0, 5) }; })
+        .filter((x) => x.text && x.text.length <= 60).slice(0, 3);
+      const lines = items.map((x) => x.text);
+      for (const x of items) {
+        await data.memory.add(who.key, x.text);
+        if (loreOn()) { const r = await writeLore(`${who.user} 和 ${who.name} 在 LINE 上：${x.text}`, x.keys.length ? x.keys : [who.name]); if (!r.ok && manual) say(`沒寫進世界書：${r.why}`); }
+      }
       t.memAt = t.msgs.length; saveThread(who.key, t);
       if (manual) { say(lines.length ? `記下了 ${lines.length} 件事` : '這段沒有新的要記'); if (view === 'memory') renderMemory(); }
       syncMain();
@@ -676,6 +686,12 @@ export function createLine({ screen, say, onUnread, onData }) {
     if (a === 'cards') { unpop(); view = 'cards'; renderCards(); }
     if (a === 'stickermgr') { unpop(); view = 'stickers'; renderStickers(); }
     if (a === 'summarize') summarize(true);
+    if (a === 'lore') { try { localStorage.setItem(LORE_KEY, loreOn() ? '0' : '1'); } catch { /* 存不了 */ } renderMemory(); say(loreOn() ? '之後的記憶會寫進世界書' : '不寫進世界書了'); }
+    if (a === 'loreall') {
+      const mem = await data.memory.all(ch.key); let n = 0; let why = '';
+      for (const m of mem) { const r = await writeLore(`${ch.user} 和 ${ch.name} 在 LINE 上：${m.text}`, [ch.name]); if (r.ok) n++; else { why = r.why; break; } }
+      say(why ? `沒寫進去：${why}` : `寫了 ${n} 條進世界書`);
+    }
     if (a === 'msclose') e.target.closest('.bp-line-ms')?.remove();
     if (a === 'stkadd') { const f = screen.querySelector('.bp-line-file'); f.dataset.for = 'sticker'; f.click(); }
     if (a === 'alarmset') askSheet('鬧鐘捷徑的名字', alarmShortcut(), 'doalarmset', '', '點鬧鐘卡時，會叫 iPhone 的「捷徑」App 跑這個名字的捷徑。<br>做法：捷徑 App → 新增捷徑 → 加「分割文字」（自訂：|）→「從清單取得項目」第一項當時間、最後一項當名稱 →「製作鬧鐘」。捷徑的名字要跟這裡一樣。', 1);

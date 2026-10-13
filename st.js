@@ -90,3 +90,30 @@ export function recentChat(n = 12) {
   return (c?.chat || []).map((m, i) => ({ i, m })).filter(({ m }) => !m.is_system && m.mes).slice(-n)
     .map(({ i, m }) => ({ i, who: m.is_user ? (c.name1 || '我') : m.name, text: String(m.mes).replace(/<[^>]+>/g, '').replace(/\n{3,}/g, '\n\n').trim() }));
 }
+
+/**
+ * 把一條記憶寫進酒館的世界書：優先寫這個聊天綁的世界書（Memory Books 多半也寫這本），
+ * 沒有就寫角色卡綁的那本。回傳 { ok, book } 或 { ok:false, why }
+ */
+export async function writeLore(text, keys = []) {
+  const c = ctx();
+  if (!c?.loadWorldInfo || !c?.saveWorldInfo) return { ok: false, why: '這個版本的酒館不支援' };
+  const ch = c.characters?.[c.characterId];
+  const book = c.chatMetadata?.world_info || ch?.data?.extensions?.world;
+  if (!book) return { ok: false, why: '這個聊天和角色卡都沒有綁世界書' };
+  const data = await c.loadWorldInfo(book).catch(() => null);
+  if (!data?.entries) return { ok: false, why: `讀不到世界書「${book}」` };
+  const uids = Object.keys(data.entries).map(Number).filter((n) => !Number.isNaN(n));
+  const uid = uids.length ? Math.max(...uids) + 1 : 0;
+  data.entries[uid] = {
+    uid, key: keys, keysecondary: [], comment: '📱 Brume Phone・LINE 記憶', content: text,
+    constant: false, vectorized: false, selective: true, selectiveLogic: 0, addMemo: true,
+    order: 100, position: 1, disable: false, ignoreBudget: false, excludeRecursion: false, preventRecursion: false,
+    delayUntilRecursion: 0, probability: 100, useProbability: true, depth: 4, group: '', groupOverride: false, groupWeight: 100,
+    scanDepth: null, caseSensitive: null, matchWholeWords: null, useGroupScoring: null, automationId: '', role: 0,
+    sticky: null, cooldown: null, delay: null, displayIndex: uid,
+  };
+  await c.saveWorldInfo(book, data, true);
+  try { c.reloadWorldInfoEditor?.(book); } catch { /* 編輯器沒開就算了 */ }
+  return { ok: true, book };
+}
