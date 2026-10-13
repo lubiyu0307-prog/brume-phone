@@ -22,10 +22,11 @@ const IC = {
   note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l11-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>',
 };
 
-// ---------- 查歌：Apple 的公開資料庫（不用金鑰） ----------
-// 有的瀏覽器擋 Apple 的跨網域讀取，擋到就改用 JSONP（script 標籤）再查一次
+// ---------- 查歌：先問 Apple，查不到或被擋再問 Deezer，都不行而且有 YouTube 金鑰就問 YouTube ----------
+// 手機瀏覽器（尤其 iPhone）常把 Apple 的查詢擋掉，所以不能只靠一家。
+// 每一家都是公開資料、不用金鑰（YouTube 除外）。
 let useJsonp = false;
-function jsonp(url) {
+function jsonp(url, param = 'callback') {
   return new Promise((resolve, reject) => {
     const cb = `bpIt${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
     const el = document.createElement('script');
@@ -33,7 +34,7 @@ function jsonp(url) {
     const timer = setTimeout(() => { done(); reject(new Error('查歌逾時')); }, 10000);
     window[cb] = (data) => { clearTimeout(timer); done(); resolve(data); };
     el.onerror = () => { clearTimeout(timer); done(); reject(new Error('查歌失敗')); };
-    el.src = `${url}&callback=${cb}`;
+    el.src = `${url}&${param}=${cb}`;
     document.head.appendChild(el);
   });
 }
@@ -43,33 +44,64 @@ async function itunes(term) {
   if (!useJsonp) {
     try {
       const r = await fetch(url);
-      if (r.ok) return (await r.json()).results || [];
+      if (r.ok) return ((await r.json()).results || []).map(fromApple);
     } catch { /* 多半是跨網域被擋 */ }
     useJsonp = true;
   }
-  return (await jsonp(url)).results || [];
+  return ((await jsonp(url)).results || []).map(fromApple);
+}
+const fromApple = (x) => ({
+  id: String(x.trackId), title: x.trackName, artist: x.artistName, album: x.collectionName || '',
+  cover: (x.artworkUrl100 || '').replace('100x100bb', '600x600bb'), preview: x.previewUrl || '',
+});
+
+async function deezer(term) {
+  const d = await jsonp(`https://api.deezer.com/search?limit=8&output=jsonp&q=${encodeURIComponent(term)}`);
+  if (d?.error) throw new Error('Deezer 查不到');
+  return (d?.data || []).map((x) => ({
+    id: 'dz' + x.id, title: x.title, artist: x.artist?.name || '', album: x.album?.title || '',
+    cover: x.album?.cover_xl || x.album?.cover_big || '', preview: x.preview || '',
+  }));
 }
 
-/** 他說的歌真的存在嗎？存在就回傳整理好的歌，查不到回 null（模型很會編歌） */
-export async function verify(title, artist) {
-  let res = await itunes(`${title} ${artist}`).catch(() => []);
-  if (!res.length) res = await itunes(title).catch(() => []);
+async function youtubeSearch(term) {
+  const key = localStorage.getItem(YT_KEY);
+  if (!key) throw new Error('沒有 YouTube 金鑰'); // 沒有就不算這家
+  const r = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&maxResults=5&q=${encodeURIComponent(term)}&key=${encodeURIComponent(key)}`, { referrerPolicy: 'strict-origin-when-cross-origin' });
+  if (!r.ok) throw new Error('YouTube 查不到');
+  const un = (t) => { const e = document.createElement('textarea'); e.innerHTML = t; return e.value; };
+  return ((await r.json()).items || []).map((it) => ({
+    id: 'yt' + it.id.videoId, ytId: it.id.videoId, title: un(it.snippet.title), artist: un(it.snippet.channelTitle || ''),
+    album: '', cover: it.snippet.thumbnails?.high?.url || '', preview: '', loose: true,
+  }));
+}
+
+function pick(res, title, artist) {
   const nt = norm(title); const na = norm(artist);
-  const hit = res.find((x) => {
-    const tn = norm(x.trackName); const an = norm(x.artistName);
+  return res.find((x) => {
+    const tn = norm(x.title); const an = norm(x.artist);
+    // YouTube 的標題常寫成「歌手 - 歌名 (Official MV)」，只要包含歌名就算
+    if (x.loose) return tn.includes(nt) && (!na || tn.includes(na) || an.includes(na) || na.includes(an));
     const titleOk = tn === nt || tn.includes(nt) || nt.includes(tn);
     const artistOk = !na || an.includes(na) || na.includes(an);
     return titleOk && artistOk;
   });
-  if (!hit) return null;
-  return {
-    id: String(hit.trackId),
-    title: hit.trackName,
-    artist: hit.artistName,
-    album: hit.collectionName || '',
-    cover: (hit.artworkUrl100 || '').replace('100x100bb', '600x600bb'),
-    preview: hit.previewUrl || '',
-  };
+}
+
+/** 查歌有沒有連得上（給錯誤訊息分辨「歌不存在」還是「網路被擋」） */
+export const lookup = { reached: false };
+
+/** 他說的歌真的存在嗎？存在就回傳整理好的歌，查不到回 null（模型很會編歌） */
+export async function verify(title, artist) {
+  for (const src of [itunes, deezer, youtubeSearch]) {
+    for (const term of [`${title} ${artist}`, title]) {
+      let res;
+      try { res = await src(term); lookup.reached = true; } catch { break; } // 這家連不上就換下一家
+      const hit = pick(res, title, artist);
+      if (hit) { const { loose, ytId, ...song } = hit; if (ytId) song.yt = ytId; return song; }
+    }
+  }
+  return null;
 }
 
 // ---------- YouTube：有金鑰才能找影片放整首 ----------
@@ -249,7 +281,7 @@ export function createMusic({ screen, ytHost, say }) {
 
   async function recommend() {
     if (loading || !ch) return;
-    loading = true; renderHome();
+    loading = true; renderHome(); lookup.reached = false;
     const who = ch; const d = data;
     try {
       const raw = await generate(recPrompt(who, d.playlist));
@@ -261,7 +293,7 @@ export function createMusic({ screen, ytHost, say }) {
       const seen = new Set();
       d.recs = found.filter((s) => !seen.has(s.id) && seen.add(s.id));
       save();
-      if (!d.recs.length) say('他挑的歌都查不到，再按一次試試');
+      if (!d.recs.length) say(lookup.reached ? '他挑的歌都查不到，再按一次試試' : '這台連不上查歌的地方（可能被瀏覽器或廣告阻擋擋住），換個網路或關掉阻擋再試');
       else if (d.recs.length < picks.length) say(`有 ${picks.length - d.recs.length} 首查不到，先拿掉了`);
     } catch (e) {
       say(`推薦失敗：${e.message || e}`);
