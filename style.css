@@ -1032,6 +1032,7 @@
 .bp-switchrow i.on { background: #8fb98a; }
 .bp-switchrow i.on::after { left: 21px; }
 .bp-sheet-note { font-size: 11.5px; color: #8a8378; line-height: 1.6; margin: 0 4px 6px; }
+.bp-sheet button[hidden] { display: none; }
 .bp-sheet button.bp-cancel { background: transparent; color: #8a8378; }
 .bp-ver { text-align: center; font-size: 11px; color: #a39b8f; margin-top: 4px; }
 
