@@ -6,6 +6,7 @@ import { createNotes, createCalendar } from './apps.js';
 import { createThreads } from './threads.js';
 import { createHisPhone } from './hisphone.js';
 import { createAlbum } from './album.js';
+import { createIG } from './ig.js';
 import { createLife, settings as lifeSet, LEVELS } from './life.js';
 import * as stage from './stage.js';
 import { currentChar, ctx, lite } from './st.js';
@@ -312,6 +313,7 @@ function build() {
       if (open.dataset.open === 'calendar') { openApp(calendar); return; }
       if (open.dataset.open === 'threads') { openApp(threads); return; }
       if (open.dataset.open === 'album') { openApp(album); return; }
+      if (open.dataset.open === 'ig') { openApp(ig); return; }
       if (open.dataset.open === 'camera') { openApp(snap); return; }
       say('這個 App 還在做 ☁︎');
       return;
@@ -340,6 +342,7 @@ function build() {
   const calendar = createCalendar({ screen: appScreen, say });
   const threads = createThreads({ screen: appScreen, say });
   const album = createAlbum({ screen: appScreen, say });
+  const ig = createIG({ screen: appScreen, say });
   const snap = { open: () => album.open('snap') };
   const his = createHisPhone({ host: overlay.querySelector('.bp-his'), say, onExit: () => say('還給他了，他沒發現') });
   const openLineRoom = () => { openApp(line); line.openRoom(); };

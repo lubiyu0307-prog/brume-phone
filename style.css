@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@200;300&family=Playfair+Display:wght@600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@200;300&family=Playfair+Display:wght@600&family=Grand+Hotel&display=swap');
 
 /* ---------- 入口按鈕 ---------- */
 #bp-launcher {
@@ -676,6 +676,89 @@
 .bp-al-bar { padding: 10px 14px calc(10px + env(safe-area-inset-bottom)); background: #fbfaf8; border-top: 1px solid #eee; }
 .bp-al-bar button { width: 100%; padding: 13px; border: 0; border-radius: 14px; background: #2b2824; color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
 .bp-al-bar button:disabled { opacity: .5; }
+
+/* ---------- Instagram ---------- */
+.bp-appscreen:has(.bp-ig) { background: #fff; }
+.bp-ig { flex: 1; display: flex; flex-direction: column; min-height: 0; background: #fff; color: #000; position: relative; font-family: -apple-system, "Helvetica Neue", "PingFang TC", sans-serif; }
+.bp-ig-head { display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; height: 50px; padding: 0 6px; border-bottom: 1px solid #efefef; }
+.bp-ig-head b { text-align: center; font-size: 16px; }
+.bp-ig-head b.logo { font-family: "Grand Hotel", "Snell Roundhand", cursive; font-weight: 400; font-size: 28px; }
+.bp-ig-head .bp-back { color: #000; }
+.bp-ig-head i { display: grid; place-items: center; cursor: pointer; color: #555; }
+.bp-ig-head i svg { width: 21px; height: 21px; }
+.bp-ig-head i.spin svg { animation: bp-spin 1s linear infinite; }
+.bp-ig-scroll { flex: 1; overflow-y: auto; overscroll-behavior: contain; }
+.bp-ig-empty { text-align: center; color: #8e8e8e; font-size: 13px; padding: 24px 16px; line-height: 1.7; }
+.bp-ig-av { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; flex: none; background: hsl(var(--h, 20) 35% 70%); color: #fff; font-weight: 600; font-size: 20px; }
+.bp-ig-av.sm { width: 32px; height: 32px; font-size: 13px; }
+.bp-ig-av.xs { width: 28px; height: 28px; font-size: 12px; }
+.bp-ig-av.lg { width: 84px; height: 84px; font-size: 30px; }
+.bp-ig-stories { display: flex; gap: 14px; overflow-x: auto; padding: 10px 12px; border-bottom: 1px solid #efefef; scrollbar-width: none; }
+.bp-ig-story { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: none; width: 66px; cursor: pointer; }
+.bp-ig-story .bp-ig-av { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #d6249f; }
+.bp-ig-story.seen .bp-ig-av, .bp-ig-story.me .bp-ig-av { box-shadow: 0 0 0 2px #fff, 0 0 0 3px #dbdbdb; }
+.bp-ig-story span { font-size: 11px; max-width: 66px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bp-ig-post { border-bottom: 1px solid #efefef; padding-bottom: 10px; }
+.bp-ig-post header { display: flex; align-items: center; gap: 10px; padding: 8px 12px; cursor: pointer; }
+.bp-ig-post header b { font-size: 14px; flex: 1; }
+.bp-ig-post header i { color: #333; display: grid; }
+.bp-ig-post header i svg { width: 20px; height: 20px; }
+.bp-ig-img { width: 100%; aspect-ratio: 1; object-fit: cover; display: block; background: #eee; }
+.bp-ig-img.card { display: grid; place-items: center; padding: 30px; background: linear-gradient(135deg, hsl(var(--h) 32% 60%), hsl(calc(var(--h) + 50) 26% 34%)); }
+.bp-ig-img.card span { color: #fff; font-size: 16px; line-height: 1.7; text-align: center; text-shadow: 0 1px 6px rgba(0, 0, 0, .35); }
+.bp-ig-img.sq.card { padding: 8px; }
+.bp-ig-img.sq.card span { font-size: 10px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; }
+.bp-ig-acts { display: flex; gap: 14px; padding: 10px 12px 4px; }
+.bp-ig-acts span { cursor: pointer; display: grid; }
+.bp-ig-acts span.r { margin-left: auto; }
+.bp-ig-acts svg { width: 25px; height: 25px; }
+.bp-ig-likes { margin: 2px 12px; font-size: 14px; font-weight: 600; }
+.bp-ig-cap { margin: 4px 12px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+.bp-ig-more { margin: 4px 12px; font-size: 14px; color: #8e8e8e; cursor: pointer; }
+.bp-ig-time { margin: 4px 12px; font-size: 11px; color: #8e8e8e; }
+.bp-ig-gen { margin: 4px 12px 8px; padding: 9px 14px; border: 1px solid #dbdbdb; border-radius: 8px; background: #fafafa; font: inherit; font-size: 13px; cursor: pointer; }
+.bp-ig-comments { padding: 6px 12px 16px; display: flex; flex-direction: column; gap: 12px; }
+.bp-ig-c { display: flex; gap: 10px; align-items: flex-start; }
+.bp-ig-c p { margin: 0; font-size: 14px; line-height: 1.45; flex: 1; word-break: break-word; }
+.bp-ig-c small { display: block; font-size: 11px; color: #8e8e8e; margin-top: 2px; }
+.bp-ig-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); border-top: 1px solid #efefef; margin: 0; }
+.bp-ig-bar input { flex: 1; height: 38px; border: 0; outline: none; font: inherit; font-size: 16px; background: none; color: #000; }
+.bp-ig-bar button { border: 0; background: none; color: #0095f6; font: inherit; font-weight: 600; cursor: pointer; white-space: nowrap; }
+.bp-ig-tabs { display: grid; grid-template-columns: repeat(3, 1fr); padding: 10px 0 calc(10px + env(safe-area-inset-bottom)); border-top: 1px solid #efefef; }
+.bp-ig-tabs span { display: grid; place-items: center; color: #8e8e8e; cursor: pointer; }
+.bp-ig-tabs span.on { color: #000; }
+.bp-ig-tabs svg { width: 26px; height: 26px; }
+.bp-ig-prof { display: flex; align-items: center; justify-content: space-around; padding: 14px 12px 8px; }
+.bp-ig-prof div { display: flex; flex-direction: column; align-items: center; }
+.bp-ig-prof b { font-size: 17px; }
+.bp-ig-prof span { font-size: 12.5px; }
+.bp-ig-bio { margin: 4px 16px 10px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; }
+.bp-ig-profbtns { display: flex; gap: 6px; margin: 0 16px 12px; }
+.bp-ig-profbtns button { flex: 1; padding: 7px; border: 0; border-radius: 8px; background: #efefef; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+.bp-ig-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.bp-ig-grid > div { cursor: pointer; }
+.bp-ig-sheet { position: absolute; inset: 0; z-index: 20; background: rgba(0, 0, 0, .4); display: flex; align-items: flex-end; }
+.bp-ig-sheet > div { width: 100%; background: #fff; border-radius: 14px 14px 0 0; padding-bottom: calc(14px + env(safe-area-inset-bottom)); max-height: 90%; overflow-y: auto; }
+.bp-ig-sheet-top { display: grid; grid-template-columns: 60px 1fr 60px; align-items: center; padding: 14px 16px; border-bottom: 1px solid #efefef; }
+.bp-ig-sheet-top u { text-decoration: none; cursor: pointer; }
+.bp-ig-sheet-top u.ok { color: #0095f6; font-weight: 600; text-align: right; }
+.bp-ig-sheet-top b { text-align: center; }
+.bp-ig-pick { margin: 14px 16px; aspect-ratio: 1; border-radius: 10px; background: #f2f2f2; display: grid; place-items: center; color: #8e8e8e; cursor: pointer; overflow: hidden; }
+.bp-ig-pick img { width: 100%; height: 100%; object-fit: cover; }
+.bp-ig-sheet textarea, .bp-ig-sheet input:not([type]) { display: block; width: calc(100% - 32px); margin: 0 16px 10px; border: 1px solid #dbdbdb; border-radius: 8px; padding: 10px; font: inherit; font-size: 16px; resize: none; outline: none; color: #000; background: #fff; }
+.bp-ig-sheet label { display: block; margin: 10px 16px 4px; font-size: 13px; color: #555; }
+.bp-ig-asstory { display: flex !important; align-items: center; gap: 8px; }
+.bp-ig-storyv { position: absolute; inset: 0; z-index: 22; background: #000; color: #fff; display: flex; flex-direction: column; cursor: pointer; padding-top: env(safe-area-inset-top); }
+.bp-ig-sbars { display: flex; gap: 4px; padding: 10px 10px 6px; }
+.bp-ig-sbars i { flex: 1; height: 2.5px; border-radius: 2px; background: rgba(255, 255, 255, .35); }
+.bp-ig-sbars i.done, .bp-ig-sbars i.now { background: #fff; }
+.bp-ig-storyv header { display: flex; align-items: center; gap: 8px; padding: 4px 12px 10px; font-size: 13px; }
+.bp-ig-storyv header span { color: rgba(255, 255, 255, .7); }
+.bp-ig-storyv img, .bp-ig-storyv .card { flex: 1; min-height: 0; width: 100%; object-fit: cover; }
+.bp-ig-storyv .card { display: grid; place-items: center; padding: 40px; background: linear-gradient(160deg, hsl(var(--h) 30% 45%), hsl(calc(var(--h) + 60) 30% 20%)); }
+.bp-ig-storyv .card span { font-size: 18px; line-height: 1.7; text-align: center; }
+.bp-ig-storyv p { position: absolute; left: 20px; right: 20px; bottom: 90px; text-align: center; font-size: 17px; background: rgba(0, 0, 0, .45); padding: 10px 14px; border-radius: 12px; }
+.bp-ig-storyv small { text-align: center; padding: 14px; color: rgba(255, 255, 255, .6); font-size: 12px; }
 
 /* ---------- 通知（鎖定畫面、按鈕紅點、網頁上方橫幅） ---------- */
 .bp-notifs { width: 100%; padding: 0 12px; margin-top: 22px; display: flex; flex-direction: column; gap: 8px; }
