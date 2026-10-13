@@ -98,7 +98,12 @@ export async function verify(title, artist) {
       let res;
       try { res = await src(term); lookup.reached = true; } catch { break; } // 這家連不上就換下一家
       const hit = pick(res, title, artist);
-      if (hit) { const { loose, ytId, ...song } = hit; if (ytId) song.yt = ytId; return song; }
+      if (hit) {
+        const { loose, ytId, ...song } = hit;
+        // YouTube 的標題是影片名、作者是上傳的頻道，不是歌名和歌手；對到了就用他說的歌名歌手
+        if (ytId) Object.assign(song, { yt: ytId, title, artist });
+        return song;
+      }
     }
   }
   return null;
