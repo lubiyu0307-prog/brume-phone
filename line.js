@@ -65,11 +65,16 @@ const TAB = {
 async function loadThread(key) {
   let t = await store.get('line:' + key).catch(() => null);
   if (!t) {
-    try { t = JSON.parse(localStorage.getItem(OLD_STORE + key)); } catch { t = null; }
-    t = t || { msgs: [] };
-    for (const m of t.msgs) m.id ||= uid();
-    await store.set('line:' + key, t).catch(() => {});
-    try { localStorage.removeItem(OLD_STORE + key); } catch { /* 沒有就算了 */ }
+    let old = null;
+    try { old = JSON.parse(localStorage.getItem(OLD_STORE + key)); } catch { old = null; }
+    if (old?.msgs?.length) {
+      for (const m of old.msgs) m.id ||= uid();
+      await store.set('line:' + key, old).catch(() => {});
+      try { localStorage.removeItem(OLD_STORE + key); } catch { /* 沒有就算了 */ }
+      return old;
+    }
+    // 空的不存：不然另一台裝置還沒拿到伺服器的資料前，會用一份「比較新的空白」把它蓋掉
+    return { msgs: [] };
   }
   return t;
 }
@@ -298,7 +303,7 @@ export function createLine({ screen, say, onUnread, onData }) {
   }
 
   function renderRoom() {
-    thread.seen = Date.now(); save(); onUnread?.(0);
+    thread.seen = Date.now(); if (thread.msgs.length) save(); onUnread?.(0); // 空的不存，理由同 loadThread
     screen.innerHTML = `<div class="bp-line bp-line-roomv${thread.sleep ? ' bp-line-sleep' : ''}">
       <div class="bp-line-head"><span class="bp-back" data-line="list">‹</span><b>${esc(ch.name)}</b>
         <span class="bp-line-tools"><i data-line="search">${IC.search}</i><i data-line="more">${IC.more}</i></span></div>

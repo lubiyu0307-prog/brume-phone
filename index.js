@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.9.4';
+const VERSION = '0.10.0';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -438,6 +438,13 @@ function build() {
     },
   });
   setInterval(refreshNotices, 30000);
+  // 切回這個分頁時（可能剛在別台裝置用過），重新跟伺服器對一次
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    store.refresh();
+    if (!appScreen.querySelector('.bp-line-roomv')) line.forget();
+    refreshNotices();
+  });
 
   // 0.9.3 以前手機資料照角色存。新的聊天一律是新手機、不問；
   // 這個角色有舊紀錄、還沒搬過的話，設定裡才出現「把之前的紀錄搬進這個聊天」
@@ -502,7 +509,7 @@ function build() {
   overlay.addEventListener('click', (e) => { if (e.target === overlay && Date.now() - lastDragEnd > 400) close(); });
 
   const api = {
-    open() { applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); },
+    open() { store.refresh(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); },
     close,
   };
   return api;

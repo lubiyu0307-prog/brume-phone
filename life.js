@@ -26,8 +26,8 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 
 export function createLife({ line, say, onNotify, onStageHint }) {
   let pending = [];
-  store.get('pending').then((p) => { pending = Array.isArray(p) ? p : []; }).catch(() => {});
-  const savePending = () => store.set('pending', pending).catch(() => {});
+  store.get('local:pending').then((p) => { pending = Array.isArray(p) ? p : []; }).catch(() => {});
+  const savePending = () => store.set('local:pending', pending).catch(() => {});
 
   // ---------- 一、劇情 → 手機 ----------
   async function bridgePrompt() {
