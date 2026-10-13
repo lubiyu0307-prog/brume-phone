@@ -1050,3 +1050,10 @@
   .bp-lock-date { margin-top: 40px; }
   .bp-appscreen { padding-top: env(safe-area-inset-top); }
 }
+
+/* ---------- 護眼模式：整支手機暗一點、偏暖，白底不刺眼 ---------- */
+.bp-phone.bp-eye { filter: brightness(.86) contrast(.93) saturate(.88); }
+.bp-phone.bp-eye::after {
+  content: ""; position: absolute; inset: 0; z-index: 40; pointer-events: none;
+  background: rgba(255, 160, 80, .13); mix-blend-mode: multiply;
+}

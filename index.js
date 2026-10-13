@@ -16,7 +16,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.9.0';
+const VERSION = '0.9.1';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -157,6 +157,8 @@ function build() {
       <div class="bp-setrow"><span>他主動的程度</span><div class="bp-seg" data-seg="level">${Object.entries(LEVELS).map(([k, v]) => `<b data-act="level" data-v="${k}">${v.name}</b>`).join('')}</div></div>
       <button data-act="bridge" class="bp-switchrow">劇情接手機<i></i></button>
       <p class="bp-sheet-note">開著：正文裡你們分開、約好下次的時候，他之後會自己傳 LINE 或發脆，過幾分鐘手機才響。</p>
+      <div class="bp-setrow"><span>護眼模式</span><div class="bp-seg" data-seg="eye">${[['off', '關'], ['on', '開'], ['auto', '晚上自動']].map(([k, n]) => `<b data-act="eye" data-v="${k}">${n}</b>`).join('')}</div></div>
+      <p class="bp-sheet-note">畫面暗一點、偏暖色，白底不刺眼。晚上自動：晚上七點到早上七點自動打開。</p>
       <button data-act="lite" class="bp-switchrow">省 token 模式<i></i></button>
       <p class="bp-sheet-note">開著：只送角色卡、被叫到的世界書和正文最後幾則，比正文一次少很多。關掉：送整份預設和整段正文，跟正文一樣貴，但他看得最完整。傳照片給他時一律走完整的。</p>
       <button data-act="his">偷看他的手機</button>
@@ -238,6 +240,15 @@ function build() {
     overlay.querySelectorAll('.bp-dots i').forEach((d, k) => d.classList.toggle('bp-on', k === i));
   }, { passive: true });
 
+  // 護眼：關、開、晚上自動（19:00～07:00）
+  function applyEye() {
+    const h = new Date().getHours();
+    const on = state.eye === 'on' || (state.eye === 'auto' && (h >= 19 || h < 7));
+    phone.classList.toggle('bp-eye', on);
+  }
+  applyEye();
+  setInterval(applyEye, 60000);
+
   const showLite = () => sheet.querySelector('[data-act="lite"] i').classList.toggle('on', lite.get());
   async function showSettings() {
     showLite();
@@ -245,6 +256,7 @@ function build() {
     sheet.querySelectorAll('[data-act="stage"]').forEach((b) => b.classList.toggle('on', b.dataset.v === cur));
     sheet.querySelectorAll('[data-act="level"]').forEach((b) => b.classList.toggle('on', b.dataset.v === lifeSet.get().level));
     sheet.querySelector('[data-act="bridge"] i').classList.toggle('on', lifeSet.get().bridge);
+    sheet.querySelectorAll('[data-act="eye"]').forEach((b) => b.classList.toggle('on', b.dataset.v === (state.eye || 'off')));
   }
 
   // 點圓點跳頁
@@ -288,6 +300,7 @@ function build() {
         sheet.classList.remove('bp-show'); his.open();
       }
       if (a === 'stage') { const c = currentChar(); if (!c) { say('先在酒館選一個角色'); return; } await stage.set(c.key, act.dataset.v); showSettings(); life.refreshPrompt(); syncMain(); say(`關係改成「${stage.name(act.dataset.v)}」了`); }
+      if (a === 'eye') { state.eye = act.dataset.v; save(state); applyEye(); showSettings(); }
       if (a === 'level') { lifeSet.set({ level: act.dataset.v }); showSettings(); }
       if (a === 'bridge') { lifeSet.set({ bridge: !lifeSet.get().bridge }); showSettings(); life.refreshPrompt(); }
       if (a === 'snap') { lock.classList.add('bp-gone'); phone.classList.remove('bp-locked'); openApp(snap); }
@@ -444,7 +457,7 @@ function build() {
   overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
 
   const api = {
-    open() { life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); },
+    open() { applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); },
     close,
   };
   return api;
