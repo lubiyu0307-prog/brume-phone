@@ -50,3 +50,6 @@ export function fromWord(w) {
   const s = STAGES.find((x) => String(w || '').includes(x.name));
   return s ? s.id : null;
 }
+
+/** 資料搬家後清掉快取，下次重讀 */
+export const forget = (key) => cache.delete(key);

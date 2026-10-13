@@ -26,13 +26,13 @@ export function createAlbum({ screen, say }) {
   let view = 'grid'; let tab = 'all'; let openId = null; let picked = new Set(); let busy = false; let note = '';
   const mine = () => !!screen.querySelector('.bp-al');
   const save = () => ch && store.set('album:' + ch.key, items).catch(() => {});
-  const saveLook = () => ch && store.set('look:' + ch.key, look).catch(() => {});
+  const saveLook = () => ch && store.set('look:' + ch.charKey, look).catch(() => {});
 
   async function load() {
     ch = currentChar();
     if (!ch) return false;
     items = (await store.get('album:' + ch.key).catch(() => null)) || [];
-    look = (await store.get('look:' + ch.key).catch(() => null)) || { him: '', me: '' };
+    look = (await store.get('look:' + ch.charKey).catch(() => null)) || { him: '', me: '' };
     return true;
   }
 

@@ -8,8 +8,12 @@ export function currentChar() {
   if (!c || c.groupId || c.characterId === undefined || c.characterId === null) return null;
   const ch = c.characters?.[c.characterId];
   if (!ch) return null;
+  const charKey = ch.avatar || ch.name;
+  // 手機的資料照「聊天」分：同一個角色開新的聊天（不同開場）就是另一個故事，另一支手機
+  const chatId = c.getCurrentChatId?.() || '';
   return {
-    key: ch.avatar || ch.name,
+    key: chatId ? `${charKey}::${chatId}` : charKey,
+    charKey,
     name: ch.name,
     avatar: ch.avatar ? `/thumbnail?type=avatar&file=${encodeURIComponent(ch.avatar)}` : '',
     user: c.name1 || '我',
@@ -117,3 +121,6 @@ export async function writeLore(text, keys = []) {
   try { c.reloadWorldInfoEditor?.(book); } catch { /* 編輯器沒開就算了 */ }
   return { ok: true, book };
 }
+
+// 以前（0.9.2 以前）手機資料是照角色存的。這裡列出每一種資料的前綴，搬家時一起搬
+export const DATA_PREFIXES = ['line', 'linebg', 'music', 'ig', 'threads', 'his', 'album', 'calls', 'rps', 'stage', 'notes', 'cal', 'memory', 'cards'];

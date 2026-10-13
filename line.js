@@ -867,6 +867,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     openRoom() { view = 'room'; render(); },
     refresh: render,
     himFirst, deliver, unseen, lastActive, unansweredRun,
+    forget() { ch = null; thread = null; }, // 換聊天或資料搬家之後，下次重讀
     get busy() { return !!busy; },
   };
 }

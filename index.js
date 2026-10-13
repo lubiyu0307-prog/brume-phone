@@ -11,12 +11,13 @@ import { createGames } from './games.js';
 import { createCall } from './call.js';
 import { createLife, settings as lifeSet, LEVELS } from './life.js';
 import * as stage from './stage.js';
-import { currentChar, ctx, lite } from './st.js';
+import { currentChar, ctx, lite, DATA_PREFIXES } from './st.js';
+import * as store from './store.js';
 import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.9.2';
+const VERSION = '0.9.3';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -321,6 +322,24 @@ function build() {
       if (a === 'notif') { lock.classList.add('bp-gone'); phone.classList.remove('bp-locked'); openLineRoom(); }
       if (a === 'hint-yes') { const h = overlay.querySelector('.bp-hintsheet'); await stage.set(h.dataset.key, h.dataset.v); h.remove(); life.refreshPrompt(); syncMain(); say(`關係改成「${stage.name(h.dataset.v)}」了`); }
       if (a === 'hint-no') overlay.querySelector('.bp-hintsheet')?.remove();
+      if (a === 'mig-yes' || a === 'mig-no') {
+        const h = overlay.querySelector('.bp-migsheet'); const c = currentChar();
+        if (h && c && c.key === h.dataset.key) {
+          if (a === 'mig-yes') {
+            for (const pre of DATA_PREFIXES) {
+              const v = await store.get(`${pre}:${c.charKey}`).catch(() => null);
+              if (v != null) await store.set(`${pre}:${c.key}`, v).catch(() => {});
+            }
+            stage.forget(c.key); line.forget();
+            try { localStorage.setItem(`brume-phone:migrated:${c.charKey}`, c.key); } catch { /* 存不了 */ }
+            say('舊的紀錄搬進這個聊天了'); life.refreshPrompt(); syncMain(); refreshNotices(); calDots();
+          } else {
+            try { localStorage.setItem(`brume-phone:skipmig:${c.key}`, '1'); } catch { /* 存不了 */ }
+            say('這個聊天的手機從空的開始');
+          }
+        }
+        h?.remove();
+      }
       if (a === 'lite') { lite.set(!lite.get()); showLite(); say(lite.get() ? '省 token 模式開了' : '改用完整模式'); }
       return;
     }
@@ -423,6 +442,26 @@ function build() {
     },
   });
   setInterval(refreshNotices, 30000);
+
+  // 0.9.3 以前手機資料照角色存。打開某個聊天時，如果這個角色有舊紀錄、還沒搬過、這個聊天也還是空的，問要不要搬進來
+  async function checkMigrate() {
+    const c = currentChar();
+    if (!c || c.key === c.charKey || !overlay.classList.contains('bp-open') || overlay.querySelector('.bp-migsheet')) return;
+    try { if (localStorage.getItem(`brume-phone:migrated:${c.charKey}`) || localStorage.getItem(`brume-phone:skipmig:${c.key}`)) return; } catch { return; }
+    const [oldLine, newLine, oldIg, oldTh] = await Promise.all([`line:${c.charKey}`, `line:${c.key}`, `ig:${c.charKey}`, `threads:${c.charKey}`].map((k) => store.get(k).catch(() => null)));
+    const n = oldLine?.msgs?.filter((m) => !m.err).length || 0;
+    if (!n && !oldIg && !oldTh) { try { localStorage.setItem(`brume-phone:migrated:${c.charKey}`, '-'); } catch { /* 存不了 */ } return; }
+    if (newLine?.msgs?.length) return;
+    phone.insertAdjacentHTML('beforeend', `<div class="bp-hintsheet bp-migsheet" data-key="${c.key.replace(/"/g, '&quot;')}"><div>
+      <b>${c.name}有之前的手機紀錄</b>
+      <span>手機現在照聊天分開了，每個開場是自己的一支手機。要把之前的紀錄（LINE ${n} 則、脆、IG、相本⋯）搬進這個聊天嗎？<br>選「不用」的話這個聊天從空的開始，舊的紀錄會留著，之後在別的聊天還可以搬。</span>
+      <div><button data-act="mig-no">不用</button><button data-act="mig-yes" class="ok">搬過來</button></div></div></div>`);
+  }
+  const stx = ctx();
+  stx?.eventSource?.on?.(stx.eventTypes?.CHAT_CHANGED || stx.event_types?.CHAT_CHANGED || 'chat_id_changed', () => {
+    line.forget(); closeApp(); his.close(); overlay.querySelectorAll('.bp-hintsheet').forEach((x) => x.remove());
+    refreshNotices(); calDots(); checkMigrate();
+  });
   setTimeout(refreshNotices, 1500);
 
   // LINE 裡點「他貼了便條／記上行事曆」那行小字，直接跳到那個 App
@@ -472,7 +511,7 @@ function build() {
   overlay.addEventListener('click', (e) => { if (e.target === overlay && Date.now() - lastDragEnd > 400) close(); });
 
   const api = {
-    open() { applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); },
+    open() { applyEye(); setTimeout(checkMigrate, 300); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); },
     close,
   };
   return api;
