@@ -108,6 +108,16 @@ export function createLife({ line, say, onNotify, onStageHint }) {
   }
 
   // ---------- 二、他先傳 ----------
+  // 正文最後一則的時間（送出或生成完成），讀不到就當很久以前
+  function storyActive() {
+    const chat = ctx()?.chat || [];
+    for (let i = chat.length - 1; i >= 0; i--) {
+      const m = chat[i]; if (!m || m.is_system) continue;
+      const t = Date.parse(m.gen_finished || m.send_date || '');
+      return Number.isFinite(t) ? t : 0;
+    }
+    return 0;
+  }
   const lastKey = (k) => `brume-phone:lastfirst:${k}`;
   const getLast = (k) => { try { return +localStorage.getItem(lastKey(k)) || 0; } catch { return 0; } };
   const setLast = (k) => { try { localStorage.setItem(lastKey(k), String(Date.now())); } catch { /* 無痕模式 */ } };
@@ -125,6 +135,7 @@ export function createLife({ line, say, onNotify, onStageHint }) {
     const gap = last ? Math.min(now - last, 24 * 36e5) : 3 * 36e5; // 從沒聊過就當三小時
     if (now - getLast(ch.key) < Math.min(L.away, L.idle)) return; // 剛剛才傳過
     if (line.busy || await line.unansweredRun() >= 2) return; // 她還沒回，不要一直刷
+    if (now - storyActive() < L.idle) return; // 正文最近還在動：她在故事裡跟他相處，他不會拿手機傳
     let kind = null;
     if (reason === 'open' && gap >= L.away) kind = 'away';
     else if (reason === 'tick' && gap >= L.idle && Math.random() < L.chance) kind = gap >= L.away ? 'away' : 'idle';

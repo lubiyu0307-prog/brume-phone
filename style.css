@@ -412,6 +412,11 @@
 .bp-line-sleep .bp-line-plus, .bp-line-sleep .bp-line-field i { color: #8f9ab0; }
 .bp-line-sleep .bp-line-qbox { color: #9aa5b8; border-left-color: rgba(255, 255, 255, .25); }
 .bp-line-sleepbar { text-align: center; font-size: 12px; color: #c9d1e0; background: #232c3d; padding: 6px; cursor: pointer; }
+/* 劇情／現實時間切換：劇情是淡淡的一條，現實換成暖色，一眼分得出來 */
+.bp-line-modebar { text-align: center; font-size: 11.5px; color: #3c4658; background: #ffffff59; padding: 5px 8px; cursor: pointer; letter-spacing: .02em; }
+.bp-line-modebar u { text-decoration: none; font-weight: 600; margin-left: 2px; }
+.bp-line-modebar.bp-now { color: #5a3a1e; background: #f3dcc0; }
+.bp-line-sleep .bp-line-modebar { color: #c9d1e0; background: #2b3447; }
 .bp-line-switch { display: flex !important; justify-content: space-between; align-items: center; text-align: left; }
 .bp-line-switch i { width: 44px; height: 26px; border-radius: 13px; background: #d6d8dc; position: relative; flex: none; transition: background .2s; }
 .bp-line-switch i::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; transition: left .2s; box-shadow: 0 1px 3px rgba(0, 0, 0, .2); }

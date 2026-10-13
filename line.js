@@ -82,6 +82,10 @@ function herPositions(msgs) {
   return pos;
 }
 
+// 劇情／現實兩種時間：m.now = 現實時間傳的；m.story = 劇情時間傳的（m.st 是劇情裡的時刻）。
+// 舊紀錄兩個都沒有，照原本的現實時間顯示。現實聊天預設不給劇情看，t.nowSync 打開才給。
+const storySees = (m, t) => !m.now || !!t.nowSync;
+
 function msgText(m) {
   if (m.sticker) return `［貼圖：${m.sticker.tag}］`;
   if (m.alarm) return `［鬧鐘卡 ${m.alarm.time}「${m.alarm.label}」］`;
@@ -98,7 +102,8 @@ export async function syncMain() {
   const t = await loadThread(ch.key);
   if (t.sync === false) return off(); // 預設打開
   const mem = await data.memory.all(ch.key);
-  const recent = t.msgs.filter((m) => !m.err).slice(-20).map((m) => `${m.me ? ch.user : ch.name}：${msgText(m)}`).join('\n');
+  const recent = t.msgs.filter((m) => !m.err && storySees(m, t)).slice(-20)
+    .map((m) => `${m.me ? ch.user : ch.name}：${msgText(m)}${m.now ? '（現實裡傳的）' : ''}`).join('\n');
   const text = [
     `[手機 LINE] ${ch.name} 跟 ${ch.user}（${stage.name(await stage.get(ch.key))}）平常也會用 LINE 聊天，下面是最近聊的（${ch.name} 記得這些，可以自然提到，不用每次都提）：`,
     recent || '（還沒聊）',
@@ -112,18 +117,24 @@ function buildPrompt(ch, msgs, x = {}) {
   const when = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}（週${WEEK[now.getDay()]}）${pad(now.getHours())}:${pad(now.getMinutes())}`;
   const pos = herPositions(msgs);
   const byId = new Map(msgs.map((m) => [m.id, m]));
-  const log = msgs.filter((m) => !m.err).slice(-40).map((m) => {
+  const nowMode = x.mode === 'now';
+  const shown = msgs.filter((m) => !m.err && (nowMode ? m.now : (!m.now || x.nowSync)));
+  const log = shown.slice(-40).map((m) => {
     const q = m.quote && byId.get(m.quote);
     const quoted = q ? `（回覆「${msgText(q).slice(0, 40)}」）` : '';
     const react = m.me ? (m.hisReact ? `（你按了 ${REACTS[m.hisReact]}）` : '') : (m.myReact ? `（她按了 ${REACTS[m.myReact]}）` : '');
+    const tag = !nowMode && m.now ? '（現實裡傳的）' : '';
     return m.me
-      ? `${ch.user}［${pos.get(m.id)}］：${quoted}${msgText(m)}${react}`
-      : `${ch.name}：${quoted}${msgText(m)}${react}`;
+      ? `${ch.user}［${pos.get(m.id)}］：${quoted}${msgText(m)}${react}${tag}`
+      : `${ch.name}：${quoted}${msgText(m)}${react}${tag}`;
   }).join('\n');
+  const timeLine = nowMode
+    ? `現在時間：${when}（現實時間）。這不是劇情裡的時刻，是 ${ch.user} 在現實生活裡打開手機找你：她可能想分享現實裡開心或難過的事、想撒嬌，或想跟你親密。陪她活在現實的此刻，不要把話題硬拉回劇情的場景。`
+    : `時間照劇情走：先從正文最近的劇情判斷故事裡現在是哪一天、幾點、${ch.name} 人在哪裡做什麼，照那個時間點回；不要用現實的時鐘。`;
   return [
     '[Brume Phone · LINE]',
     `現在不是在寫劇情正文。${ch.name} 正在用手機的 LINE 跟 ${ch.user} 傳訊息。`,
-    `現在時間：${when}（現實時間）`,
+    timeLine,
     x.stage ? `你們現在的關係：${stage.name(x.stage)}（${stage.tone(x.stage)}）。說話的親密程度照這個來` : '',
     x.sleep ? `\n【陪睡模式】${ch.user} 躺在床上準備睡了，要你陪她入睡。講話輕、短、慢，像在耳邊說；不問問題、不開新話題、不要讓她更清醒。她說晚安就溫柔收尾。` : '',
     x.memory?.length ? `\n${ch.name} 記得的事：\n${x.memory.map((m) => '- ' + m.text).join('\n')}` : '',
@@ -137,6 +148,7 @@ function buildPrompt(ch, msgs, x = {}) {
     '- 只寫他會傳出去的訊息文字，不寫動作、旁白、心理描寫',
     '- 像真人傳訊息：短句，一則一行，1～4 則',
     '- 不要加名字、引號、時間',
+    nowMode ? '' : '- 在回覆最前面獨立一行寫 [[TIME|HH:MM]]：劇情裡你傳出這些訊息的時刻（24 小時制）',
     '- 用跟對話一樣的語言',
     '',
     '想做的話可以加這些小動作（不用每次都做）：',
@@ -152,7 +164,8 @@ function buildPrompt(ch, msgs, x = {}) {
 
 function parseReply(raw, ch) {
   let text = raw.replace(/<think>[\s\S]*?<\/think>/gi, '');
-  let quote = null; let react = null; let alarm = null; let sticker = null;
+  let quote = null; let react = null; let alarm = null; let sticker = null; let time = null;
+  text = text.replace(/\[\[TIME\|(\d{1,2}:\d{2})\]\]/i, (_, t) => { time = t.padStart(5, '0'); return ''; });
   const notes = []; const cals = []; const moments = [];
   text = text.replace(/\[\[QUOTE\|(\d+)\]\]/i, (_, p) => { quote = +p; return ''; });
   text = text.replace(/\[\[REACT\|(\d+)\|(\w+)\]\]/i, (_, p, id) => { if (REACTS[id]) react = { pos: +p, id }; return ''; });
@@ -168,7 +181,7 @@ function parseReply(raw, ch) {
     .map((l) => l.trim().replace(namePrefix, '').replace(/^[「『"]+|[」』"]+$/g, '').trim())
     .filter((l) => l && !/^[-*_]{3,}$/.test(l))
     .slice(0, 6);
-  return { lines, quote, react, alarm, sticker, notes, cals, moments };
+  return { lines, quote, react, alarm, sticker, notes, cals, moments, time };
 }
 
 export function createLine({ screen, say, onUnread, onData }) {
@@ -264,19 +277,20 @@ export function createLine({ screen, say, onUnread, onData }) {
     let prevHim = false; let prevMe = false;
     for (const m of thread.msgs) {
       const d = new Date(m.ts); const day = `${d.getMonth() + 1}/${d.getDate()}（${WEEK[d.getDay()]}）`;
-      if (day !== lastDay) { out += `<div class="bp-line-day"><span>${day}</span></div>`; lastDay = day; prevHim = false; prevMe = false; }
+      if (!m.story && day !== lastDay) { out += `<div class="bp-line-day"><span>${day}</span></div>`; lastDay = day; prevHim = false; prevMe = false; }
+      const when = m.story ? (m.st || '') : hm(m.ts);
       const prev = prevHim; const prevMine = prevMe;
       prevHim = !m.me && !m.err; prevMe = !!m.me;
       if (m.moment || m.notice) {
         out += `<div class="bp-line-moment${m.notice ? ' bp-notice' : ''}"${m.goto ? ` data-goto="${m.goto}"` : ''}><span>${esc(m.moment || m.notice)}</span></div>`;
         prevHim = false; prevMe = false;
       } else if (m.me) {
-        out += `<div class="bp-line-msg bp-me${prevMine ? ' bp-cont' : ' bp-tail'}"><div class="bp-line-meta">${m.ts <= readUpTo ? '已讀<br>' : ''}${hm(m.ts)}</div>${bubble(m)}</div>`;
+        out += `<div class="bp-line-msg bp-me${prevMine ? ' bp-cont' : ' bp-tail'}"><div class="bp-line-meta">${m.ts <= readUpTo ? '已讀<br>' : ''}${when}</div>${bubble(m)}</div>`;
       } else if (m.err) {
         out += `<div class="bp-line-sys">${esc(m.text)}　<u data-line="retry">再試一次</u></div>`;
       } else {
         // 跟 LINE 一樣：連續好幾則只有第一則有頭像
-        out += `<div class="bp-line-msg bp-him${prev ? ' bp-cont' : ' bp-tail'}">${prev ? '<span class="bp-line-av sm bp-ghost"></span>' : avatar('sm')}${bubble(m)}<div class="bp-line-meta">${hm(m.ts)}</div></div>`;
+        out += `<div class="bp-line-msg bp-him${prev ? ' bp-cont' : ' bp-tail'}">${prev ? '<span class="bp-line-av sm bp-ghost"></span>' : avatar('sm')}${bubble(m)}<div class="bp-line-meta">${when}</div></div>`;
       }
     }
     if (busy === 'typing') out += `<div class="bp-line-msg bp-him${prevHim ? ' bp-cont' : ' bp-tail'}">${prevHim ? '<span class="bp-line-av sm bp-ghost"></span>' : avatar('sm')}<div class="bp-line-bub bp-typing"><i></i><i></i><i></i></div></div>`;
@@ -289,6 +303,7 @@ export function createLine({ screen, say, onUnread, onData }) {
       <div class="bp-line-head"><span class="bp-back" data-line="list">‹</span><b>${esc(ch.name)}</b>
         <span class="bp-line-tools"><i data-line="search">${IC.search}</i><i data-line="more">${IC.more}</i></span></div>
       ${thread.sleep ? '<div class="bp-line-sleepbar" data-line="sleep">🌙 陪睡模式中・點這裡結束</div>' : ''}
+      <div class="bp-line-modebar${thread.mode === 'now' ? ' bp-now' : ''}" data-line="mode">${thread.mode === 'now' ? '現實時間・他知道現在幾點　<u>換回劇情</u>' : '劇情時間・跟著正文走　<u>換成現實</u>'}</div>
       <div class="bp-line-body"${bg && !thread.sleep ? ` style="background-image:url('${bg}')"` : ''}>
         <div class="bp-line-log">${bubbles()}</div>
       </div>
@@ -382,6 +397,7 @@ export function createLine({ screen, say, onUnread, onData }) {
   function moreMenu() {
     pop(`<div class="bp-line-list">
       <button data-line="sync" class="bp-line-switch">讓正文知道 LINE 聊了什麼<i class="${thread.sync !== false ? 'on' : ''}"></i></button>
+      <button data-line="nowsync" class="bp-line-switch">現實時間聊的也讓劇情知道<i class="${thread.nowSync ? 'on' : ''}"></i></button>
       ${lockedBtn('sleep', thread.sleep ? '結束陪睡模式' : '🌙 陪睡模式')}
       <button data-line="memory">記憶書</button>
       ${lockedBtn('cards', '收藏的字卡')}
@@ -492,7 +508,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     if (!ch) return;
     const who = ch; const t = thread;
     const mem = await data.memory.all(who.key);
-    const recent = t.msgs.filter((m) => !m.err).slice(-40).map((m) => `${m.me ? who.user : who.name}：${msgText(m)}`).join('\n');
+    const recent = t.msgs.filter((m) => !m.err && storySees(m, t)).slice(-40).map((m) => `${m.me ? who.user : who.name}：${msgText(m)}`).join('\n');
     if (!recent) { if (manual) say('還沒有對話可以整理'); return; }
     if (manual) say('整理中⋯');
     try {
@@ -520,7 +536,7 @@ export function createLine({ screen, say, onUnread, onData }) {
   // ---------- 送出、回覆 ----------
   function send(msg) {
     thread.msgs = thread.msgs.filter((m) => !m.err);
-    thread.msgs.push({ id: uid(), me: true, ts: Date.now(), ...msg, ...(quoting ? { quote: quoting } : {}) });
+    thread.msgs.push({ id: uid(), me: true, ts: Date.now(), ...(thread.mode === 'now' ? { now: true } : { story: true }), ...msg, ...(quoting ? { quote: quoting } : {}) });
     quoting = null; showQuoting();
     if (stickerOpen) toggleStickers();
     checkMilestones();
@@ -552,7 +568,7 @@ export function createLine({ screen, say, onUnread, onData }) {
       const today = data.today();
       const [notes, cal, memory, stks] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key), data.stickers.all()]);
       const cur = await stage.get(who.key);
-      const extra = { stage: cur, sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => x.tag))] };
+      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => x.tag))] };
       out = parseReply(await generate(buildPrompt(who, t.msgs, extra), image), who);
       out.stickerObj = out.sticker ? stks.find((x) => x.tag === out.sticker) : null;
       if (!out.lines.length && !out.stickerObj && !out.alarm && !out.moments.length) throw new Error('他沒有回出字來');
@@ -562,13 +578,14 @@ export function createLine({ screen, say, onUnread, onData }) {
       saveThread(who.key, t); if (view === 'room') refreshLog();
       return;
     }
+    const flag = t.mode === 'now' ? { now: true } : { story: true, ...(out.time ? { st: out.time } : {}) };
     const pos = herPositions(t.msgs);
     const atPos = (p) => t.msgs.find((m) => m.me && pos.get(m.id) === p);
     if (out.react) { const target = atPos(out.react.pos); if (target) target.hisReact = out.react.id; }
     const quoteTarget = out.quote !== null ? atPos(out.quote) : null;
     for (let i = 0; i < out.lines.length; i++) {
       if (i) { busy = 'typing'; if (view === 'room') refreshLog(); await sleep(700 + Math.min(out.lines[i].length * 60, 1600)); }
-      t.msgs.push({ id: uid(), me: false, text: out.lines[i], ts: Date.now(), ...(i === 0 && quoteTarget ? { quote: quoteTarget.id } : {}) });
+      t.msgs.push({ id: uid(), me: false, text: out.lines[i], ts: Date.now(), ...flag, ...(i === 0 && quoteTarget ? { quote: quoteTarget.id } : {}) });
       busy = i < out.lines.length - 1 ? 'typing' : false;
       saveThread(who.key, t);
       if (view === 'room' && currentChar()?.key === who.key) { t.seen = Date.now(); refreshLog(); }
@@ -583,7 +600,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     for (const c of out.cals) { await data.cal.add(who.key, { ...c, by: 'him' }); extras.push({ notice: `📅 ${who.name}記上行事曆：${c.date.slice(5).replace('-', '/')} ${c.title}`, goto: 'calendar' }); }
     for (const x of extras) {
       if (x.sticker || x.alarm) { busy = 'typing'; if (view === 'room') refreshLog(); await sleep(700); }
-      t.msgs.push({ id: uid(), me: false, text: '', ts: Date.now(), ...x });
+      t.msgs.push({ id: uid(), me: false, text: '', ts: Date.now(), ...flag, ...x });
       saveThread(who.key, t);
       if (view === 'room') refreshLog();
     }
@@ -679,6 +696,14 @@ export function createLine({ screen, say, onUnread, onData }) {
     if (a === 'sync') {
       thread.sync = thread.sync === false; save(); unpop(); await syncMain();
       say(thread.sync ? '打開了，正文會知道 LINE 聊了什麼' : '關掉了，正文不會看到 LINE');
+    }
+    if (a === 'mode') {
+      thread.mode = thread.mode === 'now' ? 'story' : 'now'; save(); renderRoom();
+      say(thread.mode === 'now' ? '換成現實時間，他知道現在幾點' : '換回劇情時間，跟著正文走');
+    }
+    if (a === 'nowsync') {
+      thread.nowSync = !thread.nowSync; save(); unpop(); await syncMain();
+      say(thread.nowSync ? '打開了，劇情會知道現實時間聊了什麼' : '關掉了，現實時間聊的只留在手機裡');
     }
     if (a === 'locked') { say(`關係到「${e.target.closest('[data-need]').dataset.need}」才會打開`); return; }
     if (a === 'sleep') { thread.sleep = !thread.sleep; save(); unpop(); renderRoom(); say(thread.sleep ? '陪睡模式，他會講話輕一點' : '陪睡模式結束了'); }
@@ -794,33 +819,31 @@ export function createLine({ screen, say, onUnread, onData }) {
     const cur = await stage.get(who.key);
     if (!stage.unlocked(cur, 'proactive')) return 0;
     const t = thread; const now = Date.now();
-    const clock = (ms) => { const d = new Date(ms); return `${pad(d.getHours())}:${pad(d.getMinutes())}`; };
+    if (t.mode === 'now') return 0; // 她在現實時間跟他聊，劇情先停著
     const today = data.today();
     const [notes, cal, memory] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key)]);
+    const together = `先看正文最近的劇情：如果故事裡此刻 ${who.name} 和 ${who.user} 就在一起（同一個空間、看得到彼此、正在相處），他不會拿手機傳訊息給身邊的人——這時整則只寫 [[SKIP]]，其他什麼都不寫。`;
     const instr = kind === 'away'
-      ? `【這次是他先傳的】${who.user} 有一陣子沒打開手機（從 ${clock(now - gapMs)} 到現在 ${clock(now)}，大約 ${Math.round(gapMs / 36e5)} 小時）。這段時間裡，${who.name} 很自然地傳了幾則 LINE 給她：想到她、分享自己在做什麼、問她在幹嘛，內容要符合那個時間點（吃飯、下班、深夜⋯）和最近的劇情。\n請寫 1～3 則，每則一行，格式：HH:MM｜訊息。時間落在這段期間內、照先後排。她都還沒回，所以不要寫成一來一往。`
-      : `【這次是他先傳的】${who.user} 一陣子沒說話了，${who.name} 想到她，主動傳 LINE 給她。照現在的時間、最近的劇情和聊天寫 1～2 則，每則一行。不要重複之前說過的話。`;
+      ? `【這次是他先傳的】${together}\n不在一起的話：從劇情判斷故事裡現在的時間，寫 ${who.name} 在這之後、兩人分開的時候，很自然傳給她的幾則 LINE：想到她、分享自己在做什麼、問她在幹嘛，內容符合劇情裡那個時間點和他正在做的事。\n請寫 1～3 則，每則一行，格式：HH:MM｜訊息（HH:MM 是劇情裡的時刻），照先後排。她都還沒回，所以不要寫成一來一往。`
+      : `【這次是他先傳的】${together}\n不在一起的話：${who.name} 想到她，主動傳 LINE 給她。照劇情裡現在的時間和他正在做的事寫 1～2 則，每則一行，格式：HH:MM｜訊息（HH:MM 是劇情裡的時刻）。不要重複之前說過的話。`;
     let raw;
     try {
       raw = await generate(buildPrompt(who, t.msgs, {
-        stage: cur, proactive: instr, memory,
+        mode: 'story', nowSync: !!t.nowSync, stage: cur, proactive: instr, memory,
         notes: stage.unlocked(cur, 'notes') ? notes.filter((n) => !n.done).slice(0, 8) : [],
         cal: cal.filter((e) => e.date >= today).slice(0, 8),
       }));
     } catch { return 0; }
+    if (/\[\[SKIP\]\]/i.test(raw)) return 0;
     let added = 0;
     for (const line of raw.split('\n')) {
       const m = line.trim().match(/^(\d{1,2})[:：](\d{2})\s*[｜|]\s*(.+)$/);
       let text = (m ? m[3] : line).trim();
       text = parseReply(text, who).lines[0];
       if (!text) continue;
-      let ts = now - (2 - added) * 60000;
-      if (kind === 'away' && m) {
-        const d = new Date(now); d.setHours(+m[1], +m[2], 0, 0);
-        if (d.getTime() > now) d.setDate(d.getDate() - 1);
-        ts = Math.max(now - gapMs + 60000, Math.min(now - 60000, d.getTime()));
-      }
-      t.msgs.push({ id: uid(), me: false, text, ts, first: true });
+      // 排序用現實時間（一則隔一分鐘），畫面上顯示劇情時間
+      const ts = now - (3 - added) * 60000;
+      t.msgs.push({ id: uid(), me: false, text, ts, first: true, story: true, ...(m ? { st: `${m[1].padStart(2, '0')}:${m[2]}` } : {}) });
       if (++added >= (kind === 'away' ? 3 : 2)) break;
     }
     if (added) { t.msgs.sort((a, b) => a.ts - b.ts); await saveThread(who.key, t); if (showing() && view === 'room') refreshLog(); onUnread?.(unreadCount()); syncMain(); }
@@ -832,7 +855,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     const who = await useCurrent();
     if (!who) return 0;
     const now = Date.now();
-    lines.forEach((text, i) => thread.msgs.push({ id: uid(), me: false, text, ts: now + i * 1000, fromStory: true }));
+    lines.forEach((text, i) => thread.msgs.push({ id: uid(), me: false, text, ts: now + i * 1000, fromStory: true, story: true }));
     await saveThread(who.key, thread);
     if (showing() && view === 'room') { thread.seen = Date.now(); refreshLog(); } else onUnread?.(unreadCount());
     syncMain();
