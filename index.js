@@ -7,6 +7,8 @@ import { createThreads } from './threads.js';
 import { createHisPhone } from './hisphone.js';
 import { createAlbum } from './album.js';
 import { createIG } from './ig.js';
+import { createGames } from './games.js';
+import { createCall } from './call.js';
 import { createLife, settings as lifeSet, LEVELS } from './life.js';
 import * as stage from './stage.js';
 import { currentChar, ctx, lite } from './st.js';
@@ -314,6 +316,8 @@ function build() {
       if (open.dataset.open === 'threads') { openApp(threads); return; }
       if (open.dataset.open === 'album') { openApp(album); return; }
       if (open.dataset.open === 'ig') { openApp(ig); return; }
+      if (open.dataset.open === 'game') { openApp(games); return; }
+      if (open.dataset.open === 'phone') { openApp(callApp); return; }
       if (open.dataset.open === 'camera') { openApp(snap); return; }
       say('這個 App 還在做 ☁︎');
       return;
@@ -335,7 +339,7 @@ function build() {
   // App 畫面：從右邊滑進來，蓋在主畫面上
   const appScreen = overlay.querySelector('.bp-appscreen');
   const openApp = (app) => { music?.leave(); app.open(); appScreen.classList.add('bp-show'); phone.classList.add('bp-app-open'); };
-  const closeApp = () => { appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); music?.leave(); refreshNotices?.(); };
+  const closeApp = () => { if (callApp?.inCall) callApp.hang(); appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); music?.leave(); refreshNotices?.(); };
   appScreen.addEventListener('bp-home', closeApp);
   const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => calDots() });
   const notes = createNotes({ screen: appScreen, say });
@@ -343,6 +347,8 @@ function build() {
   const threads = createThreads({ screen: appScreen, say });
   const album = createAlbum({ screen: appScreen, say });
   const ig = createIG({ screen: appScreen, say });
+  const games = createGames({ screen: appScreen, say });
+  const callApp = createCall({ screen: appScreen, say });
   const snap = { open: () => album.open('snap') };
   const his = createHisPhone({ host: overlay.querySelector('.bp-his'), say, onExit: () => say('還給他了，他沒發現') });
   const openLineRoom = () => { openApp(line); line.openRoom(); };
