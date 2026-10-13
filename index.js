@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.10.2';
+const VERSION = '0.10.3';
 
 const ICON = {
   phone: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2.5" width="12" height="19" rx="3"/><path d="M10.5 18.5h3"/></svg>',
@@ -194,9 +194,22 @@ function build() {
     }
   };
   fit();
-  addEventListener('resize', fit);
+  // iPhone 彈出鍵盤時：先縮高度（resize），再把看得到的範圍往下挪（visualViewport 的 scroll，不是網頁的 scroll）。
+  // 只跟 resize 的話，手機會停在舊位置、整個被推到畫面外。
+  // 手機版酒館在 resize 時也會把 <html> 暫時改成 fixed 一個畫格，那一格量到的位置是歪的，
+  // 所以等兩個畫格再量一次，鍵盤動畫跑完再量一次。
+  let fitTimer = 0;
+  const refit = () => {
+    fit();
+    requestAnimationFrame(() => requestAnimationFrame(fit));
+    clearTimeout(fitTimer); fitTimer = setTimeout(fit, 350);
+  };
+  addEventListener('resize', refit);
   addEventListener('scroll', fit, { passive: true }); // 外層有 transform 時，網頁一捲手機會跟著跑
-  window.visualViewport?.addEventListener('resize', fit);
+  window.visualViewport?.addEventListener('resize', refit);
+  window.visualViewport?.addEventListener('scroll', fit);
+  overlay.addEventListener('focusin', refit);
+  overlay.addEventListener('focusout', () => setTimeout(refit, 50));
 
   const phone = overlay.querySelector('.bp-phone');
   const lock = overlay.querySelector('.bp-lock');
@@ -558,6 +571,7 @@ function launcher(phone) {
   addEventListener('resize', place);
   addEventListener('scroll', place, { passive: true });
   window.visualViewport?.addEventListener('resize', place);
+  window.visualViewport?.addEventListener('scroll', place);
   setTimeout(place, 1000); // 酒館載完版面可能又動一次
 
   // 可以拖著移位置，短按才開手機
