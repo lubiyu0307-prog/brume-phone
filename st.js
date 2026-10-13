@@ -71,3 +71,22 @@ export async function generate(prompt, image) {
     : await fn.call(c, prompt, false, false, image || null);
   return String(out || '').replace(/<think>[\s\S]*?<\/think>/gi, '');
 }
+
+/** 叫酒館的生圖（Image Generation 擴充）。回傳圖片網址；沒接生圖或失敗回空字串 */
+export async function imagine(prompt) {
+  const c = ctx();
+  if (!c?.executeSlashCommandsWithOptions) return '';
+  // | 會被當成指令分隔、{{ }} 會被當成巨集，先換掉
+  const safe = String(prompt).replace(/[|{}]/g, ' ').replace(/\s+/g, ' ').trim();
+  try {
+    const r = await c.executeSlashCommandsWithOptions(`/imagine quiet=true ${safe}`, { handleParserErrors: true });
+    return String(r?.pipe || '').trim();
+  } catch { return ''; }
+}
+
+/** 正文最近幾則（給快照挑劇情用） */
+export function recentChat(n = 12) {
+  const c = ctx();
+  return (c?.chat || []).map((m, i) => ({ i, m })).filter(({ m }) => !m.is_system && m.mes).slice(-n)
+    .map(({ i, m }) => ({ i, who: m.is_user ? (c.name1 || '我') : m.name, text: String(m.mes).replace(/<[^>]+>/g, '').replace(/\n{3,}/g, '\n\n').trim() }));
+}

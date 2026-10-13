@@ -5,6 +5,7 @@ import { createLine, syncMain } from './line.js';
 import { createNotes, createCalendar } from './apps.js';
 import { createThreads } from './threads.js';
 import { createHisPhone } from './hisphone.js';
+import { createAlbum } from './album.js';
 import { createLife, settings as lifeSet, LEVELS } from './life.js';
 import * as stage from './stage.js';
 import { currentChar, ctx, lite } from './st.js';
@@ -137,7 +138,7 @@ function build() {
           <div class="bp-weather"><b>☁︎ 24°</b><br>多雲<br>高 27° 低 21°</div>
           <div class="bp-lock-chips"><div class="bp-round">${ICON.music}</div></div>
         </div>
-        <div class="bp-lock-tools"><div class="bp-round bp-swap" data-act="his" title="偷看他的手機">${ICON.swap}</div><div class="bp-round">${ICON.camera}</div></div>
+        <div class="bp-lock-tools"><div class="bp-round bp-swap" data-act="his" title="偷看他的手機">${ICON.swap}</div><div class="bp-round" data-act="snap" title="快照">${ICON.camera}</div></div>
         <div class="bp-hint">往上滑或點一下解鎖</div>
       </div>
     </div>
@@ -286,6 +287,7 @@ function build() {
       if (a === 'stage') { const c = currentChar(); if (!c) { say('先在酒館選一個角色'); return; } await stage.set(c.key, act.dataset.v); showSettings(); life.refreshPrompt(); syncMain(); say(`關係改成「${stage.name(act.dataset.v)}」了`); }
       if (a === 'level') { lifeSet.set({ level: act.dataset.v }); showSettings(); }
       if (a === 'bridge') { lifeSet.set({ bridge: !lifeSet.get().bridge }); showSettings(); life.refreshPrompt(); }
+      if (a === 'snap') { lock.classList.add('bp-gone'); phone.classList.remove('bp-locked'); openApp(snap); }
       if (a === 'notif') { lock.classList.add('bp-gone'); phone.classList.remove('bp-locked'); openLineRoom(); }
       if (a === 'hint-yes') { const h = overlay.querySelector('.bp-hintsheet'); await stage.set(h.dataset.key, h.dataset.v); h.remove(); life.refreshPrompt(); syncMain(); say(`關係改成「${stage.name(h.dataset.v)}」了`); }
       if (a === 'hint-no') overlay.querySelector('.bp-hintsheet')?.remove();
@@ -309,6 +311,8 @@ function build() {
       }
       if (open.dataset.open === 'calendar') { openApp(calendar); return; }
       if (open.dataset.open === 'threads') { openApp(threads); return; }
+      if (open.dataset.open === 'album') { openApp(album); return; }
+      if (open.dataset.open === 'camera') { openApp(snap); return; }
       say('這個 App 還在做 ☁︎');
       return;
     }
@@ -335,6 +339,8 @@ function build() {
   const notes = createNotes({ screen: appScreen, say });
   const calendar = createCalendar({ screen: appScreen, say });
   const threads = createThreads({ screen: appScreen, say });
+  const album = createAlbum({ screen: appScreen, say });
+  const snap = { open: () => album.open('snap') };
   const his = createHisPhone({ host: overlay.querySelector('.bp-his'), say, onExit: () => say('還給他了，他沒發現') });
   const openLineRoom = () => { openApp(line); line.openRoom(); };
 

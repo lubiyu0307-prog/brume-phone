@@ -1,0 +1,195 @@
+// 相本＋快照：挑一段正文，寫成照片；接了生圖就直接出圖，沒接就給 prompt 拿去外面生，生好再傳回來。
+// 第一次用要先存「他的長相」，之後每張快照都帶著，同一個人才不會每張長得不一樣。
+
+import * as store from './store.js';
+import { currentChar, generate, imagine, recentChat } from './st.js';
+
+const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const hue = (s) => { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+const day = (ts) => { const d = new Date(ts); return `${d.getFullYear()}/${d.getMonth() + 1}/${d.getDate()}`; };
+
+function parseJSON(raw) {
+  const t = raw.replace(/```(?:json)?/gi, '');
+  const i = t.indexOf('{'); const j = t.lastIndexOf('}');
+  if (i < 0 || j < i) throw new Error('沒有生出內容');
+  return JSON.parse(t.slice(i, j + 1));
+}
+
+const IC = {
+  cam: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M4 8h3l1.6-2.5h6.8L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>',
+};
+
+export function createAlbum({ screen, say }) {
+  let ch = null; let items = []; let look = { him: '', me: '' };
+  let view = 'grid'; let tab = 'all'; let openId = null; let picked = new Set(); let busy = false; let note = '';
+  const mine = () => !!screen.querySelector('.bp-al');
+  const save = () => ch && store.set('album:' + ch.key, items).catch(() => {});
+  const saveLook = () => ch && store.set('look:' + ch.key, look).catch(() => {});
+
+  async function load() {
+    ch = currentChar();
+    if (!ch) return false;
+    items = (await store.get('album:' + ch.key).catch(() => null)) || [];
+    look = (await store.get('look:' + ch.key).catch(() => null)) || { him: '', me: '' };
+    return true;
+  }
+
+  // LINE 裡傳過的照片也算在相本裡
+  async function chatPhotos() {
+    const t = (await store.get('line:' + ch.key).catch(() => null)) || { msgs: [] };
+    return t.msgs.filter((m) => m.img).map((m) => ({ id: 'line-' + m.id, img: m.img, desc: m.me ? '妳在 LINE 傳的照片' : `${ch.name}在 LINE 傳的照片`, ts: m.ts, source: 'line' }));
+  }
+
+  function tile(p) {
+    return p.img
+      ? `<div class="bp-al-tile" data-photo="${p.id}"><img src="${esc(p.img)}" alt="" loading="lazy"></div>`
+      : `<div class="bp-al-tile card" data-photo="${p.id}" style="--h:${hue(p.desc)}"><span>${esc(p.desc)}</span></div>`;
+  }
+
+  function head(title, back = 'home', right = '') {
+    return `<div class="bp-al-head"><span class="bp-back" data-al="${back}">‹</span><b>${title}</b><span>${right}</span></div>`;
+  }
+
+  async function render() {
+    if (!ch && !(await load())) { screen.innerHTML = `<div class="bp-al">${head('相本')}<p class="bp-al-empty">先在酒館選一個角色。</p></div>`; return; }
+    if (view === 'snap') return renderSnap();
+    if (view === 'look') return renderLook();
+    if (view === 'one') return renderOne();
+    const line = await chatPhotos();
+    const all = [...items, ...line].sort((a, b) => b.ts - a.ts);
+    const shown = tab === 'snap' ? all.filter((p) => p.source === 'snap') : tab === 'line' ? line : tab === 'mine' ? all.filter((p) => p.source === 'upload') : all;
+    screen.innerHTML = `<div class="bp-al">${head('相本', 'home', `<i data-al="upload" title="放一張照片">${IC.up}</i>`)}
+      <div class="bp-al-tabs">${[['all', '全部'], ['snap', '快照'], ['line', '聊天'], ['mine', '我放的']].map(([k, n]) => `<span data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</span>`).join('')}</div>
+      <div class="bp-al-scroll">
+        ${shown.length ? `<div class="bp-al-grid">${shown.map(tile).join('')}</div>` : `<p class="bp-al-empty">${tab === 'snap' || tab === 'all' ? '還沒有快照。<br>按右下角的相機，挑一段劇情拍下來。' : '這裡還沒有照片。'}</p>`}
+      </div>
+      <button class="bp-al-fab" data-al="snap">${IC.cam}</button>
+      <input class="bp-al-file" type="file" accept="image/*" hidden>
+    </div>`;
+  }
+
+  async function renderOne() {
+    const all = [...items, ...(await chatPhotos())];
+    const p = all.find((x) => x.id === openId);
+    if (!p) { view = 'grid'; return render(); }
+    const own = !String(p.id).startsWith('line-');
+    screen.innerHTML = `<div class="bp-al bp-al-dark">${head(day(p.ts), 'grid')}
+      <div class="bp-al-scroll">
+        ${p.img ? `<img class="bp-al-big" src="${esc(p.img)}" alt="">` : `<div class="bp-al-bigcard" style="--h:${hue(p.desc)}"><span>${esc(p.desc)}</span></div>`}
+        <p class="bp-al-desc">${esc(p.desc)}</p>
+        ${p.scene ? `<details class="bp-al-scene"><summary>這一幕</summary><p>${esc(p.scene)}</p></details>` : ''}
+        ${p.prompt ? `<div class="bp-al-prompt"><small>生圖 prompt</small><p>${esc(p.prompt)}</p><button data-al="copy">複製</button></div>` : ''}
+        ${own ? `<div class="bp-al-acts">
+          ${p.prompt && !p.img ? '<button data-al="gen">用酒館生圖</button>' : ''}
+          ${p.prompt ? '<button data-al="regen">重新生一張</button>' : ''}
+          <button data-al="attach">${p.img ? '換一張圖' : '傳生好的圖進來'}</button>
+          <button data-al="del" class="danger">刪除</button></div>` : ''}
+        <p class="bp-al-note">${esc(note)}</p>
+      </div>
+      <input class="bp-al-file" type="file" accept="image/*" hidden>
+    </div>`;
+  }
+
+  function renderSnap() {
+    const chat = recentChat(12).reverse();
+    screen.innerHTML = `<div class="bp-al">${head('快照', 'grid', '<i data-al="look" title="長相">長相</i>')}
+      <div class="bp-al-scroll">
+        <p class="bp-al-hint">挑一到三段劇情，拍成一張照片。${look.him ? '' : '<br><u data-al="look">先存他的長相</u>，照片裡的他才會每張都一樣。'}</p>
+        ${chat.length ? chat.map((m) => `<div class="bp-al-pick${picked.has(m.i) ? ' on' : ''}" data-pick="${m.i}"><b>${esc(m.who)}</b><p>${esc(m.text.slice(0, 160))}${m.text.length > 160 ? '⋯' : ''}</p></div>`).join('') : '<p class="bp-al-empty">正文還沒有內容。</p>'}
+        <textarea class="bp-al-extra" rows="2" placeholder="想特別拍什麼？（可以不寫）"></textarea>
+      </div>
+      <div class="bp-al-bar"><button data-al="shoot" ${busy ? 'disabled' : ''}>${busy ? '拍照中⋯' : `拍下來${picked.size ? `（${picked.size} 段）` : ''}`}</button></div>
+    </div>`;
+  }
+
+  function renderLook() {
+    screen.innerHTML = `<div class="bp-al">${head('長相', 'snap')}
+      <div class="bp-al-scroll">
+        <p class="bp-al-hint">寫成生圖用的描述，英文的 tag 最好，例如：black short hair, gray eyes, glasses, white shirt。每張快照都會帶著。</p>
+        <label>${esc(ch.name)}</label><textarea class="bp-al-look-him" rows="4">${esc(look.him)}</textarea>
+        <button class="bp-al-ghost" data-al="lookauto" ${busy ? 'disabled' : ''}>${busy ? '整理中⋯' : '從角色卡幫我整理'}</button>
+        <label>${esc(ch.user)}（可以不寫）</label><textarea class="bp-al-look-me" rows="3">${esc(look.me)}</textarea>
+      </div>
+      <div class="bp-al-bar"><button data-al="lookok">存好</button></div>
+    </div>`;
+  }
+
+  async function shoot() {
+    if (busy) return;
+    const chat = recentChat(30);
+    const scenes = chat.filter((m) => picked.has(m.i)).map((m) => `${m.who}：${m.text}`);
+    const extra = screen.querySelector('.bp-al-extra')?.value.trim() || '';
+    if (!scenes.length && !extra) { say('先挑一段劇情'); return; }
+    busy = true; renderSnap();
+    const who = ch;
+    try {
+      const r = parseJSON(await generate([
+        '[Brume Phone · 快照]',
+        `現在不是在寫劇情正文。請把下面這段劇情裡最值得留下來的一個畫面，想成一張照片（像是誰用手機拍下來的）。`,
+        `${who.name} 的長相：${look.him || '照角色卡'}`,
+        look.me ? `${who.user} 的長相：${look.me}` : '',
+        '', '劇情：', scenes.join('\n\n').slice(0, 3000), extra ? `\n她想拍的：${extra}` : '', '',
+        '只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","prompt":"生圖用的英文 prompt，逗號分隔：人物（照上面的長相）、動作、表情、場景、光線、鏡頭，寫實手機照片風格"}',
+      ].filter(Boolean).join('\n')));
+      const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
+      p.img = p.prompt ? await imagine(p.prompt) : '';
+      note = p.img ? '' : '沒有出圖：酒館可能還沒接生圖。可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。';
+      if (who.key === ch?.key) { items.push(p); save(); }
+      picked = new Set(); openId = p.id; view = 'one';
+    } catch (e) { say(`拍照失敗：${e.message || e}`); }
+    busy = false;
+    if (mine()) render();
+  }
+
+  async function lookAuto() {
+    busy = true; renderLook();
+    try {
+      const t = await generate(`[Brume Phone · 長相]\n現在不是在寫劇情正文。請從角色卡整理出 ${ch.name} 的外貌，寫成生圖用的英文 tag：性別年齡感、髮型髮色、眼睛、臉部特徵、身材、常穿的衣服。只輸出一行，逗號分隔，不要其他文字。`);
+      look.him = t.trim().split('\n')[0].slice(0, 400);
+    } catch (e) { say(`整理失敗：${e.message || e}`); }
+    busy = false; if (mine()) renderLook();
+  }
+
+  screen.addEventListener('click', async (e) => {
+    if (!mine()) return;
+    const tb = e.target.closest('[data-tab]'); if (tb) { tab = tb.dataset.tab; render(); return; }
+    const ph = e.target.closest('[data-photo]'); if (ph) { openId = ph.dataset.photo; note = ''; view = 'one'; render(); return; }
+    const pk = e.target.closest('[data-pick]');
+    if (pk) { const i = +pk.dataset.pick; if (picked.has(i)) picked.delete(i); else if (picked.size < 3) picked.add(i); else say('最多三段'); renderSnap(); return; }
+    const a = e.target.closest('[data-al]')?.dataset.al;
+    if (!a) return;
+    const p = items.find((x) => x.id === openId);
+    if (a === 'home') screen.dispatchEvent(new CustomEvent('bp-home', { bubbles: true }));
+    if (a === 'grid') { view = 'grid'; render(); }
+    if (a === 'snap') { view = 'snap'; renderSnap(); }
+    if (a === 'look') { view = 'look'; renderLook(); }
+    if (a === 'lookauto') lookAuto();
+    if (a === 'lookok') { look = { him: screen.querySelector('.bp-al-look-him').value.trim(), me: screen.querySelector('.bp-al-look-me').value.trim() }; saveLook(); say('長相存好了'); view = 'snap'; renderSnap(); }
+    if (a === 'shoot') shoot();
+    if (a === 'upload') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'new'; f.click(); }
+    if (a === 'attach') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'attach'; f.click(); }
+    if (a === 'copy' && p) { try { await navigator.clipboard.writeText(p.prompt); say('複製了'); } catch { say('這裡不能複製，長按文字自己選'); } }
+    if ((a === 'gen' || a === 'regen') && p) {
+      note = '生圖中⋯'; renderOne();
+      const url = await imagine(p.prompt);
+      if (url) { p.img = url; note = ''; save(); } else note = '沒有出圖：酒館可能還沒接生圖，或這次失敗了。';
+      if (mine()) renderOne();
+    }
+    if (a === 'del' && p) { items = items.filter((x) => x.id !== p.id); save(); view = 'grid'; render(); }
+  });
+
+  screen.addEventListener('change', async (e) => {
+    if (!mine() || !e.target.classList.contains('bp-al-file')) return;
+    const f = e.target.files[0]; e.target.value = '';
+    if (!f) return;
+    const img = await store.shrink(f, 1600, 0.85);
+    if (e.target.dataset.for === 'attach') { const p = items.find((x) => x.id === openId); if (p) { p.img = img; note = ''; save(); renderOne(); } return; }
+    items.push({ id: uid(), source: 'upload', ts: Date.now(), desc: '妳放的照片', img }); save(); tab = 'all'; render();
+  });
+
+  return {
+    async open(to = 'grid') { await load(); view = to; picked = new Set(); note = ''; render(); },
+  };
+}
