@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.11.1';
+const VERSION = '0.11.2';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -200,7 +200,11 @@ function build() {
   const fit = () => {
     const vv = window.visualViewport;
     const W = Math.round(vv ? vv.width : innerWidth); const H = Math.round(vv ? vv.height : innerHeight);
-    const X = Math.round(vv ? vv.offsetLeft : 0); const Y = Math.round(vv ? vv.offsetTop : 0);
+    // 看得到的範圍在網頁座標裡的左上角。用 pageTop − scrollY，不用 offsetTop：
+    // iPhone（iOS 26）彈出鍵盤時整頁捲下去 404，offsetTop 也報 404，但其實看得到的範圍就在最上面，
+    // 照 offsetTop 擺會把手機擺到鍵盤後面（0.11.1 的除錯紀錄抓到的）
+    const X = Math.round(vv ? (vv.pageLeft != null ? vv.pageLeft - scrollX : vv.offsetLeft) : 0);
+    const Y = Math.round(vv ? (vv.pageTop != null ? vv.pageTop - scrollY : vv.offsetTop) : 0);
     overlay.style.setProperty('--bp-w', `${W}px`); overlay.style.setProperty('--bp-h', `${H}px`);
     overlay.style.left = `${X}px`; overlay.style.top = `${Y}px`;
     overlay.style.setProperty('--bp-left', `${X}px`); overlay.style.setProperty('--bp-top', `${Y}px`);
