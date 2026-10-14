@@ -74,8 +74,21 @@ export function refsFor(data, ch, text, always = []) {
  * 送去生圖的完整 prompt：場景 prompt＋入鏡的人的長相（髮色、身形這些要照做）＋玩家寫的照片風格。
  * 長相直接接在最後，不靠寫 prompt 的模型轉述，轉述常把髮色、身材改掉
  */
+// 長相裡講臉、髮色、髮型、眼睛、膚色、年紀的詞：有參考照片的人，這些交給照片決定，文字留著反而會蓋過照片
+// （10/14 企鵝館：文字寫 honey brown hair，Gemini 照字畫成橘髮，臉也跑掉）
+const FACE_TAG = /hair|bang|fringe|undercut|eye|face|skin|freckle|beard|mustache|lips?\b|nose|eyebrow|\d+\s*(years?|yo)\b|\bage\b|髮|瀏海|眼|臉|膚|歲|鬍/i;
+const stripFace = (text) => String(text).split(/[,，、]/).map((t) => t.trim()).filter((t) => t && !FACE_TAG.test(t)).join(', ');
+const hasRef = (data, p) => !!(p.photo || (p.id === HIM && data.cardAvatar));
+
 export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
-  const notes = ids.map((id) => person(data, ch, id)).filter((p) => p.look).map((p) => `${p.name}: ${p.look}`);
+  const inFrame = ids.map((id) => person(data, ch, id));
+  const anyRef = inFrame.some((p) => hasRef(data, p));
+  // 有照片的人：臉和頭髮照照片，文字只留身形、衣著；沒照片的人照舊整段長相
+  const notes = inFrame.filter((p) => p.look || hasRef(data, p)).map((p) => (hasRef(data, p)
+    ? `${p.name}: face, hair colour and hairstyle exactly as in ${p.name}'s reference photo (ignore any text that says otherwise)${stripFace(p.look) ? `; body and clothes: ${stripFace(p.look)}` : ''}`
+    : `${p.name}: ${p.look}`));
+  // 場景 prompt 裡寫長相的詞也拿掉（寫 prompt 的模型會把長相抄進去），沒照片的人的長相上面 notes 會補回來
+  if (anyRef) prompt = stripFace(prompt);
   // 拍照的人：他自己拍的照片常常只有手入鏡（托著東西、拿著杯子），不講是誰的手，模型會隨便畫一隻（10/14 阿愷的企鵝變成女生的手）。
   // 只講性別，不貼整段長相：貼了模型會把整個人畫進去（同一天第二張，冒出一個陌生男人）
   const cam = by && !ids.includes(by) ? person(data, ch, by) : null;
@@ -86,7 +99,7 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
   return [
     String(prompt).trim(),
     cam ? `First-person shot taken by ${cam.name} on their own phone. ${cam.name} is NOT in the photo: no face, no body. If a hand or arm reaches into the frame, it is ${cam.name}'s own${sex || hand ? ` (${[sex ? `${sex} hand` : '', hand].filter(Boolean).join(': ')})` : ''}.` : '',
-    notes.length ? `Appearance to keep exactly (hair colour, body shape, clothes):\n${notes.join('\n')}` : '',
+    notes.length ? `People in the picture:\n${notes.join('\n')}` : '',
     // 玩家寫的風格蓋過上面的「photo」「realistic」：動漫風的卡寫 anime style 就要畫成動漫，不是寫實照片。
     // 玩家沒寫就用看頭像判斷的；判斷是寫實照片就不用加
     style && !/^realistic photo\.?$/i.test(style) ? `Visual style (this overrides any "photo" or "realistic" wording above): ${style}` : '',

@@ -151,7 +151,7 @@ async function imageModels(key) {
 async function viaKey(prompt, refs = [], aspect = '1:1') {
   const key = geminiKeyGet(); const prev = imageInfo.why;
   if (!key) { imageInfo.why = (imageInfo.why ? imageInfo.why + '；' : '') + '手機裡也沒有貼 AI Studio 金鑰（電話的「他的聲音」或相本證件照頁可以貼）'; return ''; }
-  const parts = [{ text: `Generate one image. No text in the image, no captions.\n${String(prompt).trim()}${refs.length ? '\nReference images of the people in this picture follow. Keep each person\'s face, hair and overall look. Unless a visual style is given above, draw in the same art style as the references.' : ''}` }];
+  const parts = [{ text: `Generate one image. No text in the image, no captions.\n${String(prompt).trim()}${refs.length ? '\nReference photos of the people in this picture follow. Each person must be clearly the same person as in their reference: same face, same hair colour, same hairstyle. The photo wins over any text. Unless a visual style is given above, draw in the same art style as the references (anime stays anime, photo stays photo).' : ''}` }];
   for (const r of refs) {
     const url = await asDataUrl(r.url); if (!url) continue;
     parts.push({ text: `Reference: ${r.name}` }, { inline_data: { mime_type: url.slice(5, url.indexOf(';')), data: url.slice(url.indexOf(',') + 1) } });
@@ -180,7 +180,7 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
   const ask = `Generate one image. No text in the image, no captions.\n${String(prompt).trim()}`;
   // 參考圖一張一張標上是誰，畫出來的人才會對得上
   const content = refs.length
-    ? [{ type: 'text', text: `${ask}\nReference images of the people in this picture follow. Keep each person's face, hair and overall look. Unless a visual style is given above, draw in the same art style as the references (anime stays anime, photo stays photo).` },
+    ? [{ type: 'text', text: `${ask}\nReference photos of the people in this picture follow. Each person must be clearly the same person as in their reference: same face, same hair colour, same hairstyle. The photo wins over any text. Unless a visual style is given above, draw in the same art style as the references (anime stays anime, photo stays photo).` },
       ...(await Promise.all(refs.map(async (r) => { const url = await asDataUrl(r.url); return url ? [{ type: 'text', text: `Reference: ${r.name}` }, { type: 'image_url', image_url: { url } }] : []; }))).flat()]
     : ask;
   for (const model of GEMINI_IMAGE_MODELS) {
