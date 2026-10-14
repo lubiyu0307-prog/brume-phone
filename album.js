@@ -3,7 +3,7 @@
 
 import * as store from './store.js';
 import { currentChar, generate, imagine, recentChat } from './st.js';
-import { HIM, ME, loadCast, saveCast, person, setPerson, sideNames, refsFor, idsFor, finalPrompt } from './cast.js';
+import { HIM, ME, loadCast, saveCast, person, setPerson, sideNames, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -122,7 +122,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <p class="bp-al-hint">放每個人的參考照片，快照和 IG 生圖時會拿給 Gemini 看，同一個人才會每張都長一樣。配角的照片也是他在 IG 的大頭貼。</p>
         <div class="bp-al-ids">${[HIM, ME, ...sideNames(people)].map(card).join('')}<div class="bp-al-id add" data-person=""><span class="bp-al-idnone">＋</span><b>加配角</b><small>名字要跟劇情裡一樣</small></div></div>
         <label>照片風格（每張生圖都會套用，可以不寫）</label>
-        <textarea class="bp-al-style" rows="3" placeholder="不寫就是寫實的手機照片。動漫風的卡寫：anime style, cel shading／濾鏡寫：film photo, warm tone, soft grain">${esc(people.look.style)}</textarea>
+        <textarea class="bp-al-style" rows="3" placeholder="${people.look.autoStyle ? `沒寫的話照頭像判斷的：${esc(people.look.autoStyle)}` : '沒寫的話，第一次生圖會看角色卡頭像自己判斷寫實或動漫。也可以自己寫：anime style, cel shading／film photo, warm tone'}">${esc(people.look.style)}</textarea>
         <p class="bp-al-hint">畫風、濾鏡、色調寫在這裡，寫了就以這裡為準（例如寫動漫風，就不會畫成寫實照片）。某個人的髮色、身形要寫在那個人的證件照裡。</p>
       </div></div>`;
   }
@@ -162,6 +162,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         '只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","prompt":"生圖用的英文 prompt，逗號分隔：人物（照上面的長相）、動作、表情、場景、光線、鏡頭，寫實手機照片風格"}',
       ].filter(Boolean).join('\n')));
       const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
+      if (p.prompt) await ensureAutoStyle(people, who.charKey);
       p.img = p.prompt ? await imagine(snapPrompt(p), { refs: snapRefs(p) }) : '';
       note = p.img ? '' : '沒有出圖：酒館可能還沒接生圖。可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。';
       if (who.key === ch?.key) { items.push(p); save(); }
@@ -220,6 +221,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (a === 'copy' && p) { try { await navigator.clipboard.writeText(snapPrompt(p)); say('複製了'); } catch { say('這裡不能複製，長按文字自己選'); } }
     if ((a === 'gen' || a === 'regen') && p) {
       note = '生圖中⋯'; renderOne();
+      await ensureAutoStyle(people, ch.charKey);
       const url = await imagine(snapPrompt(p), { refs: snapRefs(p) });
       if (url) { p.img = url; note = ''; save(); } else note = '沒有出圖：酒館可能還沒接生圖，或這次失敗了。';
       if (mine()) renderOne();

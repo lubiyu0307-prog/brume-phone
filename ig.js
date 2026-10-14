@@ -5,7 +5,7 @@
 
 import * as store from './store.js';
 import { currentChar, generate, imagine, canSeeImages, ctx } from './st.js';
-import { HIM, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt } from './cast.js';
+import { HIM, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
 
 // 自動生圖：打開的話，他新發的貼文用酒館的生圖畫成真的照片（要接好生圖，一張要等一下）
 const AUTO_KEY = 'brume-phone:igauto';
@@ -214,7 +214,7 @@ export function createIG({ screen, say }) {
     return { prompt: finalPrompt(people, who, `${p.desc}, instagram photo, natural light`, ids, { by }), refs: refsFor(people, who, p.desc, always) };
   }
   // 限動是直的（9:16），貼文是方的
-  const draw = (p, who, aspect = '1:1') => { const { prompt, refs } = photoPrompt(p, who); return imagine(prompt.replace('instagram photo', aspect === '9:16' ? 'vertical instagram story photo' : 'instagram photo'), { refs, aspect }); };
+  const draw = async (p, who, aspect = '1:1') => { await ensureAutoStyle(people, who.charKey); const { prompt, refs } = photoPrompt(p, who); return imagine(prompt.replace('instagram photo', aspect === '9:16' ? 'vertical instagram story photo' : 'instagram photo'), { refs, aspect }); };
 
   // 配角的證件照：一張照片（當大頭貼，也是生圖的參考）＋長相文字。相本的證件照區是同一份
   function castSheet(name) {

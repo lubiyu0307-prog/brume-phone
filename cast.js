@@ -4,6 +4,7 @@
 // look.style 是玩家寫的照片風格（濾鏡、畫風），每張生圖都套用。
 
 import * as store from './store.js';
+import { generate, asDataUrl } from './st.js';
 
 export const HIM = '@him';
 export const ME = '@me';
@@ -18,6 +19,23 @@ export async function loadCast(charKey) {
 
 export function saveCast(charKey, { cast, look }) {
   return Promise.all([store.set('cast:' + charKey, cast), store.set('look:' + charKey, look)]).catch(() => {});
+}
+
+/**
+ * 玩家沒寫照片風格時，看一眼角色卡頭像自己判斷畫風（寫實或動漫），記在 look.autoStyle，一張卡只判斷一次。
+ * 動漫風的卡不寫風格，生出來會是寫實照片，跟卡對不上
+ */
+export async function ensureAutoStyle(data, charKey) {
+  if (data.look.style || data.look.autoStyle || !data.cardAvatar) return;
+  try {
+    const img = await asDataUrl(data.cardAvatar);
+    if (!img) return;
+    const t = await generate('[Brume Phone · 畫風]\n現在不是在寫劇情正文。看附上的角色圖片，用英文寫一行生圖用的畫風描述：寫實照片就只回 realistic photo；動漫、插畫、3D 就寫出畫風（例如 anime style, cel shading, soft colours）。只輸出那一行，不要其他文字。', img);
+    const line = String(t || '').trim().split('\n')[0].replace(/^["'`]+|["'`]+$/g, '').slice(0, 160);
+    if (!line) return;
+    data.look.autoStyle = line;
+    await saveCast(charKey, data);
+  } catch { /* 判斷不了就照寫實 */ }
 }
 
 /** 某個人的資料：{ name, photo, look } */
@@ -61,6 +79,7 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
   // 拍照的人：他自己拍的照片常常只有手入鏡（托著東西、拿著杯子），不講是誰的手，模型會隨便畫一隻（10/14 阿愷的企鵝變成女生的手）。
   // 只講性別，不貼整段長相：貼了模型會把整個人畫進去（同一天第二張，冒出一個陌生男人）
   const cam = by && !ids.includes(by) ? person(data, ch, by) : null;
+  const style = data.look.style || data.look.autoStyle || '';
   // 長相裡跟手有關的詞（膚色、手指、指節、青筋、手毛）也帶上，只講「男生的手」會被畫成刻板的毛手（10/14 第三張）
   const hand = cam ? cam.look.split(/[,，、]/).map((t) => t.trim()).filter((t) => /skin|finger|knuckle|vein|hand|nail|wrist|arm|hair(less|y)|膚|手|指|腕|毛/i.test(t) && !/head|hair\b(?!less)/i.test(t)).join(', ') : '';
   const sex = cam && (/\b(1boy|male|man|boy)\b/i.test(cam.look) || /男/.test(cam.look) ? "a man's" : /\b(1girl|female|woman|girl)\b/i.test(cam.look) || /女/.test(cam.look) ? "a woman's" : '');
@@ -68,7 +87,8 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
     String(prompt).trim(),
     cam ? `First-person shot taken by ${cam.name} on their own phone. ${cam.name} is NOT in the photo: no face, no body. If a hand or arm reaches into the frame, it is ${cam.name}'s own${sex || hand ? ` (${[sex ? `${sex} hand` : '', hand].filter(Boolean).join(': ')})` : ''}.` : '',
     notes.length ? `Appearance to keep exactly (hair colour, body shape, clothes):\n${notes.join('\n')}` : '',
-    // 玩家寫的風格蓋過上面的「photo」「realistic」：動漫風的卡寫 anime style 就要畫成動漫，不是寫實照片
-    data.look.style ? `Visual style (this overrides any "photo" or "realistic" wording above): ${data.look.style}` : '',
+    // 玩家寫的風格蓋過上面的「photo」「realistic」：動漫風的卡寫 anime style 就要畫成動漫，不是寫實照片。
+    // 玩家沒寫就用看頭像判斷的；判斷是寫實照片就不用加
+    style && !/^realistic photo\.?$/i.test(style) ? `Visual style (this overrides any "photo" or "realistic" wording above): ${style}` : '',
   ].filter(Boolean).join('\n');
 }

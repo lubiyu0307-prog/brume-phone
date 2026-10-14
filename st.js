@@ -139,7 +139,7 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
   const ask = `Generate one image. No text in the image, no captions.\n${String(prompt).trim()}`;
   // 參考圖一張一張標上是誰，畫出來的人才會對得上
   const content = refs.length
-    ? [{ type: 'text', text: `${ask}\nReference photos of the people in this photo follow. Keep each person's face, hair and overall look.` },
+    ? [{ type: 'text', text: `${ask}\nReference images of the people in this picture follow. Keep each person's face, hair and overall look. Unless a visual style is given above, draw in the same art style as the references (anime stays anime, photo stays photo).` },
       ...(await Promise.all(refs.map(async (r) => { const url = await asDataUrl(r.url); return url ? [{ type: 'text', text: `Reference: ${r.name}` }, { type: 'image_url', image_url: { url } }] : []; }))).flat()]
     : ask;
   for (const model of GEMINI_IMAGE_MODELS) {
@@ -166,7 +166,7 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
 }
 
 // 參考圖要給 dataURL；角色卡頭像這種網址先抓下來縮到 768 寬（原檔常常一兩 MB）
-async function asDataUrl(url) {
+export async function asDataUrl(url) {
   if (String(url).startsWith('data:')) return url;
   try {
     const bmp = await createImageBitmap(await (await fetch(url)).blob());
