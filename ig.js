@@ -3,7 +3,12 @@
 // 他的照片先是文字描述，點進去可以叫酒館生圖。
 
 import * as store from './store.js';
-import { currentChar, generate, imagine } from './st.js';
+import { currentChar, generate, imagine, canSeeImages, ctx } from './st.js';
+
+// 自動生圖：打開的話，他新發的貼文用酒館的生圖畫成真的照片（要接好生圖，一張要等一下）
+const AUTO_KEY = 'brume-phone:igauto';
+const autoOn = () => { try { return localStorage.getItem(AUTO_KEY) === '1'; } catch { return false; } };
+const canImagine = () => !!ctx()?.executeSlashCommandsWithOptions;
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -87,7 +92,7 @@ export function createIG({ screen, say }) {
     const people = [...new Map(stories.map((s) => [s.author.handle, s])).values()];
     const posts = [...d.posts].sort((a, b) => b.ts - a.ts);
     screen.innerHTML = `<div class="bp-ig">
-      <div class="bp-ig-head"><span class="bp-back" data-ig="home">‹</span><b class="logo">Instagram</b><i class="${loading ? 'spin' : ''}" data-ig="refresh">${IC.refresh}</i></div>
+      <div class="bp-ig-head"><span class="bp-back" data-ig="home">‹</span><b class="logo">Instagram</b><span class="bp-ig-tools">${canImagine() ? `<em class="bp-ig-auto${autoOn() ? ' on' : ''}" data-ig="auto">${autoOn() ? '自動生圖' : '文字照片'}</em>` : ''}<i class="${loading ? 'spin' : ''}" data-ig="refresh">${IC.refresh}</i></span></div>
       <div class="bp-ig-scroll">
         <div class="bp-ig-stories">
           <div class="bp-ig-story me" data-ig="compose">${av(meA())}<span>你的限動</span></div>
@@ -147,6 +152,10 @@ export function createIG({ screen, say }) {
     loading = true; if (view === 'feed') renderFeed();
     const who = ch; const dd = d;
     try {
+      // 你們相本裡的照片，他可以挑一張自己發（發過的不再給）
+      dd.usedAlbum ||= [];
+      const album = ((await store.get('album:' + who.key).catch(() => null)) || [])
+        .filter((p) => p.img && !dd.usedAlbum.includes(p.id) && p.desc && p.desc !== '妳放的照片').slice(-6);
       const have = dd.posts.slice(-10).map((p) => `${p.author.handle}：${p.caption.slice(0, 20)}`).join('\n');
       const r = parseJSON(await generate([
         '[Brume Phone · Instagram]',
@@ -156,21 +165,49 @@ export function createIG({ screen, say }) {
         WORLD, `- 不要寫 ${who.user} 發的`,
         `- ${who.name} 的帳號用：${dd.him.handle === who.name ? '幫他取一個英文小寫帳號' : dd.him.handle}`,
         have ? `已經有的（不要重複）：\n${have}` : '',
-        '', '只輸出 JSON：{"posts":[{"type":"本人/配角/路人","name":"","handle":"英文小寫帳號","photo":"照片拍到什麼，一句話","caption":"說明文字","likes":120}],"stories":[{"type":"","name":"","handle":"","photo":"畫面","text":"限動上的字"}]}',
+        album.length ? `${who.name} 和 ${who.user} 相本裡的合照（${who.name} 想曬的話，可以拿其中一張發，在那篇加 "album":編號；不想就不用）：\n${album.map((p, i) => `${i + 1}. ${p.desc}`).join('\n')}` : '',
+        '', '只輸出 JSON：{"posts":[{"type":"本人/配角/路人","name":"","handle":"英文小寫帳號","photo":"照片拍到什麼，一句話","caption":"說明文字","likes":120,"album":0}],"stories":[{"type":"","name":"","handle":"","photo":"畫面","text":"限動上的字"}]}',
       ].filter(Boolean).join('\n')));
       const now = Date.now();
       const author = (x) => {
         const kind = KIND[x.type] || 'other';
-        if (kind === 'him') { if (dd.him.handle === who.name && x.handle) dd.him.handle = String(x.handle).replace(/^@/, ''); return himA(); }
+        if (kind === 'him') {
+          if (dd.him.handle === who.name && x.handle) {
+            dd.him.handle = String(x.handle).replace(/^@/, '');
+            for (const q of dd.posts) if (q.author.kind === 'him') q.author.handle = dd.him.handle; // 之前用名字當帳號發的也一起換
+          }
+          return himA();
+        }
         return { kind, name: String(x.name || '路人'), handle: String(x.handle || x.name || 'user').replace(/^@/, '').slice(0, 24) };
       };
-      (r.posts || []).forEach((x, i) => dd.posts.push({ id: uid(), author: author(x), desc: String(x.photo || ''), caption: String(x.caption || ''), likes: +x.likes || Math.floor(Math.random() * 200), ts: now - (i + Math.random()) * 3 * 36e5, comments: null }));
+      (r.posts || []).forEach((x, i) => {
+        const a = author(x);
+        const pic = a.kind === 'him' && +x.album > 0 ? album[+x.album - 1] : null;
+        if (pic) dd.usedAlbum.push(pic.id);
+        dd.posts.push({ id: uid(), author: a, desc: pic ? pic.desc : String(x.photo || ''), ...(pic ? { img: pic.img, fromAlbum: true } : {}), caption: String(x.caption || ''), likes: +x.likes || Math.floor(Math.random() * 200), ts: now - (i + Math.random()) * 3 * 36e5, comments: null });
+      });
       (r.stories || []).forEach((x, i) => dd.stories.push({ id: uid(), author: author(x), desc: String(x.photo || ''), text: String(x.text || ''), ts: now - i * 2 * 36e5, seen: false }));
       dd.posts = dd.posts.slice(-80); dd.stories = dd.stories.filter((s) => now - s.ts < 864e5);
       if (who.key === ch?.key) save();
     } catch (e) { say(`動態更新失敗：${e.message || e}`); }
     loading = false;
     if (mine() && view === 'feed') renderFeed();
+    autoDraw(who, dd);
+  }
+
+  // 照片的生圖 prompt：他的貼文帶上相本存的長相，每張的他才會像同一個人
+  async function photoPrompt(p, who) {
+    const look = p.author.kind === 'him' ? ((await store.get('look:' + who.charKey).catch(() => null)) || {}).him : '';
+    return `${p.desc}${look && /他|自拍|本人|鏡/.test(p.desc) ? `, ${look}` : ''}, instagram photo, natural light`;
+  }
+  // 把他剛發、還是文字卡的貼文一張一張畫出來
+  async function autoDraw(who, dd) {
+    if (!autoOn() || !canImagine()) return;
+    for (const p of dd.posts.filter((x) => x.author.kind === 'him' && !x.img && !x.drawn).slice(-2)) {
+      p.drawn = true; // 失敗也不重試，免得每次重整都卡在同一張
+      const url = await imagine(await photoPrompt(p, who));
+      if (url) { p.img = url; if (who.key === ch?.key) { save(); if (mine() && view === 'feed') renderFeed(); } else store.set('ig:' + who.key, dd).catch(() => {}); }
+    }
   }
 
   async function loadComments(p) {
@@ -254,9 +291,14 @@ export function createIG({ screen, say }) {
       d.posts.push(p); save(); openId = p.id; back = 'feed'; renderPost(); say('分享了，等等會有人來留言');
       setTimeout(() => { if (!p.comments) loadComments(p); }, 2500);
     }
+    if (a === 'auto') {
+      try { localStorage.setItem(AUTO_KEY, autoOn() ? '0' : '1'); } catch { /* 存不了 */ }
+      say(autoOn() ? '打開了：他之後發的貼文會自動生成照片' : '關掉了：貼文先用文字描述，點進去再生圖');
+      renderFeed(); if (autoOn()) autoDraw(ch, d); return;
+    }
     if (a === 'gen') {
       const p = find(openId); const btn = screen.querySelector('.bp-ig-gen'); if (btn) btn.textContent = '生圖中⋯';
-      const url = await imagine(`${p.desc}, instagram photo, natural light`);
+      const url = await imagine(await photoPrompt(p, ch));
       if (url) { p.img = url; save(); } else say('沒有出圖：酒館可能還沒接生圖');
       if (mine() && view === 'post') renderPost();
     }
@@ -288,5 +330,27 @@ export function createIG({ screen, say }) {
     if (text && p) reply(p, text);
   });
 
-  return { open() { view = 'feed'; render(); } };
+  // 從相本請他發一篇：照片給他看（酒館能送圖的話），他寫說明文字，發在他的帳號
+  async function postPhoto(img, hint, albumId) {
+    const who = currentChar(); if (!who) return false;
+    const dd = (await store.get('ig:' + who.key).catch(() => null)) || { me: { handle: '', bio: '' }, him: { handle: '', bio: '' }, posts: [], stories: [] };
+    dd.me.handle ||= who.user; dd.him.handle ||= who.name;
+    const see = canSeeImages();
+    const raw = await generate([
+      '[Brume Phone · Instagram]',
+      `現在不是在寫劇情正文。${who.user} 把你們相本裡的一張照片給 ${who.name}，問他要不要發 IG。`,
+      see ? '照片附在這則訊息裡，照實際看到的寫。' : (hint ? `照片內容：${hint}` : '（照片你看不到，寫得含蓄一點）'),
+      hint && see ? `她對這張照片的說明：${hint}` : '',
+      `用 ${who.name} 的個性寫這篇貼文的說明文字：他會怎麼曬、會不會標她、會不會害羞。可以很短。`,
+      '只輸出 JSON：{"caption":"說明文字","likes":150}',
+    ].filter(Boolean).join('\n'), see ? img : null);
+    const r = parseJSON(raw);
+    if (albumId) { dd.usedAlbum ||= []; dd.usedAlbum.push(albumId); }
+    dd.posts.push({ id: uid(), author: { kind: 'him', name: who.name, handle: dd.him.handle }, desc: hint || '你們的合照', img, fromAlbum: true, caption: String(r.caption || ''), likes: +r.likes || 80 + Math.floor(Math.random() * 200), ts: Date.now(), comments: null });
+    await store.set('ig:' + who.key, dd);
+    if (ch?.key === who.key) d = dd;
+    return String(r.caption || '');
+  }
+
+  return { open() { view = 'feed'; render(); }, postPhoto };
 }

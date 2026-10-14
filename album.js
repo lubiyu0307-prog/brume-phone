@@ -21,7 +21,7 @@ const IC = {
   up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>',
 };
 
-export function createAlbum({ screen, say, onShare }) {
+export function createAlbum({ screen, say, onShare, onIG }) {
   let ch = null; let items = []; let look = { him: '', me: '' };
   let view = 'grid'; let tab = 'all'; let openId = null; let picked = new Set(); let busy = false; let note = '';
   const mine = () => !!screen.querySelector('.bp-al');
@@ -85,6 +85,7 @@ export function createAlbum({ screen, say, onShare }) {
           ${p.prompt && !p.img ? '<button data-al="gen">用酒館生圖</button>' : ''}
           ${p.prompt ? '<button data-al="regen">重新生一張</button>' : ''}
           ${p.img && onShare ? '<button data-al="share">傳到 LINE 給他看</button>' : ''}
+          ${p.img && onIG ? `<button data-al="ig" ${busy ? 'disabled' : ''}>${busy === 'ig' ? '他在想要寫什麼⋯' : '請他發到 IG'}</button>` : ''}
           <button data-al="attach">${p.img ? '換一張圖' : '傳生好的圖進來'}</button>
           <button data-al="del" class="danger">刪除</button></div>` : ''}
         <p class="bp-al-note">${esc(note)}</p>
@@ -177,6 +178,16 @@ export function createAlbum({ screen, say, onShare }) {
       const url = await imagine(p.prompt);
       if (url) { p.img = url; note = ''; save(); } else note = '沒有出圖：酒館可能還沒接生圖，或這次失敗了。';
       if (mine()) renderOne();
+    }
+    if (a === 'ig' && p?.img && !busy) {
+      busy = 'ig'; renderOne();
+      try {
+        const cap = await onIG(p.img, p.desc !== '妳放的照片' ? p.desc : '', p.id);
+        note = cap ? `他發了：「${cap}」` : '';
+        say('他發到 IG 了');
+      } catch (err) { note = `沒發成：${err.message || err}`; }
+      busy = false; if (mine() && view === 'one') renderOne();
+      return;
     }
     if (a === 'share' && p?.img) { onShare(p.img, p.source === 'upload' && p.desc !== '妳放的照片' ? p.desc : ''); return; }
     if (a === 'del' && p) { items = items.filter((x) => x.id !== p.id); save(); view = 'grid'; render(); }

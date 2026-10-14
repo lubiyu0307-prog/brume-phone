@@ -1148,3 +1148,10 @@
 .bp-al-head i.bp-al-up small { font-size: 13px; white-space: nowrap; }
 .bp-al-cap { display: block; width: calc(100% - 32px); margin: 14px 16px 6px; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 12px; background: rgba(255, 255, 255, .08); color: inherit; font: inherit; outline: none; }
 .bp-al-cap::placeholder { color: rgba(255, 255, 255, .45); }
+
+/* IG：右上角的自動生圖開關 */
+.bp-ig-head:has(.bp-ig-tools) { grid-template-columns: 96px 1fr 96px; }
+.bp-ig-tools { display: flex; align-items: center; justify-content: flex-end; gap: 4px; }
+.bp-ig-tools i { width: 32px; height: 32px; }
+.bp-ig-auto { font-style: normal; font-size: 11px; white-space: nowrap; padding: 4px 8px; border-radius: 12px; border: 1px solid #dbdbdb; color: #8e8e8e; cursor: pointer; }
+.bp-ig-auto.on { border-color: #0095f6; color: #0095f6; }
