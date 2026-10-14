@@ -198,6 +198,13 @@ export function createAlbum({ screen, say, onShare }) {
     save(); tab = 'mine'; render(); say(`放進相本了（${Math.min(files.length, 20)} 張）`);
   });
 
+  // 伺服器比較慢才送到的相本（另一台放的照片），到了就重畫
+  window.addEventListener('bp-store-late', async (e) => {
+    if (!ch || e.detail !== 'album:' + ch.key) return;
+    items = (await store.get('album:' + ch.key).catch(() => null)) || [];
+    if (mine() && view === 'grid') render();
+  });
+
   return {
     async open(to = 'grid') { await load(); view = to; picked = new Set(); note = ''; render(); },
   };

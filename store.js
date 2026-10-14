@@ -91,10 +91,21 @@ function remotePut(key, rec) {
 /** 下次 get 一律重問伺服器（打開手機、切回這個分頁時用） */
 export function refresh() { remoteCache.clear(); }
 
+const SLOW = Symbol('slow');
 export async function get(key) {
   const local = unwrap(await idbGet(key));
   if (!canSync(key)) return local.v;
-  const remote = await Promise.race([remoteGet(key), new Promise((r) => setTimeout(() => r(null), 2500))]);
+  const pending = remoteGet(key);
+  const remote = await Promise.race([pending, new Promise((r) => setTimeout(() => r(SLOW), 2500))]);
+  if (remote === SLOW) {
+    // 伺服器回得慢（相本這種大檔、手機網路）：先用這台的，等伺服器回來再比一次。
+    // 這時候不能把這台的傳上去，伺服器上可能是比較新的
+    pending.then(async (late) => {
+      if (late && late.t > local.t) { await idbPut(key, late); window.dispatchEvent(new CustomEvent('bp-store-late', { detail: key })); }
+      else if (local.t && (!late || late.t < local.t)) remotePut(key, local);
+    });
+    return local.v;
+  }
   if (remote && remote.t > local.t) { await idbPut(key, remote); return remote.v; }
   // 伺服器上沒有、或比較舊（例如這台離線時改過），把這台的傳上去
   if (local.t && (!remote || remote.t < local.t)) remotePut(key, local);
