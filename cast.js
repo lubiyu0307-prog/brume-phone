@@ -126,7 +126,7 @@ const realistic = (style) => !style || /^realistic photo\.?$/i.test(style) || (/
 // 人入鏡時一定要的（精修、生活感、動漫都適用）：人體結構、各自的臉、衣服、互動不擺拍
 function people(n) {
   if (!n) return [];
-  return [P.ANATOMY, P.CLOTHES, ...(n > 1 ? [P.TWO_PEOPLE] : [])];
+  return [P.ONLY_LISTED, P.ANATOMY, P.CLOTHES, ...(n > 1 ? [P.TWO_PEOPLE] : [])];
 }
 
 /**

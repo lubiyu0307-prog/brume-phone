@@ -206,7 +206,9 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     return ids.length ? ids : [HIM];
   }
   const snapRefs = (p) => refsFor(people, ch, p.desc || '', snapWho(p));
-  const snapPrompt = (p) => finalPrompt(people, ch, p.prompt, idsFor(people, p.desc || '', snapWho(p)));
+  // 快照是妳用手機拍的：畫面裡沒有妳，就講明是妳拍的第一人稱照片，不然「他把硬幣遞過來」這種畫面，
+  // Gemini 會自己生一個收硬幣的人出來，有時是他的分身，有時硬塞一個妳（10/14）
+  const snapPrompt = (p) => { const ids = idsFor(people, p.desc || '', snapWho(p)); return finalPrompt(people, ch, p.prompt, ids, { by: ids.includes(ME) ? null : ME }); };
 
   async function lookAuto() {
     busy = true; renderPerson();
