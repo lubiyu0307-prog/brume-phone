@@ -18,6 +18,7 @@ const UNLOCK = {
   his: 'dating', // 偷看他的手機
   sleep: 'dating', // 陪睡模式
   milestones: 'dating', // 里程碑
+  couple: 'dating', // 情侶頭貼
   notes: 'living', // 冰箱門便條
 };
 

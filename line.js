@@ -2,7 +2,7 @@
 // 回覆走酒館自己的 generateQuietPrompt，所以模型看得到角色卡、世界書與正文。
 
 import * as store from './store.js';
-import { currentChar, generate, ctx, writeLore, canSeeImages } from './st.js';
+import { currentChar, generate, ctx, writeLore, canSeeImages, imagine } from './st.js';
 import * as data from './data.js';
 import * as stage from './stage.js';
 import { findUrls, readLink, linkForPrompt } from './link.js';
@@ -103,6 +103,7 @@ export const GIFT_PRESETS = ['一杯熱拿鐵', '一杯珍珠奶茶', '一塊草
 function msgText(m) {
   if (m.unsent) return m.peek ? `（收回了一則訊息；收回前你已經看到了：「${m.was}」）` : '（收回了一則訊息）';
   if (m.gift) return `［送了禮物：${m.gift.item}${m.gift.note ? `，附一句「${m.gift.note}」` : ''}${m.me ? '' : m.gift.opened ? '（她拆開了）' : '（她還沒拆）'}］`;
+  if (m.couple) return m.couple === 'off' ? '［她把你們的情侶頭貼換回來了］' : '［她把你們兩個的 LINE 頭貼換成情侶頭貼了］';
   if (m.loc) return `［傳了位置：${m.loc.place}${m.loc.note ? `「${m.loc.note}」` : ''}］`;
   if (m.sticker) return `［貼圖：${m.sticker.tag}］`;
   if (m.alarm) return `［鬧鐘卡 ${m.alarm.time}「${m.alarm.label}」］`;
@@ -157,6 +158,7 @@ function buildPrompt(ch, msgs, x = {}) {
     x.sleep ? `\n【陪睡模式】${ch.user} 躺在床上準備睡了，要你陪她入睡。講話輕、短、慢，像在耳邊說；不問問題、不開新話題、不要讓她更清醒。她說晚安就溫柔收尾。` : '',
     x.memory?.length ? `\n${ch.name} 記得的事：\n${x.memory.map((m) => '- ' + m.text).join('\n')}` : '',
     x.notes?.length ? `\n她冰箱上的便條（你貼過的也在裡面）：\n${x.notes.map((n) => `- ${n.text}${n.date ? `（${n.date}）` : ''}${n.done ? '（已完成）' : ''}`).join('\n')}` : '',
+    x.couple ? `\n你們的 LINE 現在用情侶頭貼（${x.couple}）。` : (x.stage && stage.unlocked(x.stage, 'couple') ? `\n你們還沒有情侶頭貼。很偶爾、氣氛對的時候，你可以提議換一組（她在 LINE 主頁換）。` : ''),
     x.pin ? `\n聊天室公告（釘在最上面的）：${x.pin}` : '',
     x.cal?.length ? `\n你們共用的行事曆（之後的）：\n${x.cal.map((e) => `- ${e.date} ${e.title}`).join('\n')}` : '',
     '',
@@ -252,16 +254,19 @@ export function createLine({ screen, say, onUnread, onData }) {
     const [t, b] = await Promise.all([loadThread(ch.key), store.get('linebg:' + ch.key).catch(() => null)]);
     if (token !== renderToken) return;
     thread = t; bg = b; curStage = await stage.get(ch.key);
+    couple = await store.get('couple:' + ch.key).catch(() => null);
     if (view === 'list') renderList();
     else if (view === 'memory') renderMemory();
     else if (view === 'cards') renderCards();
     else if (view === 'stickers') renderStickers();
+    else if (view === 'profile') renderProfile();
     else renderRoom();
   }
 
   function avatar(cls = '') {
-    return ch.avatar
-      ? `<img class="bp-line-av ${cls}" src="${ch.avatar}" alt="">`
+    const src = couple?.his || ch.avatar;
+    return src
+      ? `<img class="bp-line-av ${cls}" src="${src}" alt="">`
       : `<span class="bp-line-av ${cls} bp-line-av-txt">${esc(ch.name.slice(0, 1))}</span>`;
   }
 
@@ -283,7 +288,7 @@ export function createLine({ screen, say, onUnread, onData }) {
         </div>
       </div>
       <div class="bp-line-tabs">
-        <span>${TAB.home}<i>主頁</i></span><span class="on">${TAB.chat}<i>聊天</i></span>
+        <span data-line="profile">${TAB.home}<i>主頁</i></span><span class="on" data-line="list">${TAB.chat}<i>聊天</i></span>
         <span>${TAB.voom}<i>VOOM</i></span><span>${TAB.news}<i>新聞</i></span><span>${TAB.wallet}<i>錢包</i></span>
       </div></div>`;
   }
@@ -325,6 +330,9 @@ export function createLine({ screen, say, onUnread, onData }) {
       prevHim = !m.me && !m.err; prevMe = !!m.me;
       if (m.unsent) {
         out += `<div class="bp-line-sys bp-unsent">${m.me ? '妳' : esc(ch.name)}已收回訊息</div>`;
+        prevHim = false; prevMe = false;
+      } else if (m.couple) {
+        out += `<div class="bp-line-moment"><span>${m.couple === 'off' ? '妳換回了原本的頭貼' : `💑 妳把妳和${esc(ch.name)}換成情侶頭貼了`}</span></div>`;
         prevHim = false; prevMe = false;
       } else if (m.moment || m.notice) {
         out += `<div class="bp-line-moment${m.notice ? ' bp-notice' : ''}"${m.goto ? ` data-goto="${m.goto}"` : ''}><span>${esc(m.moment || m.notice)}</span></div>`;
@@ -462,6 +470,7 @@ export function createLine({ screen, say, onUnread, onData }) {
       <button data-line="sync" class="bp-line-switch">讓正文知道 LINE 聊了什麼<i class="${thread.sync !== false ? 'on' : ''}"></i></button>
       <button data-line="nowsync" class="bp-line-switch">現實時間聊的也讓劇情知道<i class="${thread.nowSync ? 'on' : ''}"></i></button>
       ${lockedBtn('sleep', thread.sleep ? '結束陪睡模式' : '🌙 陪睡模式')}
+      ${lockedBtn('couple', '💑 情侶頭貼')}
       <button data-line="memory">記憶書</button>
       ${lockedBtn('cards', '收藏的字卡')}
       <button data-line="stickermgr">管理貼圖</button>
@@ -498,6 +507,63 @@ export function createLine({ screen, say, onUnread, onData }) {
   // ---------- 其他頁：記憶書、字卡、貼圖管理 ----------
   function subHead(title, extra = '') {
     return `<div class="bp-line-head bp-line-subhead"><span class="bp-back" data-line="room">‹</span><b>${title}</b><span class="bp-line-tools">${extra}</span></div>`;
+  }
+
+  // 主頁：兩個人的頭貼並排，換了情侶頭貼最看得出來
+  function renderProfile() {
+    const me = couple?.mine;
+    screen.innerHTML = `<div class="bp-line bp-line-listv bp-line-profv">
+      <div class="bp-line-lhead"><span class="bp-back" data-line="home">‹</span><b>主頁</b><span></span></div>
+      <div class="bp-line-prof">
+        <div class="bp-line-prof-pair${couple ? ' bp-couple' : ''}">
+          <div>${me ? `<img src="${me}" alt="">` : `<span class="bp-line-av-txt">${esc(ch.user.slice(0, 1))}</span>`}<b>${esc(ch.user)}</b></div>
+          ${couple ? '<i>♥</i>' : ''}
+          <div>${avatar()}<b>${esc(ch.name)}</b></div>
+        </div>
+        <p>${couple ? `情侶頭貼・${new Date(couple.ts).getMonth() + 1}/${new Date(couple.ts).getDate()} 換上的` : ''}</p>
+        ${stage.unlocked(curStage, 'couple') ? `<button data-line="couple">${couple ? '換一組情侶頭貼' : '💑 換情侶頭貼'}</button>` : `<p class="soft">${stage.needFor('couple')}之後可以換情侶頭貼</p>`}
+      </div>
+      <div class="bp-line-tabs">
+        <span class="on">${TAB.home}<i>主頁</i></span><span data-line="list">${TAB.chat}<i>聊天</i></span>
+        <span>${TAB.voom}<i>VOOM</i></span><span>${TAB.news}<i>新聞</i></span><span>${TAB.wallet}<i>錢包</i></span>
+      </div>
+      <input class="bp-line-file" type="file" accept="image/*" hidden>
+      <div class="bp-line-pop"></div></div>`;
+  }
+
+  // 情侶頭貼：兩格各自選圖，或一張切兩半，或請酒館的生圖做一組
+  let coupleDraft = null;
+  function coupleSheet() {
+    coupleDraft = coupleDraft || { his: couple?.his || '', mine: couple?.mine || '' };
+    const slot = (k, label) => `<div class="bp-line-cslot" data-line="cpick" data-k="${k}">${coupleDraft[k] ? `<img src="${coupleDraft[k]}" alt="">` : '<span>＋</span>'}<small>${label}</small></div>`;
+    pop(`<div class="bp-line-edit"><b>情侶頭貼</b>
+      <div class="bp-line-cpair">${slot('mine', esc(ch.user))}<i>♥</i>${slot('his', esc(ch.name))}</div>
+      <div class="bp-line-list">
+        <button data-line="csplit">一張圖切成兩半（左邊給妳、右邊給他）</button>
+        ${ctx()?.executeSlashCommandsWithOptions ? '<button data-line="cgen">✨ 用酒館的生圖做一組</button>' : ''}
+        ${couple ? '<button data-line="coff" class="danger">換回原本的頭貼</button>' : ''}
+      </div>
+      <div class="bp-line-edit-btns"><button data-line="cancelcouple">取消</button><button class="ok" data-line="csave">換上</button></div></div>`, 'bp-center-mode');
+  }
+  async function setCouple(val) {
+    couple = val;
+    if (val) await store.set('couple:' + ch.key, val).catch(() => say('存不下'));
+    else await store.del('couple:' + ch.key).catch(() => {});
+    coupleDraft = null; unpop();
+    // 聊天室留一行，他下一則會看到
+    thread.msgs.push({ id: uid(), me: true, ts: Date.now(), ...(thread.mode === 'now' ? { now: true } : { story: true }), couple: val ? 'on' : 'off', text: '' });
+    save(); syncMain();
+    if (view === 'room') { refreshLog(); scheduleReply(); } else { render(); scheduleReply(); }
+  }
+  // 一張圖切左右兩半，各自裁成正方形
+  async function splitPair(src) {
+    const im = await new Promise((ok, no) => { const i = new Image(); i.crossOrigin = 'anonymous'; i.onload = () => ok(i); i.onerror = no; i.src = src; });
+    const half = (x) => {
+      const w = im.width / 2; const sz = Math.min(w, im.height); const cv = document.createElement('canvas'); cv.width = cv.height = 400;
+      cv.getContext('2d').drawImage(im, x + (w - sz) / 2, (im.height - sz) / 2, sz, sz, 0, 0, 400, 400);
+      return cv.toDataURL('image/jpeg', 0.88);
+    };
+    return { mine: half(0), his: half(im.width / 2) };
   }
 
   async function renderMemory() {
@@ -600,6 +666,7 @@ export function createLine({ screen, say, onUnread, onData }) {
   // 她貼的連結：送出當下就請伺服器去讀，讀好了泡泡底下長出預覽卡；他回之前會等讀完
   const linkJobs = new Map();
   let roundPhotos = []; let warnedImages = false;
+  let couple = null; // 情侶頭貼 { his, mine, ts }
   function readLinks(m, t, key) {
     const urls = findUrls(m.text);
     if (!urls.length) return;
@@ -651,7 +718,7 @@ export function createLine({ screen, say, onUnread, onData }) {
       const today = data.today();
       const [notes, cal, memory, stks] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key), data.stickers.all()]);
       const cur = await stage.get(who.key);
-      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => x.tag))], photos: roundPhotos.length, photosSeen: !!image, pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
+      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => x.tag))], photos: roundPhotos.length, photosSeen: !!image, couple: couple ? `${new Date(couple.ts).getMonth() + 1}/${new Date(couple.ts).getDate()} 換的` : '', pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
       out = parseReply(await generate(buildPrompt(who, t.msgs, extra), image), who);
       out.stickerObj = out.sticker ? stks.find((x) => x.tag === out.sticker) : null;
       if (!out.lines.length && !out.stickerObj && !out.alarm && !out.moments.length && !out.gifts.length && !out.locs.length) throw new Error('他沒有回出字來');
@@ -796,6 +863,30 @@ export function createLine({ screen, say, onUnread, onData }) {
     if (a === 'list') { view = 'list'; quoting = null; render(); }
     if (a === 'retry') { thread.msgs = thread.msgs.filter((m) => !m.err); save(); refreshLog(); reply(); }
     if (a === 'unquote') { quoting = null; showQuoting(); }
+    if (a === 'profile') { view = 'profile'; render(); }
+    if (a === 'couple') coupleSheet();
+    if (a === 'cancelcouple') { coupleDraft = null; unpop(); }
+    if (a === 'cpick' || a === 'csplit') {
+      const f = screen.querySelector('.bp-line-file');
+      f.dataset.for = a === 'csplit' ? 'csplit' : 'c-' + e.target.closest('[data-k]').dataset.k; f.click();
+    }
+    if (a === 'cgen') {
+      const look = (await store.get('look:' + ch.charKey).catch(() => null)) || {};
+      say('生圖中，要等一下⋯');
+      const style = 'matching couple profile picture, same art style, same pastel background, soft light, head and shoulders, square';
+      const [his, mine] = await Promise.all([
+        imagine(`${style}, ${look.him || ch.name}, holding the left half of a heart`),
+        imagine(`${style}, ${look.me || 'a young woman'}, holding the right half of a heart`),
+      ]);
+      if (!his || !mine) { say('生圖沒成功，酒館要先接好生圖（相本的快照用的那個）'); return; }
+      coupleDraft = { his, mine }; coupleSheet();
+    }
+    if (a === 'csave') {
+      if (!coupleDraft?.his || !coupleDraft?.mine) { say('兩邊都要有圖'); return; }
+      await setCouple({ his: coupleDraft.his, mine: coupleDraft.mine, ts: Date.now() });
+      say('換上了 💑');
+    }
+    if (a === 'coff') { await setCouple(null); say('換回原本的頭貼了'); }
     if (a === 'unpin') { delete thread.pin; save(); pinBar(); }
     if (a === 'down') { const log = screen.querySelector('.bp-line-log'); log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' }); }
     if (a === 'plus') {
@@ -912,6 +1003,14 @@ export function createLine({ screen, say, onUnread, onData }) {
       pendingSticker = await store.shrink(f, 320, 0.85, 'image/png');
       askSheet('這張貼圖的標籤', '', 'dostktag', '', '一兩個字就好，像「抱抱」「哭哭」「生氣」。他會照標籤挑。', 1);
       return;
+    }
+    const fr = e.target.dataset.for || '';
+    if (fr === 'csplit' || fr.startsWith('c-')) {
+      const src = await store.shrink(f, 1200, 0.9);
+      coupleDraft = coupleDraft || {};
+      if (fr === 'csplit') { try { Object.assign(coupleDraft, await splitPair(src)); } catch { say('這張切不開，換一張試試'); } }
+      else coupleDraft[fr.slice(2)] = await store.shrink(f, 400, 0.88);
+      coupleSheet(); return;
     }
     if (e.target.dataset.for === 'bg') {
       bg = await store.shrink(f, 1290);

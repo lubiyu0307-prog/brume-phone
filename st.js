@@ -151,4 +151,4 @@ export async function writeLore(text, keys = []) {
 }
 
 // 以前（0.9.2 以前）手機資料是照角色存的。這裡列出每一種資料的前綴，搬家時一起搬
-export const DATA_PREFIXES = ['line', 'linebg', 'music', 'ig', 'threads', 'his', 'album', 'calls', 'rps', 'stage', 'notes', 'cal', 'memory', 'cards'];
+export const DATA_PREFIXES = ['line', 'linebg', 'music', 'ig', 'threads', 'his', 'album', 'calls', 'rps', 'stage', 'notes', 'cal', 'memory', 'cards', 'couple'];

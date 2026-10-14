@@ -1128,3 +1128,17 @@
 .bp-line-giftgrid small { font-size: 10.5px; color: #555; text-align: center; line-height: 1.2; }
 .bp-line-edit .bp-line-giftitem { width: 100%; height: 40px; margin-bottom: 8px; border: 1px solid rgba(0, 0, 0, .1); border-radius: 12px; padding: 0 12px; background: #fff; color: #33302b; outline: none; }
 .bp-line-gift small { display: block; margin-top: 8px; font-size: 11px; color: #8fb98a; }
+
+/* LINE：主頁與情侶頭貼 */
+.bp-line-prof { flex: 1; display: flex; flex-direction: column; align-items: center; padding: 40px 20px; gap: 14px; background: #fff; }
+.bp-line-prof-pair { display: flex; align-items: center; gap: 18px; }
+.bp-line-prof-pair > div { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.bp-line-prof-pair img, .bp-line-prof-pair .bp-line-av, .bp-line-prof-pair .bp-line-av-txt { width: 92px; height: 92px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; font-size: 34px; background: #cfd6e0; color: #fff; }
+.bp-line-prof-pair b { font-size: 15px; color: #222; }
+.bp-line-prof-pair > i, .bp-line-cpair > i { font-style: normal; color: #e66a7f; font-size: 22px; }
+.bp-line-prof p { margin: 0; font-size: 13px; color: #888; }
+.bp-line-prof button { margin-top: 8px; padding: 11px 22px; border: 0; border-radius: 22px; background: #06c755; color: #fff; font: inherit; font-size: 15px; cursor: pointer; }
+.bp-line-cpair { display: flex; align-items: center; justify-content: center; gap: 14px; margin: 6px 0 14px; }
+.bp-line-cslot { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
+.bp-line-cslot img, .bp-line-cslot span { width: 86px; height: 86px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; background: #ebe7e0; color: #9a948a; font-size: 26px; }
+.bp-line-cslot small { font-size: 12px; color: #6b665e; }
