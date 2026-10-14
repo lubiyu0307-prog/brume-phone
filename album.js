@@ -159,7 +159,12 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     </div>`;
   }
 
-  const lookLine = (text) => { const { body, wardrobe } = splitLook(text || ''); return [body, wardrobe ? `（衣櫃：${wardrobe}）` : ''].filter(Boolean).join(' '); };
+
+  // 把欄位組成固定格式的生圖描述（鏡頭 → 地點 → 每個人 → 物品 → 光線），每張快照的 prompt 長得一樣整齊
+  function snapFromFields(r) {
+    const ppl = (Array.isArray(r.people) ? r.people : []).map((x) => [x.name, x.doing, x.face, x.wearing && P.WEARING(x.wearing)].filter(Boolean).join(P.COMMA)).filter(Boolean);
+    return [r.shot, r.place, ...ppl, r.props, r.light].filter(Boolean).map((t) => String(t).trim()).join(P.PERIOD);
+  }
 
   async function shoot() {
     if (busy) return;
@@ -170,19 +175,27 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     busy = true; renderSnap();
     const who = ch;
     try {
+      // 不讓寫劇情的模型自由寫 prompt：它會把長相、內心戲、氣味都塞進去，鏡頭和誰在哪也常漏掉，圖就跟著怪（10/14 露比發現的）。
+      // 改成照欄位填，程式再組成固定格式的生圖描述
       const r = parseJSON(await generate([
         '[Brume Phone · 快照]',
-        `現在不是在寫劇情正文。請把下面這段劇情裡最值得留下來的一個畫面，想成一張照片（像是誰用手機拍下來的）。`,
-        // 長相裡的衣服是衣櫃，不是這一刻穿的：整串給它，它會全抄進 prompt，畫出來變成混搭（10/14 Polo 衫配運動褲）
-        `${who.name} 的長相：${lookLine(people.look.him) || '照角色卡'}`,
-        people.look.me ? `${who.user} 的長相：${lookLine(people.look.me)}` : '',
-        ...sideNames(people).map((n) => person(people, who, n)).filter((c) => c.look).map((c) => `${c.name} 的長相（他有入鏡才寫）：${lookLine(c.look)}`),
-        '- 穿著照劇情這一刻寫，劇情沒寫才從衣櫃挑一套搭得起來的，不要把衣櫃裡的衣服全部寫進去',
+        `現在不是在寫劇情正文。請把下面這段劇情裡最值得留下來的一個瞬間，想成一張用手機拍下來的照片，照欄位填寫。`,
+        `${who.name} 的衣櫃：${splitLook(people.look.him || '').wardrobe || '照角色卡'}`,
+        people.look.me ? `${who.user} 的衣櫃：${splitLook(people.look.me).wardrobe || '照劇情'}` : '',
         '', '劇情：', scenes.join('\n\n').slice(0, 3000), extra ? `\n她想拍的：${extra}` : '', '',
-        `- in 列出照片裡看得到臉的人（${who.name}、${who.user} 或配角的名字），拍照的人沒入鏡就不要列`,
-        '- 鏡頭照這一刻最自然的拍法選：全身、半身、近景、背影都可以，prompt 裡要寫明是哪一種；看不看鏡頭也照情境，多半是被拍的人沒注意到鏡頭、正在做自己的事',
-        `只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","in":["入鏡的人名"],"prompt":"${P.SNAP_PROMPT}"}`,
+        '填寫規則：',
+        '- 只寫鏡頭拍得到的東西：動作、姿勢、表情、穿著、物品、地點、光線。不寫心情、內心話、氣味、聲音、比喻',
+        '- 不寫長相：臉、髮色、髮型、眼睛、年紀、身材都不要寫（證件照會處理）',
+        '- 只拍一個瞬間：每個人一個動作、一個表情，寫具體（「左手撐著下巴看她」，不是「很溫柔」）',
+        '- 穿著照劇情這一刻；劇情沒寫才從衣櫃挑一套搭得起來的',
+        `- 拍照的人：沒寫的話就是 ${who.user} 用手機拍的，那 ${who.user} 不入鏡；${who.user} 入鏡的話就是朋友拍或自拍`,
+        `- in 列出畫面裡看得到臉的人（${who.name}、${who.user} 或配角的名字）`,
+        '- 鏡頭選這一刻最自然的：近景、半身、七分身、全身、背影；人多半沒注意到鏡頭',
+        '- 地點寫具體，背景放兩三樣看得到的東西',
+        P.SNAP_LANG,
+        '只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","in":["入鏡的人名"],"shot":"鏡頭","by":"誰拍的","people":[{"name":"人名","doing":"動作和姿勢","face":"表情和視線","wearing":"穿著"}],"place":"地點和背景","props":"重要的物品","light":"時間和光線"}',
       ].filter(Boolean).join('\n')));
+      r.prompt = r.prompt || snapFromFields(r);
       const inFrame = Array.isArray(r.in) ? r.in.map(String) : null;
       const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), ...(inFrame ? { in: inFrame } : {}), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
       if (p.prompt) await ensureAutoStyle(people, who.charKey);

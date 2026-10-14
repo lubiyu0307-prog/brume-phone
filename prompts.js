@@ -54,6 +54,10 @@ const ZH = {
 
   // 相本快照：請寫劇情的模型把這一幕寫成生圖描述時，要它用哪種語言寫
   SNAP_PROMPT: '生圖用的中文描述，逗號分隔：鏡頭（全身、半身、近景）、誰在做什麼、動作、表情、穿著、場景、光線',
+  SNAP_LANG: '- 欄位都用中文寫',
+  WEARING: (w) => `穿${w}`,
+  COMMA: '，',
+  PERIOD: '。',
 };
 
 const EN = {
@@ -98,6 +102,10 @@ const EN = {
   IG_STORY: ', vertical instagram story photo, natural light',
 
   SNAP_PROMPT: '英文生圖 prompt，逗號分隔：鏡頭（full body、half body、close-up）、誰在做什麼、動作、表情、穿著、場景、光線',
+  SNAP_LANG: '- 欄位除了 desc 以外都用英文寫（desc 用中文）',
+  WEARING: (w) => `wearing ${w}`,
+  COMMA: ', ',
+  PERIOD: '. ',
 };
 
 // 玩家選的語言，每台裝置各自記，預設中文
