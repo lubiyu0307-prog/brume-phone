@@ -23,6 +23,8 @@ export const LEVELS = {
 };
 
 const TAG = /<phone>([\s\S]*?)<\/phone>/i;
+// 看起來像寫作計畫、檢查清單的行不收（拍、節拍、玩家、區塊、輸出、正文、標籤）
+const META = /節拍|厚拍|\d+\s*拍|玩家|區塊|輸出|正文|主詞|prompt|<|>|\{\{/i;
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 export function createLife({ line, say, onNotify, onStageHint, onData }) {
@@ -66,10 +68,14 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     // 只拿最後一個真正的區塊：模型的思考、預設的檢查清單常會先提到「<phone>」這個字，
     // 從第一次提到一路抓到結尾，會把整段計畫當成 LINE 送出去（10/15 阿愷傳了「區塊輸出⋯節拍單⋯」）
     const mes = String(m.mes || '');
-    const close = mes.toLowerCase().lastIndexOf('</phone>');
-    const open = close < 0 ? -1 : mes.toLowerCase().lastIndexOf('<phone>', close);
-    if (open < 0) return null;
+    const low = mes.toLowerCase();
+    const close = low.lastIndexOf('</phone>');
+    // 思考區塊（<thinking>、<think>）裡的不算：從思考結束之後才開始找
+    const thinkEnd = Math.max(low.lastIndexOf('</thinking>'), low.lastIndexOf('</think>'));
+    const open = close < 0 ? -1 : low.lastIndexOf('<phone>', close);
+    if (open < 0 || open < thinkEnd) return null;
     const hit = [null, mes.slice(open + 7, close)];
+    if (hit[1].length > 1500 || /<\/?think/i.test(hit[1])) return null; // 正常的區塊只有幾行，這麼長一定是抓錯了
     m.mes = (mes.slice(0, open) + mes.slice(close + 8)).trim();
     const sw = m.swipe_id ?? 0;
     if (Array.isArray(m.swipes) && m.swipes[sw] != null) m.swipes[sw] = m.mes;
@@ -87,7 +93,6 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     if (!body || !ch) return;
     const lines = []; const posts = []; const cals = []; const notes = []; let rel = null; let mode = null;
     // 看起來像寫作計畫、檢查清單的行不收（拍、節拍、玩家、區塊、輸出、正文、標籤）
-    const META = /節拍|厚拍|\d+\s*拍|玩家|區塊|輸出|正文|主詞|prompt|<|>|\{\{/i;
     for (const raw of body.split('\n')) {
       const l = raw.trim(); if (!l) continue;
       const m = l.match(/^(LINE|脆|Threads|關係|行事曆|便條|便利貼)\s*[｜|:：]\s*(.*)$/i);
@@ -155,6 +160,9 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     await store.set('threads:' + key, f).catch(() => {});
   }
 
+  // 送出前再擋一次：舊版排進佇列的、或漏網的寫作計畫，不讓它變成他傳的訊息
+  const clean = (t) => { t = String(t || '').trim(); return t && t.length <= 200 && !META.test(t) ? t : ''; };
+
   async function deliverDue() {
     const ch = currentChar();
     if (!ch || !pending.length) return;
@@ -164,8 +172,9 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     pending = pending.filter((p) => !due.includes(p));
     savePending();
     for (const p of due) {
-      if (p.type === 'line') { await line.deliver(p.lines); onNotify?.({ app: 'line', who: ch.name, text: p.lines[p.lines.length - 1] }); }
-      if (p.type === 'post') { for (const t of p.posts) await addPost(ch.key, ch.name, t); onNotify?.({ app: 'threads', who: ch.name, text: `發了一篇串文：${p.posts[0]}` }); }
+      const lines = (p.lines || []).map(clean).filter(Boolean); const posts = (p.posts || []).map(clean).filter(Boolean);
+      if (p.type === 'line' && lines.length) { await line.deliver(lines); onNotify?.({ app: 'line', who: ch.name, text: lines[lines.length - 1] }); }
+      if (p.type === 'post' && posts.length) { for (const t of posts) await addPost(ch.key, ch.name, t); onNotify?.({ app: 'threads', who: ch.name, text: `發了一篇串文：${posts[0]}` }); }
     }
   }
 
