@@ -648,7 +648,7 @@
 .bp-al-dark .bp-back { color: #eee; }
 .bp-al-head i { justify-self: end; font-style: normal; font-size: 13px; color: #0a84ff; cursor: pointer; padding: 6px; display: grid; place-items: center; }
 .bp-al-head i svg { width: 22px; height: 22px; }
-.bp-al-tabs { display: grid; grid-template-columns: repeat(4, 1fr); margin: 0 14px 8px; background: rgba(0, 0, 0, .06); border-radius: 10px; padding: 3px; }
+.bp-al-tabs { display: grid; grid-template-columns: repeat(5, 1fr); margin: 0 14px 8px; background: rgba(0, 0, 0, .06); border-radius: 10px; padding: 3px; }
 .bp-al-tabs span { text-align: center; font-size: 13px; padding: 6px 0; border-radius: 8px; cursor: pointer; }
 .bp-al-tabs span.on { background: #fff; font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
 .bp-al-scroll { flex: 1; overflow-y: auto; padding: 0 0 90px; overscroll-behavior: contain; }
@@ -1155,3 +1155,20 @@
 .bp-ig-tools i { width: 32px; height: 32px; }
 .bp-ig-auto { font-style: normal; font-size: 11px; white-space: nowrap; padding: 4px 8px; border-radius: 12px; border: 1px solid #dbdbdb; color: #8e8e8e; cursor: pointer; }
 .bp-ig-auto.on { border-color: #0095f6; color: #0095f6; }
+/* 配角的證件照（IG 點頭像打開） */
+.bp-ig-castpic { width: 44%; margin: 16px auto 4px; border-radius: 50%; }
+.bp-ig-casthint { margin: 0 16px 10px; font-size: 12px; line-height: 1.5; color: #8e8e8e; }
+.bp-ig-casthint u { color: #ed4956; text-decoration: none; cursor: pointer; }
+[data-cast] { cursor: pointer; }
+/* 相本的證件照區 */
+.bp-al-ids { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px 10px; padding: 4px 14px 20px; }
+.bp-al-id { display: flex; flex-direction: column; align-items: center; gap: 3px; cursor: pointer; text-align: center; min-width: 0; }
+.bp-al-id img, .bp-al-idnone { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; }
+.bp-al-idnone { display: grid; place-items: center; font-size: 26px; color: #fff; background: linear-gradient(135deg, hsl(var(--h, 30) 30% 62%), hsl(calc(var(--h, 30) + 40) 25% 38%)); }
+.bp-al-id.add .bp-al-idnone { background: none; border: 1.5px dashed #c9c2b6; color: #8a8378; }
+.bp-al-id b { font-size: 13px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bp-al-id small { font-size: 11px; color: #8a8378; }
+.bp-al-idpic { width: 46%; aspect-ratio: 1; margin: 14px auto 6px; border-radius: 50%; background: rgba(0, 0, 0, .06); display: grid; place-items: center; color: #8a8378; font-size: 13px; overflow: hidden; cursor: pointer; }
+.bp-al-idpic img { width: 100%; height: 100%; object-fit: cover; }
+.bp-al .bp-al-idname { display: block; width: calc(100% - 28px); margin: 6px 14px 12px; border: 1px solid #e6e1d8; border-radius: 12px; padding: 10px; font: inherit; font-size: 16px; background: #fff; color: #2b2824; outline: none; }
+.bp-al-ghost.danger { color: #c4473a; border-color: #e8c4be; }

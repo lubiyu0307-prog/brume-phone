@@ -110,7 +110,10 @@ export async function generate(prompt, image) {
  *   二、沒接、或接了沒出圖，而聊天是接 Google（Vertex／AI Studio）→ 借酒館的連線叫 Gemini 生圖
  * 酒館擴充裡的 Google 只有 Imagen，Imagen 2026 年中已經停用，所以第二條才是 Google 玩家真正會走的路
  */
-export async function imagine(prompt) {
+export async function imagine(prompt, { refs = [] } = {}) {
+  // 有參考圖（相本證件照區的照片）時先走 Gemini：/imagine 吃不了參考圖，畫出來會是另一張臉
+  refs = refs.filter((r) => r?.url);
+  if (refs.length) return (await viaGemini(prompt, refs)) || (await viaImagine(prompt));
   return (await viaImagine(prompt)) || (await viaGemini(prompt));
 }
 
@@ -129,17 +132,22 @@ async function viaImagine(prompt) {
 // flash 快（十幾秒），pro 慢一點但細；flash 叫不到才換 pro
 const GEMINI_IMAGE_MODELS = ['gemini-3.1-flash-image', 'gemini-3-pro-image'];
 
-async function viaGemini(prompt) {
+async function viaGemini(prompt, refs = []) {
   const c = ctx(); const o = c?.chatCompletionSettings || {};
   const src = o.chat_completion_source;
   if (src !== 'vertexai' && src !== 'makersuite') return '';
   const ask = `Generate one photo. No text in the image, no captions.\n${String(prompt).trim()}`;
+  // 參考圖一張一張標上是誰，畫出來的人才會對得上
+  const content = refs.length
+    ? [{ type: 'text', text: `${ask}\nReference photos of the people in this photo follow. Keep each person's face, hair and overall look.` },
+      ...refs.flatMap((r) => [{ type: 'text', text: `Reference: ${r.name}` }, { type: 'image_url', image_url: { url: r.url } }])]
+    : ask;
   for (const model of GEMINI_IMAGE_MODELS) {
     try {
       const r = await fetch('/api/backends/chat-completions/generate', {
         method: 'POST', headers: c.getRequestHeaders(),
         body: JSON.stringify({
-          messages: [{ role: 'user', content: ask }], model, chat_completion_source: src, stream: false,
+          messages: [{ role: 'user', content }], model, chat_completion_source: src, stream: false,
           request_images: true, request_image_aspect_ratio: '1:1', request_image_resolution: '1K', max_tokens: 4096, temperature: 1,
           vertexai_auth_mode: o.vertexai_auth_mode, vertexai_region: o.vertexai_region, vertexai_express_project_id: o.vertexai_express_project_id,
           reverse_proxy: o.reverse_proxy, proxy_password: o.proxy_password,

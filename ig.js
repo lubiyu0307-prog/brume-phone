@@ -1,9 +1,11 @@
 // Instagram：妳的帳號在看。有他的貼文和限時動態，也有卡裡的配角、符合世界觀的路人。
 // 妳可以發真的照片（他會看到照片本身來留言）、按愛心、留言（發文的人會回）、看他的個人頁。
 // 他的照片先是文字描述，點進去可以叫酒館生圖。
+// 配角的大頭貼由玩家自己放（點配角的頭像，或相本的證件照區）：卡片作者不一定會做，玩家可以拿作者宣傳時附的配角照片來用。
 
 import * as store from './store.js';
 import { currentChar, generate, imagine, canSeeImages, ctx } from './st.js';
+import { HIM, loadCast, saveCast as storeCast, person, setPerson, refsFor } from './cast.js';
 
 // 自動生圖：打開的話，他新發的貼文用酒館的生圖畫成真的照片（要接好生圖，一張要等一下）
 const AUTO_KEY = 'brume-phone:igauto';
@@ -44,9 +46,11 @@ const IC = {
 };
 
 export function createIG({ screen, say }) {
+  let people = { cast: {}, look: { him: '', me: '' } }; let castEdit = null; // 證件照（cast.js），照角色卡存
   let ch = null; let d = null; let view = 'feed'; let openId = null; let profileOf = 'me'; let loading = false; let story = null; let back = 'feed';
   const mine = () => !!screen.querySelector('.bp-ig');
   const save = () => ch && store.set('ig:' + ch.key, d).catch(() => {});
+  const saveCast = () => ch && storeCast(ch.charKey, people);
   const find = (id) => d.posts.find((p) => p.id === id);
   const meA = () => ({ kind: 'me', name: ch.user, handle: d.me.handle });
   const himA = () => ({ kind: 'him', name: ch.name, handle: d.him.handle });
@@ -54,7 +58,10 @@ export function createIG({ screen, say }) {
   function av(a, cls = '') {
     if (a.kind === 'him' && ch.avatar) return `<img class="bp-ig-av ${cls}" src="${ch.avatar}" alt="">`;
     if (a.kind === 'me' && d.me.avatar) return `<img class="bp-ig-av ${cls}" src="${d.me.avatar}" alt="">`;
-    return `<span class="bp-ig-av ${cls}" style="--h:${hue(a.handle)}">${esc((a.name || '?').slice(0, 1))}</span>`;
+    const tap = a.kind === 'other' ? ` data-cast="${esc(a.name)}"` : '';
+    const pic = a.kind === 'other' && people.cast[a.name]?.photo;
+    if (pic) return `<img class="bp-ig-av ${cls}"${tap} src="${pic}" alt="">`;
+    return `<span class="bp-ig-av ${cls}"${tap} style="--h:${hue(a.handle)}">${esc((a.name || '?').slice(0, 1))}</span>`;
   }
   const photo = (p, cls = '') => (p.img
     ? `<img class="bp-ig-img ${cls}" src="${esc(p.img)}" alt="">`
@@ -63,7 +70,7 @@ export function createIG({ screen, say }) {
   function post(p, detail) {
     const n = p.comments?.length || 0;
     return `<article class="bp-ig-post">
-      <header data-prof="${p.author.kind}">${av(p.author, 'sm')}<b>${esc(p.author.handle)}</b><i>${IC.more}</i></header>
+      <header data-prof="${p.author.kind}"${p.author.kind === 'other' ? ` data-cast="${esc(p.author.name)}"` : ''}>${av(p.author, 'sm')}<b>${esc(p.author.handle)}</b><i>${IC.more}</i></header>
       <div ${detail ? '' : `data-post="${p.id}"`}>${photo(p)}</div>
       <div class="bp-ig-acts"><span data-like="${p.id}">${p.liked ? IC.heartOn : IC.heart}</span><span data-post="${p.id}">${IC.comment}</span><span>${IC.send}</span><span class="r">${IC.save}</span></div>
       <p class="bp-ig-likes">${fmt(p.likes + (p.liked ? 1 : 0))} 個讚</p>
@@ -82,6 +89,7 @@ export function createIG({ screen, say }) {
     if (!ch) { screen.innerHTML = `<div class="bp-ig"><div class="bp-ig-head"><span class="bp-back" data-ig="home">‹</span><b class="logo">Instagram</b><span></span></div><p class="bp-ig-empty">先在酒館選一個角色。</p></div>`; return; }
     d = (await store.get('ig:' + ch.key).catch(() => null)) || { me: { handle: '', bio: '' }, him: { handle: '', bio: '' }, posts: [], stories: [] };
     d.me.handle ||= ch.user; d.him.handle ||= ch.name;
+    people = await loadCast(ch.charKey);
     if (view === 'post' && find(openId)) renderPost(); else if (view === 'profile') renderProfile(); else renderFeed();
     if (view === 'feed' && !d.posts.some((p) => p.author.kind !== 'me') && !loading) refresh();
   }
@@ -195,17 +203,39 @@ export function createIG({ screen, say }) {
     autoDraw(who, dd);
   }
 
-  // 照片的生圖 prompt：他的貼文帶上相本存的長相，每張的他才會像同一個人
-  async function photoPrompt(p, who) {
-    const look = p.author.kind === 'him' ? ((await store.get('look:' + who.charKey).catch(() => null)) || {}).him : '';
-    return `${p.desc}${look && /他|自拍|本人|鏡/.test(p.desc) ? `, ${look}` : ''}, instagram photo, natural light`;
+  // 照片的生圖 prompt：照片裡有誰入鏡，就帶誰的長相和證件照（他用相本存的長相；配角用玩家放的照片）
+  function photoPrompt(p, who) {
+    const self = /自拍|本人|鏡|他|她|合照|我/.test(p.desc);
+    if (p.author.kind === 'other') {
+      const c = person(people, who, p.author.name);
+      const inIt = self || p.desc.includes(p.author.name);
+      return { prompt: `${p.desc}${c.look && inIt ? `, ${c.look}` : ''}, instagram photo, natural light`, refs: refsFor(people, who, p.desc, inIt ? [p.author.name] : []) };
+    }
+    const look = p.author.kind === 'him' ? people.look.him : '';
+    const inIt = p.author.kind === 'him' && /他|自拍|本人|鏡/.test(p.desc);
+    return { prompt: `${p.desc}${look && inIt ? `, ${look}` : ''}, instagram photo, natural light`, refs: refsFor(people, who, p.desc, inIt ? [HIM] : []) };
   }
+  const draw = (p, who) => { const { prompt, refs } = photoPrompt(p, who); return imagine(prompt, { refs }); };
+
+  // 配角的證件照：一張照片（當大頭貼，也是生圖的參考）＋長相文字。相本的證件照區是同一份
+  function castSheet(name) {
+    const c = person(people, ch, name);
+    castEdit = { name, photo: c.photo };
+    screen.insertAdjacentHTML('beforeend', `<div class="bp-ig-sheet"><div>
+      <div class="bp-ig-sheet-top"><u data-ig="unsheet">取消</u><b>${esc(name)}</b><u data-ig="savecast" class="ok">完成</u></div>
+      <div class="bp-ig-pick round bp-ig-castpic" data-ig="castpic">${c.photo ? `<img src="${c.photo}" alt="">` : '<span>放一張照片</span>'}</div>
+      <label>長相（生圖用，選填）</label><textarea class="bp-ig-look" rows="2" placeholder="例如：short black hair, round glasses, gray hoodie">${esc(c.look)}</textarea>
+      <p class="bp-ig-casthint">照片會當 ${esc(name)} 的大頭貼，生 ${esc(name)} 入鏡的照片時也會給 Gemini 看，長得比較像。同一張角色卡的每個聊天都用這份，相本的「證件照」也看得到。</p>
+      ${c.photo || c.look ? '<p class="bp-ig-casthint"><u data-ig="castclear">清掉</u></p>' : ''}
+      <input class="bp-ig-file" type="file" accept="image/*" hidden></div></div>`);
+  }
+  function rerender() { view === 'post' ? renderPost() : view === 'profile' ? renderProfile() : renderFeed(); }
   // 把他剛發、還是文字卡的貼文一張一張畫出來
   async function autoDraw(who, dd) {
     if (!autoOn() || !canImagine()) return;
     for (const p of dd.posts.filter((x) => x.author.kind === 'him' && !x.img && !x.drawn).slice(-2)) {
       p.drawn = true; // 失敗也不重試，免得每次重整都卡在同一張
-      const url = await imagine(await photoPrompt(p, who));
+      const url = await draw(p, who);
       if (url) { p.img = url; if (who.key === ch?.key) { save(); if (mine() && view === 'feed') renderFeed(); } else store.set('ig:' + who.key, dd).catch(() => {}); }
     }
   }
@@ -256,6 +286,8 @@ export function createIG({ screen, say }) {
   let pendingImg = null;
   screen.addEventListener('click', async (e) => {
     if (!mine()) return;
+    const cs = e.target.closest('[data-cast]');
+    if (cs && !e.target.closest('.bp-ig-storyv')) { castSheet(cs.dataset.cast); return; }
     const lk = e.target.closest('[data-like]');
     if (lk) { const p = find(lk.dataset.like); p.liked = !p.liked; save(); view === 'post' ? renderPost() : view === 'profile' ? renderProfile() : renderFeed(); return; }
     const pr = e.target.closest('[data-prof]');
@@ -274,7 +306,7 @@ export function createIG({ screen, say }) {
     if (a === 'profme') { profileOf = 'me'; renderProfile(); }
     if (a === 'compose') { pendingImg = null; composer(); }
     if (a === 'unsheet') screen.querySelector('.bp-ig-sheet')?.remove();
-    if (a === 'pick' || a === 'avatar') { const f = screen.querySelector('.bp-ig-sheet .bp-ig-file') || screen.querySelector('.bp-ig-file'); f.dataset.for = a; f.click(); }
+    if (a === 'pick' || a === 'avatar' || a === 'castpic') { const f = screen.querySelector('.bp-ig-sheet .bp-ig-file') || screen.querySelector('.bp-ig-file'); f.dataset.for = a; f.click(); }
     if (a === 'editme') {
       screen.insertAdjacentHTML('beforeend', `<div class="bp-ig-sheet"><div>
         <div class="bp-ig-sheet-top"><u data-ig="unsheet">取消</u><b>編輯個人檔案</b><u data-ig="saveme" class="ok">完成</u></div>
@@ -291,6 +323,12 @@ export function createIG({ screen, say }) {
       d.posts.push(p); save(); openId = p.id; back = 'feed'; renderPost(); say('分享了，等等會有人來留言');
       setTimeout(() => { if (!p.comments) loadComments(p); }, 2500);
     }
+    if (a === 'savecast' && castEdit) {
+      const look = screen.querySelector('.bp-ig-look')?.value.trim() || '';
+      setPerson(people, castEdit.name, { photo: castEdit.photo, look });
+      castEdit = null; saveCast(); screen.querySelector('.bp-ig-sheet')?.remove(); rerender(); return;
+    }
+    if (a === 'castclear' && castEdit) { setPerson(people, castEdit.name, {}); castEdit = null; saveCast(); screen.querySelector('.bp-ig-sheet')?.remove(); rerender(); return; }
     if (a === 'auto') {
       try { localStorage.setItem(AUTO_KEY, autoOn() ? '0' : '1'); } catch { /* 存不了 */ }
       say(autoOn() ? '打開了：他之後發的貼文會自動生成照片' : '關掉了：貼文先用文字描述，點進去再生圖');
@@ -298,7 +336,7 @@ export function createIG({ screen, say }) {
     }
     if (a === 'gen') {
       const p = find(openId); const btn = screen.querySelector('.bp-ig-gen'); if (btn) btn.textContent = '生圖中⋯';
-      const url = await imagine(await photoPrompt(p, ch));
+      const url = await draw(p, ch);
       if (url) { p.img = url; save(); } else say('沒有出圖：酒館可能還沒接生圖');
       if (mine() && view === 'post') renderPost();
     }
@@ -317,8 +355,14 @@ export function createIG({ screen, say }) {
   screen.addEventListener('change', async (e) => {
     if (!mine() || !e.target.classList.contains('bp-ig-file')) return;
     const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-    const img = await store.shrink(f, 1080, 0.85);
     if (e.target.dataset.for === 'avatar') { d.me.avatar = await store.shrink(f, 300, 0.85); save(); renderProfile(); return; }
+    if (castEdit && e.target.dataset.for === 'castpic') {
+      // 768 寬：當大頭貼夠清楚，當生圖參考也看得清臉，又不會讓同步的檔案太大
+      castEdit.photo = await store.shrink(f, 768, 0.85);
+      const box = screen.querySelector('.bp-ig-sheet [data-ig="castpic"]'); if (box) box.innerHTML = `<img src="${castEdit.photo}" alt="">`;
+      return;
+    }
+    const img = await store.shrink(f, 1080, 0.85);
     pendingImg = img;
     const pk = screen.querySelector('.bp-ig-pick'); if (pk) pk.innerHTML = `<img src="${img}" alt="">`;
   });
