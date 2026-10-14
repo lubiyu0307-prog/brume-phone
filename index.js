@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.13.1';
+const VERSION = '0.13.2';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -436,7 +436,7 @@ function build() {
   const notes = createNotes({ screen: appScreen, say });
   const calendar = createCalendar({ screen: appScreen, say });
   const threads = createThreads({ screen: appScreen, say });
-  const album = createAlbum({ screen: appScreen, say });
+  const album = createAlbum({ screen: appScreen, say, onShare: async (img, text) => { await line.share({ text: text || '', img }); openApp(line); line.openRoom(); } });
   const ig = createIG({ screen: appScreen, say });
   const games = createGames({ screen: appScreen, say });
   const callApp = createCall({ screen: appScreen, say });

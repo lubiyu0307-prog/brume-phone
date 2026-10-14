@@ -1142,3 +1142,9 @@
 .bp-line-cslot { display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: pointer; }
 .bp-line-cslot img, .bp-line-cslot span { width: 86px; height: 86px; border-radius: 50%; object-fit: cover; display: grid; place-items: center; background: #ebe7e0; color: #9a948a; font-size: 26px; }
 .bp-line-cslot small { font-size: 12px; color: #6b665e; }
+
+/* 相本：放照片按鈕帶字、照片可以寫一句話 */
+.bp-al-head i.bp-al-up { display: flex; align-items: center; gap: 3px; }
+.bp-al-head i.bp-al-up small { font-size: 13px; white-space: nowrap; }
+.bp-al-cap { display: block; width: calc(100% - 32px); margin: 14px 16px 6px; padding: 10px 12px; border: 1px solid rgba(255, 255, 255, .2); border-radius: 12px; background: rgba(255, 255, 255, .08); color: inherit; font: inherit; outline: none; }
+.bp-al-cap::placeholder { color: rgba(255, 255, 255, .45); }

@@ -21,7 +21,7 @@ const IC = {
   up: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>',
 };
 
-export function createAlbum({ screen, say }) {
+export function createAlbum({ screen, say, onShare }) {
   let ch = null; let items = []; let look = { him: '', me: '' };
   let view = 'grid'; let tab = 'all'; let openId = null; let picked = new Set(); let busy = false; let note = '';
   const mine = () => !!screen.querySelector('.bp-al');
@@ -60,13 +60,13 @@ export function createAlbum({ screen, say }) {
     const line = await chatPhotos();
     const all = [...items, ...line].sort((a, b) => b.ts - a.ts);
     const shown = tab === 'snap' ? all.filter((p) => p.source === 'snap') : tab === 'line' ? line : tab === 'mine' ? all.filter((p) => p.source === 'upload') : all;
-    screen.innerHTML = `<div class="bp-al">${head('相本', 'home', `<i data-al="upload" title="放一張照片">${IC.up}</i>`)}
+    screen.innerHTML = `<div class="bp-al">${head('相本', 'home', `<i data-al="upload" class="bp-al-up" title="放照片">${IC.up}<small>放照片</small></i>`)}
       <div class="bp-al-tabs">${[['all', '全部'], ['snap', '快照'], ['line', '聊天'], ['mine', '我放的']].map(([k, n]) => `<span data-tab="${k}" class="${tab === k ? 'on' : ''}">${n}</span>`).join('')}</div>
       <div class="bp-al-scroll">
-        ${shown.length ? `<div class="bp-al-grid">${shown.map(tile).join('')}</div>` : `<p class="bp-al-empty">${tab === 'snap' || tab === 'all' ? '還沒有快照。<br>按右下角的相機，挑一段劇情拍下來。' : '這裡還沒有照片。'}</p>`}
+        ${shown.length ? `<div class="bp-al-grid">${shown.map(tile).join('')}</div>` : `<p class="bp-al-empty">${tab === 'snap' || tab === 'all' ? '還沒有快照。<br>按右下角的相機，挑一段劇情拍下來。' : tab === 'mine' ? '還沒有放照片。<br>按右上角的「放照片」，一次可以選好幾張。' : '這裡還沒有照片。'}</p>`}
       </div>
       <button class="bp-al-fab" data-al="snap">${IC.cam}</button>
-      <input class="bp-al-file" type="file" accept="image/*" hidden>
+      <input class="bp-al-file" type="file" accept="image/*" multiple hidden>
     </div>`;
   }
 
@@ -78,12 +78,13 @@ export function createAlbum({ screen, say }) {
     screen.innerHTML = `<div class="bp-al bp-al-dark">${head(day(p.ts), 'grid')}
       <div class="bp-al-scroll">
         ${p.img ? `<img class="bp-al-big" src="${esc(p.img)}" alt="">` : `<div class="bp-al-bigcard" style="--h:${hue(p.desc)}"><span>${esc(p.desc)}</span></div>`}
-        <p class="bp-al-desc">${esc(p.desc)}</p>
+        ${own && p.source === 'upload' ? `<input class="bp-al-cap" value="${esc(p.desc === '妳放的照片' ? '' : p.desc)}" placeholder="寫一句話（例如：第一次一起去海邊）" maxlength="60">` : `<p class="bp-al-desc">${esc(p.desc)}</p>`}
         ${p.scene ? `<details class="bp-al-scene"><summary>這一幕</summary><p>${esc(p.scene)}</p></details>` : ''}
         ${p.prompt ? `<div class="bp-al-prompt"><small>生圖 prompt</small><p>${esc(p.prompt)}</p><button data-al="copy">複製</button></div>` : ''}
         ${own ? `<div class="bp-al-acts">
           ${p.prompt && !p.img ? '<button data-al="gen">用酒館生圖</button>' : ''}
           ${p.prompt ? '<button data-al="regen">重新生一張</button>' : ''}
+          ${p.img && onShare ? '<button data-al="share">傳到 LINE 給他看</button>' : ''}
           <button data-al="attach">${p.img ? '換一張圖' : '傳生好的圖進來'}</button>
           <button data-al="del" class="danger">刪除</button></div>` : ''}
         <p class="bp-al-note">${esc(note)}</p>
@@ -177,16 +178,24 @@ export function createAlbum({ screen, say }) {
       if (url) { p.img = url; note = ''; save(); } else note = '沒有出圖：酒館可能還沒接生圖，或這次失敗了。';
       if (mine()) renderOne();
     }
+    if (a === 'share' && p?.img) { onShare(p.img, p.source === 'upload' && p.desc !== '妳放的照片' ? p.desc : ''); return; }
     if (a === 'del' && p) { items = items.filter((x) => x.id !== p.id); save(); view = 'grid'; render(); }
   });
 
   screen.addEventListener('change', async (e) => {
+    if (mine() && e.target.classList.contains('bp-al-cap')) {
+      const p = items.find((x) => x.id === openId);
+      if (p) { p.desc = e.target.value.trim() || '妳放的照片'; save(); say('記下來了'); }
+      return;
+    }
     if (!mine() || !e.target.classList.contains('bp-al-file')) return;
-    const f = e.target.files[0]; e.target.value = '';
-    if (!f) return;
-    const img = await store.shrink(f, 1600, 0.85);
-    if (e.target.dataset.for === 'attach') { const p = items.find((x) => x.id === openId); if (p) { p.img = img; note = ''; save(); renderOne(); } return; }
-    items.push({ id: uid(), source: 'upload', ts: Date.now(), desc: '妳放的照片', img }); save(); tab = 'all'; render();
+    const files = [...e.target.files]; e.target.value = '';
+    if (!files.length) return;
+    // 一張約兩三百 KB；整本相本會同步到酒館伺服器，所以縮到 1280 寬
+    if (e.target.dataset.for === 'attach') { const p = items.find((x) => x.id === openId); if (p) { p.img = await store.shrink(files[0], 1280, 0.82); note = ''; save(); renderOne(); } return; }
+    const t0 = Date.now();
+    for (const [i, f] of files.slice(0, 20).entries()) items.push({ id: uid(), source: 'upload', ts: t0 + i, desc: '妳放的照片', img: await store.shrink(f, 1280, 0.82) });
+    save(); tab = 'mine'; render(); say(`放進相本了（${Math.min(files.length, 20)} 張）`);
   });
 
   return {

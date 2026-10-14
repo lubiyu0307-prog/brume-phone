@@ -1126,6 +1126,8 @@ export function createLine({ screen, say, onUnread, onData }) {
     open() { view = 'list'; render(); },
     openRoom() { view = 'room'; render(); },
     refresh: render,
+    // 從別的 App（相本）傳一則給他：先換到目前這個角色的紀錄，再照一般送出走
+    async share(msg) { if (await useCurrent()) send(msg); },
     himFirst, deliver, unseen, lastActive, unansweredRun,
     forget() { ch = null; thread = null; }, // 換聊天或資料搬家之後，下次重讀
     get busy() { return !!busy; },
