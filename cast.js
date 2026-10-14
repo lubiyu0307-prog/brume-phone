@@ -61,10 +61,12 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
   // 拍照的人：他自己拍的照片常常只有手入鏡（托著東西、拿著杯子），不講是誰的手，模型會隨便畫一隻（10/14 阿愷的企鵝變成女生的手）。
   // 只講性別，不貼整段長相：貼了模型會把整個人畫進去（同一天第二張，冒出一個陌生男人）
   const cam = by && !ids.includes(by) ? person(data, ch, by) : null;
+  // 長相裡跟手有關的詞（膚色、手指、指節、青筋、手毛）也帶上，只講「男生的手」會被畫成刻板的毛手（10/14 第三張）
+  const hand = cam ? cam.look.split(/[,，、]/).map((t) => t.trim()).filter((t) => /skin|finger|knuckle|vein|hand|nail|wrist|arm|hair(less|y)|膚|手|指|腕|毛/i.test(t) && !/head|hair\b(?!less)/i.test(t)).join(', ') : '';
   const sex = cam && (/\b(1boy|male|man|boy)\b/i.test(cam.look) || /男/.test(cam.look) ? "a man's" : /\b(1girl|female|woman|girl)\b/i.test(cam.look) || /女/.test(cam.look) ? "a woman's" : '');
   return [
     String(prompt).trim(),
-    cam ? `First-person shot taken by ${cam.name} on their own phone. ${cam.name} is NOT in the photo: no face, no body. If a hand or arm reaches into the frame, it is ${cam.name}'s own${sex ? ` (${sex} hand)` : ''}.` : '',
+    cam ? `First-person shot taken by ${cam.name} on their own phone. ${cam.name} is NOT in the photo: no face, no body. If a hand or arm reaches into the frame, it is ${cam.name}'s own${sex || hand ? ` (${[sex ? `${sex} hand` : '', hand].filter(Boolean).join(': ')})` : ''}.` : '',
     notes.length ? `Appearance to keep exactly (hair colour, body shape, clothes):\n${notes.join('\n')}` : '',
     data.look.style ? `Photo style / filter: ${data.look.style}` : '',
   ].filter(Boolean).join('\n');
