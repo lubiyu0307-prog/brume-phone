@@ -147,7 +147,9 @@ async function viaGemini(prompt) {
       });
       if (!r.ok) continue;
       const j = await r.json();
-      const img = (j?.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData?.data)?.inlineData;
+      // 酒館把 Gemini 的回應整理成 responseContent；舊版直接轉 Google 原本的 candidates，兩種都看
+      const parts = j?.responseContent?.parts || j?.candidates?.[0]?.content?.parts || [];
+      const img = parts.find((p) => p.inlineData?.data)?.inlineData;
       if (!img) return ''; // 只回了文字＝這張被擋了（多半是太露骨），換模型也一樣，交給玩家拿 prompt 去外面生
       return await saveImage(img.data, (img.mimeType || 'image/png').split('/')[1] || 'png');
     } catch { /* 換下一個模型 */ }
