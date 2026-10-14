@@ -78,6 +78,16 @@ export function refsFor(data, ch, text, always = []) {
 // （10/14 企鵝館：文字寫 honey brown hair，Gemini 照字畫成橘髮，臉也跑掉）
 const FACE_TAG = /hair|bang|fringe|undercut|eye|face|skin|freckle|beard|mustache|lips?\b|nose|eyebrow|\d+\s*(years?|yo)\b|\bage\b|髮|瀏海|眼|臉|膚|歲|鬍/i;
 const stripFace = (text) => String(text).split(/[,，、]/).map((t) => t.trim()).filter((t) => t && !FACE_TAG.test(t)).join(', ');
+// 長相裡的衣服當「衣櫃」：玩家常把他會穿的衣服全列上去，整串送去生圖會被混搭成一身（10/14 員工 Polo 衫配灰色運動褲）
+const CLOTHES = /shirt|polo|tee|t-shirt|top|jeans|pants|trousers|shorts|sweatpants|jogger|jacket|coat|hoodie|sweater|cardigan|knit|vest|dress|skirt|suit|uniform|lanyard|badge|apron|scarf|tie|socks|shoes|sneakers|boots|cap|hat|衣|衫|褲|裙|外套|帽|鞋|圍裙|制服|識別證/i;
+export const splitLook = (text) => {
+  const tags = stripFace(text).split(', ').filter(Boolean);
+  return { body: tags.filter((t) => !CLOTHES.test(t)).join(', '), wardrobe: tags.filter((t) => CLOTHES.test(t)).join(', ') };
+};
+const lookNote = (text) => {
+  const { body, wardrobe } = splitLook(text);
+  return [body ? `body: ${body}` : '', wardrobe ? `clothes he/she might own (wear only what the scene describes; if the scene says nothing, pick ONE coherent outfit from these, never mix them all): ${wardrobe}` : ''].filter(Boolean).join('; ');
+};
 const hasRef = (data, p) => !!(p.photo || (p.id === HIM && data.cardAvatar));
 
 export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
@@ -85,8 +95,8 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
   const anyRef = inFrame.some((p) => hasRef(data, p));
   // 有照片的人：臉和頭髮照照片，文字只留身形、衣著；沒照片的人照舊整段長相
   const notes = inFrame.filter((p) => p.look || hasRef(data, p)).map((p) => (hasRef(data, p)
-    ? `${p.name}: face, hair colour and hairstyle exactly as in ${p.name}'s reference photo (ignore any text that says otherwise)${stripFace(p.look) ? `; body and clothes: ${stripFace(p.look)}` : ''}`
-    : `${p.name}: ${p.look}`));
+    ? `${p.name}: face, hair colour and hairstyle exactly as in ${p.name}'s reference photo (ignore any text that says otherwise)${lookNote(p.look) ? `; ${lookNote(p.look)}` : ''}`
+    : `${p.name}: ${lookNote(p.look) || p.look}`));
   // 場景 prompt 裡寫長相的詞也拿掉（寫 prompt 的模型會把長相抄進去），沒照片的人的長相上面 notes 會補回來
   if (anyRef) prompt = stripFace(prompt);
   // 拍照的人：他自己拍的照片常常只有手入鏡（托著東西、拿著杯子），不講是誰的手，模型會隨便畫一隻（10/14 阿愷的企鵝變成女生的手）。

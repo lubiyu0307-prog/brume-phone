@@ -3,7 +3,7 @@
 
 import * as store from './store.js';
 import { currentChar, generate, imagine, recentChat, imageInfo, imageModelPref } from './st.js';
-import { HIM, ME, loadCast, saveCast, person, setPerson, sideNames, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
+import { HIM, ME, loadCast, saveCast, person, setPerson, sideNames, refsFor, idsFor, finalPrompt, ensureAutoStyle, splitLook } from './cast.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -151,6 +151,8 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     </div>`;
   }
 
+  const lookLine = (text) => { const { body, wardrobe } = splitLook(text || ''); return [body, wardrobe ? `（衣櫃：${wardrobe}）` : ''].filter(Boolean).join(' '); };
+
   async function shoot() {
     if (busy) return;
     const chat = recentChat(30);
@@ -163,9 +165,11 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       const r = parseJSON(await generate([
         '[Brume Phone · 快照]',
         `現在不是在寫劇情正文。請把下面這段劇情裡最值得留下來的一個畫面，想成一張照片（像是誰用手機拍下來的）。`,
-        `${who.name} 的長相：${people.look.him || '照角色卡'}`,
-        people.look.me ? `${who.user} 的長相：${people.look.me}` : '',
-        ...sideNames(people).map((n) => person(people, who, n)).filter((c) => c.look).map((c) => `${c.name} 的長相（他有入鏡才寫）：${c.look}`),
+        // 長相裡的衣服是衣櫃，不是這一刻穿的：整串給它，它會全抄進 prompt，畫出來變成混搭（10/14 Polo 衫配運動褲）
+        `${who.name} 的長相：${lookLine(people.look.him) || '照角色卡'}`,
+        people.look.me ? `${who.user} 的長相：${lookLine(people.look.me)}` : '',
+        ...sideNames(people).map((n) => person(people, who, n)).filter((c) => c.look).map((c) => `${c.name} 的長相（他有入鏡才寫）：${lookLine(c.look)}`),
+        '- 穿著照劇情這一刻寫，劇情沒寫才從衣櫃挑一套搭得起來的，不要把衣櫃裡的衣服全部寫進去',
         '', '劇情：', scenes.join('\n\n').slice(0, 3000), extra ? `\n她想拍的：${extra}` : '', '',
         `- in 列出照片裡看得到臉的人（${who.name}、${who.user} 或配角的名字），拍照的人沒入鏡就不要列`,
         '- 鏡頭照這一刻最自然的拍法選：全身、半身、近景、背影都可以，prompt 裡要寫明是哪一種；看不看鏡頭也照情境，多半是被拍的人沒注意到鏡頭、正在做自己的事',
