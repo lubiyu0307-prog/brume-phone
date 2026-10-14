@@ -163,7 +163,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
   // 把欄位組成固定格式的生圖描述（鏡頭 → 地點 → 每個人 → 物品 → 光線），每張快照的 prompt 長得一樣整齊
   function snapFromFields(r) {
     const ppl = (Array.isArray(r.people) ? r.people : []).map((x) => [x.name, x.doing, x.face, x.wearing && P.WEARING(x.wearing)].filter(Boolean).join(P.COMMA)).filter(Boolean);
-    return [r.shot, r.place, ...ppl, r.props, r.light].filter(Boolean).map((t) => String(t).trim()).join(P.PERIOD);
+    return [[r.shot, r.angle].filter(Boolean).join(P.COMMA), r.place, ...ppl, r.props, r.light].filter(Boolean).map((t) => String(t).trim()).join(P.PERIOD);
   }
 
   async function shoot() {
@@ -188,14 +188,15 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         '- 不寫長相：臉、髮色、髮型、眼睛、年紀、身材都不要寫（證件照會處理）',
         '- 只拍一個瞬間：每個人一個動作、一個表情，寫具體（「左手撐著下巴看她」，不是「很溫柔」）',
         '- 穿著照劇情這一刻；劇情沒寫才從衣櫃挑一套搭得起來的',
-        // 以前寫「入鏡的話就是朋友拍或自拍」，在家窩沙發這種沒有別人的場景，模型只能選自拍，硬讓她舉手機（10/14）
-        `- 拍照的人：${who.user} 沒入鏡的話，就是 ${who.user} 用手機拍的；${who.user} 入鏡的話不用交代誰拍的，當作手機架在旁邊拍的就好`,
+        // 不問「誰拍的」改問「鏡頭從哪裡看」：問誰拍的，在家窩沙發這種沒有別人的場景模型只能選自拍（10/14 露比的點子）
+        `- angle 寫鏡頭從哪裡看：位置、高度、距離，例如「從沙發對面稍低的角度」「從他肩膀後面看過去」「隔著扭蛋機的透明罩」；可以有一點前景擋在鏡頭前，更有景深`,
+        `- ${who.user} 沒入鏡的話，鏡頭就是 ${who.user} 的視線（第一人稱）`,
         '- 除非劇情真的寫到自拍或拍照，畫面裡不要有人拿著手機在拍',
         `- in 列出畫面裡看得到臉的人（${who.name}、${who.user} 或配角的名字）`,
         '- 鏡頭選這一刻最自然的：近景、半身、七分身、全身、背影；人多半沒注意到鏡頭',
         '- 地點寫具體，背景放兩三樣看得到的東西',
         P.SNAP_LANG,
-        '只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","in":["入鏡的人名"],"shot":"鏡頭","by":"誰拍的","people":[{"name":"人名","doing":"動作和姿勢","face":"表情和視線","wearing":"穿著"}],"place":"地點和背景","props":"重要的物品","light":"時間和光線"}',
+        '只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","in":["入鏡的人名"],"shot":"鏡頭","angle":"鏡頭從哪裡看","people":[{"name":"人名","doing":"動作和姿勢","face":"表情和視線","wearing":"穿著"}],"place":"地點和背景","props":"重要的物品","light":"時間和光線"}',
       ].filter(Boolean).join('\n')));
       r.prompt = r.prompt || snapFromFields(r);
       const inFrame = Array.isArray(r.in) ? r.in.map(String) : null;

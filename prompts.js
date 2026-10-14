@@ -47,7 +47,7 @@ const ZH = {
     colour: (anyRef) => `顏色：自然真實的色彩和白平衡，${anyRef ? '膚色照各自的參考照片' : '膚色自然'}，不要黃色濾鏡。只用現場真的存在的光（窗光、日光、路燈、餐廳燈）；不要電影感輪廓光、不要棚拍補光。`,
     skin: '質感：真實的皮膚，看得到毛孔、細小汗毛、些微泛紅、眼下淡淡的陰影；不要美顏、不要磨皮塑膠感、不要 CG 光澤。好看但不是模特兒般完美，保留自然的些微不對稱。',
     gaze: '除非情境說他們在看鏡頭，不然就是被捕捉到的瞬間、沒看鏡頭：在聊天、吃東西、走路、看對方或看別的地方。',
-    camera: '相機：一般的手機隨手拍，朋友拍的或手機架著拍的，會直接發到社群上的那種。普通手機畫質，有一點雜訊和壓縮感，不要過度銳利；構圖可以有點歪、不置中、裁得隨意。不是廣告、婚紗、偶像宣傳照或棚拍。',
+    camera: '相機：一般的手機隨手拍，會直接發到社群上的那種，用人像模式拍：人是清楚的，背景和前景自然虛化，有景深。普通手機畫質，有一點雜訊和壓縮感，不要過度銳利；構圖可以有點歪、不置中、裁得隨意。不是廣告、婚紗、偶像宣傳照或棚拍。',
   },
 
   // IG 照片接在描述後面的
@@ -98,7 +98,7 @@ const EN = {
     colour: (anyRef) => `Colour: natural, true-to-life colour and white balance. ${anyRef ? "Skin tone like each person's reference photo, " : 'Skin tone natural, '}never yellow-filtered. Only the light that really exists in the place (window light, daylight, street lights, restaurant light); no cinematic rim light, no studio fill.`,
     skin: 'Texture: real skin with visible pores, fine vellus hair, slight redness and subtle under-eye shadows; no beauty filter, no airbrushed or plastic skin, no CG sheen. Attractive but not model-perfect, keep natural slight asymmetry.',
     gaze: 'Unless the scene says they look at the camera, the people are caught in the moment and not looking at the lens: talking, eating, walking, looking at each other or at something else.',
-    camera: 'Camera: an everyday smartphone snapshot taken by a friend or on a propped-up phone, the kind posted straight to social media. Ordinary phone image quality with slight noise and compression, not over-sharp; composition can be slightly tilted, off-centre or loosely cropped. Not an advert, wedding shoot, idol photo or studio shoot.',
+    camera: 'Camera: an everyday smartphone snapshot, the kind posted straight to social media, shot in portrait mode: the people are sharp while the background and foreground fall into natural depth-of-field blur. Ordinary phone image quality with slight noise and compression, not over-sharp; composition can be slightly tilted, off-centre or loosely cropped. Not an advert, wedding shoot, idol photo or studio shoot.',
   },
 
   IG_POST: ', instagram photo, natural light',
