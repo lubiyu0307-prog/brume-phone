@@ -3,7 +3,7 @@
 
 import * as store from './store.js';
 import { currentChar, generate, imagine, recentChat } from './st.js';
-import { HIM, ME, loadCast, saveCast, person, setPerson, sideNames, refsFor } from './cast.js';
+import { HIM, ME, loadCast, saveCast, person, setPerson, sideNames, refsFor, idsFor, finalPrompt } from './cast.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -121,6 +121,9 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       <div class="bp-al-scroll">
         <p class="bp-al-hint">放每個人的參考照片，快照和 IG 生圖時會拿給 Gemini 看，同一個人才會每張都長一樣。配角的照片也是他在 IG 的大頭貼。</p>
         <div class="bp-al-ids">${[HIM, ME, ...sideNames(people)].map(card).join('')}<div class="bp-al-id add" data-person=""><span class="bp-al-idnone">＋</span><b>加配角</b><small>名字要跟劇情裡一樣</small></div></div>
+        <label>照片風格（每張生圖都會套用，可以不寫）</label>
+        <textarea class="bp-al-style" rows="3" placeholder="例如：film photo, warm tone, soft grain／日系清新、低飽和／韓系冷白、柔焦">${esc(people.look.style)}</textarea>
+        <p class="bp-al-hint">濾鏡、色調、畫風寫在這裡；某個人的髮色、身形要寫在那個人的證件照裡。</p>
       </div></div>`;
   }
 
@@ -131,7 +134,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       <div class="bp-al-scroll">
         <div class="bp-al-idpic" data-al="idpic">${editing.photo ? `<img src="${esc(editing.photo)}" alt="">` : '<span>點這裡放照片</span>'}</div>
         ${isNew ? '<label>名字（跟劇情、IG 裡出現的一樣）</label><input class="bp-al-idname" maxlength="20">' : ''}
-        <label>長相（生圖用，英文 tag 最好，可以不寫）</label><textarea class="bp-al-idlook" rows="3" placeholder="例如：black short hair, gray eyes, glasses, white shirt">${esc(p.look)}</textarea>
+        <label>長相與身形（生圖會照這段，英文 tag 最好，可以不寫）</label><textarea class="bp-al-idlook" rows="4" placeholder="髮色髮型、眼睛、身高身材、常穿的衣服。例如：ash-gray messy short hair, gray eyes, tall and slim, broad shoulders, black knit sweater">${esc(p.look)}</textarea>
         ${editing.id === HIM ? `<button class="bp-al-ghost" data-al="lookauto" ${busy ? 'disabled' : ''}>${busy ? '整理中⋯' : '從角色卡幫我整理'}</button>` : ''}
         ${!isNew && editing.id !== HIM && editing.id !== ME ? '<button class="bp-al-ghost danger" data-al="iddel">刪掉這個配角</button>' : ''}
       </div>
@@ -159,7 +162,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         '只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","prompt":"生圖用的英文 prompt，逗號分隔：人物（照上面的長相）、動作、表情、場景、光線、鏡頭，寫實手機照片風格"}',
       ].filter(Boolean).join('\n')));
       const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
-      p.img = p.prompt ? await imagine(p.prompt, { refs: snapRefs(p) }) : '';
+      p.img = p.prompt ? await imagine(snapPrompt(p), { refs: snapRefs(p) }) : '';
       note = p.img ? '' : '沒有出圖：酒館可能還沒接生圖。可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。';
       if (who.key === ch?.key) { items.push(p); save(); }
       picked = new Set(); openId = p.id; view = 'one';
@@ -169,7 +172,9 @@ export function createAlbum({ screen, say, onShare, onIG }) {
   }
 
   // 快照的參考照片：他和妳一定帶，劇情裡出現名字的配角也帶
-  const snapRefs = (p) => refsFor(people, ch, `${p.scene || ''}\n${p.desc || ''}`, [HIM, ME]);
+  const snapText = (p) => `${p.scene || ''}\n${p.desc || ''}`;
+  const snapRefs = (p) => refsFor(people, ch, snapText(p), [HIM, ME]);
+  const snapPrompt = (p) => finalPrompt(people, ch, p.prompt, idsFor(people, snapText(p), [HIM, ME]));
 
   async function lookAuto() {
     busy = true; renderPerson();
@@ -211,10 +216,11 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (a === 'shoot') shoot();
     if (a === 'upload') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'new'; f.click(); }
     if (a === 'attach') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'attach'; f.click(); }
-    if (a === 'copy' && p) { try { await navigator.clipboard.writeText(p.prompt); say('複製了'); } catch { say('這裡不能複製，長按文字自己選'); } }
+    // 複製的是完整的 prompt（帶長相和照片風格），拿去外面生也一樣像
+    if (a === 'copy' && p) { try { await navigator.clipboard.writeText(snapPrompt(p)); say('複製了'); } catch { say('這裡不能複製，長按文字自己選'); } }
     if ((a === 'gen' || a === 'regen') && p) {
       note = '生圖中⋯'; renderOne();
-      const url = await imagine(p.prompt, { refs: snapRefs(p) });
+      const url = await imagine(snapPrompt(p), { refs: snapRefs(p) });
       if (url) { p.img = url; note = ''; save(); } else note = '沒有出圖：酒館可能還沒接生圖，或這次失敗了。';
       if (mine()) renderOne();
     }
@@ -233,6 +239,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
   });
 
   screen.addEventListener('change', async (e) => {
+    if (mine() && e.target.classList.contains('bp-al-style')) { people.look.style = e.target.value.trim(); saveCast(ch.charKey, people); say('照片風格存好了'); return; }
     if (mine() && e.target.classList.contains('bp-al-cap')) {
       const p = items.find((x) => x.id === openId);
       if (p) { p.desc = e.target.value.trim() || '妳放的照片'; save(); say('記下來了'); }

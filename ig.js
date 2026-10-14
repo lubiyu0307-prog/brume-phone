@@ -5,7 +5,7 @@
 
 import * as store from './store.js';
 import { currentChar, generate, imagine, canSeeImages, ctx } from './st.js';
-import { HIM, loadCast, saveCast as storeCast, person, setPerson, refsFor } from './cast.js';
+import { HIM, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt } from './cast.js';
 
 // 自動生圖：打開的話，他新發的貼文用酒館的生圖畫成真的照片（要接好生圖，一張要等一下）
 const AUTO_KEY = 'brume-phone:igauto';
@@ -203,17 +203,13 @@ export function createIG({ screen, say }) {
     autoDraw(who, dd);
   }
 
-  // 照片的生圖 prompt：照片裡有誰入鏡，就帶誰的長相和證件照（他用相本存的長相；配角用玩家放的照片）
+  // 照片的生圖 prompt：照片裡有誰入鏡，就帶誰的長相和證件照，最後套上玩家寫的照片風格
   function photoPrompt(p, who) {
     const self = /自拍|本人|鏡|他|她|合照|我/.test(p.desc);
-    if (p.author.kind === 'other') {
-      const c = person(people, who, p.author.name);
-      const inIt = self || p.desc.includes(p.author.name);
-      return { prompt: `${p.desc}${c.look && inIt ? `, ${c.look}` : ''}, instagram photo, natural light`, refs: refsFor(people, who, p.desc, inIt ? [p.author.name] : []) };
-    }
-    const look = p.author.kind === 'him' ? people.look.him : '';
-    const inIt = p.author.kind === 'him' && /他|自拍|本人|鏡/.test(p.desc);
-    return { prompt: `${p.desc}${look && inIt ? `, ${look}` : ''}, instagram photo, natural light`, refs: refsFor(people, who, p.desc, inIt ? [HIM] : []) };
+    const always = p.author.kind === 'other' ? (self || p.desc.includes(p.author.name) ? [p.author.name] : [])
+      : p.author.kind === 'him' && /他|自拍|本人|鏡/.test(p.desc) ? [HIM] : [];
+    const ids = idsFor(people, p.desc, always);
+    return { prompt: finalPrompt(people, who, `${p.desc}, instagram photo, natural light`, ids), refs: refsFor(people, who, p.desc, always) };
   }
   const draw = (p, who) => { const { prompt, refs } = photoPrompt(p, who); return imagine(prompt, { refs }); };
 
@@ -224,7 +220,7 @@ export function createIG({ screen, say }) {
     screen.insertAdjacentHTML('beforeend', `<div class="bp-ig-sheet"><div>
       <div class="bp-ig-sheet-top"><u data-ig="unsheet">取消</u><b>${esc(name)}</b><u data-ig="savecast" class="ok">完成</u></div>
       <div class="bp-ig-pick round bp-ig-castpic" data-ig="castpic">${c.photo ? `<img src="${c.photo}" alt="">` : '<span>放一張照片</span>'}</div>
-      <label>長相（生圖用，選填）</label><textarea class="bp-ig-look" rows="2" placeholder="例如：short black hair, round glasses, gray hoodie">${esc(c.look)}</textarea>
+      <label>長相與身形（生圖會照這段，選填）</label><textarea class="bp-ig-look" rows="3" placeholder="髮色髮型、身材、常穿的衣服。例如：short black hair, round glasses, petite, gray hoodie">${esc(c.look)}</textarea>
       <p class="bp-ig-casthint">照片會當 ${esc(name)} 的大頭貼，生 ${esc(name)} 入鏡的照片時也會給 Gemini 看，長得比較像。同一張角色卡的每個聊天都用這份，相本的「證件照」也看得到。</p>
       ${c.photo || c.look ? '<p class="bp-ig-casthint"><u data-ig="castclear">清掉</u></p>' : ''}
       <input class="bp-ig-file" type="file" accept="image/*" hidden></div></div>`);
