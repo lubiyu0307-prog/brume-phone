@@ -1,8 +1,9 @@
 // 一次生好幾張讓玩家挑：Gemini 不是每張都歪，是有時準有時歪，多給幾張挑最像的。
-// 兩張兩張一起叫（同時叫太多張會被 Google 擋速度）；先出來的先顯示，玩家可以不等全部生完就挑。
+// 一張畫完再畫下一張：兩張同時叫 Pro，Google 常只放行一張，另一張退回 Flash 畫，「第二張通常很恐怖」（10/14）。
+// 先出來的先顯示，玩家可以不等全部生完就挑；萬一還是退回別的模型，格子角落標出來。
 // 沒選中的圖從酒館伺服器刪掉，不然每次都留三張用不到的
 
-import { imagine, imageInfo, imageCountPref, dropImage } from './st.js';
+import { imagine, imageInfo, imageCountPref, imageModelPref, dropImage } from './st.js';
 
 export async function imagineAndPick(screen, prompt, opts = {}) {
   const n = imageCountPref.get();
@@ -50,11 +51,12 @@ export async function imagineAndPick(screen, prompt, opts = {}) {
     const u = await imagine(prompt, opts);
     done++;
     if (u && chosen !== null) { dropImage(u); return; } // 已經挑好了，晚到的直接刪
-    if (u) { const i = urls.push(u) - 1; cells[i].innerHTML = `<img src="${u}" alt="">`; cells[i].dataset.i = i; }
+    const off = u && imageInfo.model && !imageInfo.model.includes(imageModelPref.get()) ? (/pro/.test(imageInfo.model) ? 'Pro' : 'Flash') : '';
+    if (u) { const i = urls.push(u) - 1; cells[i].innerHTML = `<img src="${u}" alt="">${off ? `<em>${off}</em>` : ''}`; cells[i].dataset.i = i; }
     note.textContent = done < n ? `生圖中⋯ ${done}/${n}${urls.length ? '（可以先挑）' : ''}` : urls.length ? '點一張用它' : `沒有出圖：${imageInfo.why || '這次失敗了'}`;
   };
   (async () => {
-    for (let k = 0; k < n; k += 2) await Promise.all([one(), k + 1 < n ? one() : null]);
+    for (let k = 0; k < n && chosen === null; k++) await one(); // 已經挑好就不再生剩下的，省錢
     if (!urls.length) setTimeout(() => settle(''), 2500); // 一張都沒有：讓玩家看一下原因再關
   })();
   return result;

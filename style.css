@@ -1200,3 +1200,5 @@
 .bp-pick-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .bp-pick-acts button { padding: 11px 0; border-radius: 22px; border: 1px solid rgba(255, 255, 255, .4); background: none; color: #fff; font: inherit; font-size: 14px; cursor: pointer; }
 .bp-pick-acts button.ok { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
+.bp-pick-grid i { position: relative; }
+.bp-pick-grid em { position: absolute; right: 6px; bottom: 6px; padding: 2px 7px; border-radius: 9px; background: rgba(0, 0, 0, .65); color: #fff; font-size: 10px; font-style: normal; }

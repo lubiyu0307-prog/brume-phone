@@ -111,7 +111,7 @@ export async function generate(prompt, image) {
  * 酒館擴充的 /imagine（Imagen、GPT、Pollinations⋯）不用：看不到證件照，畫出來是另一張臉
  */
 /** 上一張圖是誰畫的、Gemini 為什麼沒畫（相本、IG 顯示給玩家看） */
-export const imageInfo = { by: '', why: '' };
+export const imageInfo = { by: '', why: '', model: '' };
 
 /** 手機現在畫得出圖嗎：聊天接 Google，或貼了 AI Studio 金鑰 */
 export function canDraw() {
@@ -121,7 +121,7 @@ export function canDraw() {
 
 export async function imagine(prompt, { refs = [], aspect = '1:1' } = {}) {
   refs = refs.filter((r) => r?.url);
-  imageInfo.by = ''; imageInfo.why = '';
+  imageInfo.by = ''; imageInfo.why = ''; imageInfo.model = '';
   const g = (await viaGemini(prompt, refs, aspect)) || (await viaKey(prompt, refs, aspect));
   if (g) imageInfo.by = 'gemini';
   return g;
@@ -203,6 +203,7 @@ async function viaKey(prompt, refs = [], aspect = '1:1') {
       if (!r.ok) { imageInfo.why = (prev ? prev + '；' : '') + `金鑰那條：${model} 回 ${r.status}${r.status === 429 ? '（額度用完或太頻繁）' : r.status === 400 ? '（金鑰或參數不對）' : r.status === 403 ? '（金鑰沒有權限，或限制了網站）' : ''}`; continue; }
       const img = (await r.json())?.candidates?.[0]?.content?.parts?.find((x) => x.inlineData?.data)?.inlineData;
       if (!img) { imageInfo.why = (prev ? prev + '；' : '') + '金鑰那條：這張被 Google 擋下來了（多半是太露骨）'; return ''; }
+      imageInfo.model = model;
       return await saveImage(img.data, (img.mimeType || 'image/png').split('/')[1] || 'png');
     } catch (e) { imageInfo.why = (prev ? prev + '；' : '') + `金鑰那條：${model} 連不上（${e.message || e}）`; }
   }
@@ -232,6 +233,7 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
       const parts = j?.responseContent?.parts || j?.candidates?.[0]?.content?.parts || [];
       const img = parts.find((p) => p.inlineData?.data)?.inlineData;
       if (!img) { imageInfo.why = '這張被 Google 擋下來了（多半是太露骨）'; return ''; } // 只回了文字＝這張被擋了（多半是太露骨），換模型也一樣，交給玩家拿 prompt 去外面生
+      imageInfo.model = model;
       return await saveImage(img.data, (img.mimeType || 'image/png').split('/')[1] || 'png');
     } catch (e) { imageInfo.why = `${model} 連不上（${e.message || e}）`; /* 換下一個模型 */ }
   }
