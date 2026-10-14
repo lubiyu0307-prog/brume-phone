@@ -136,7 +136,7 @@ export function createIG({ screen, say }) {
       <div class="bp-ig-head"><span class="bp-back" data-ig="back">‹</span><b>貼文</b><span></span></div>
       <div class="bp-ig-scroll">
         ${post(p, true)}
-        ${!p.img && p.author.kind !== 'me' ? '<button class="bp-ig-gen" data-ig="gen">用酒館生出這張照片</button>' : ''}
+        ${p.author.kind !== 'me' && !p.fromAlbum ? `<button class="bp-ig-gen" data-ig="gen">${p.img ? '重新生一張' : '用酒館生出這張照片'}</button>` : ''}
         <div class="bp-ig-comments">
           ${p.loading ? '<p class="bp-ig-empty">留言載入中⋯</p>' : ''}
           ${(p.comments || []).map((c) => `<div class="bp-ig-c">${av(c.author, 'xs')}<p><b>${esc(c.author.handle)}</b> ${esc(c.text)}<small>${ago(c.ts)}</small></p></div>`).join('')}
