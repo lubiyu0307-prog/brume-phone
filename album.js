@@ -86,7 +86,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         ${p.scene ? `<details class="bp-al-scene"><summary>這一幕</summary><p>${esc(p.scene)}</p></details>` : ''}
         ${p.prompt ? `<div class="bp-al-prompt"><small>生圖 prompt</small><p>${esc(p.prompt)}</p><button data-al="copy">複製</button></div>` : ''}
         ${own ? `<div class="bp-al-acts">
-          ${p.prompt && !p.img ? '<button data-al="gen">用酒館生圖</button>' : ''}
+          ${p.prompt && !p.img ? '<button data-al="gen">生成這張照片</button>' : ''}
           ${p.prompt ? '<button data-al="regen">重新生一張</button>' : ''}
           ${p.img && onShare ? '<button data-al="share">傳到 LINE 給他看</button>' : ''}
           ${p.img && onIG ? `<button data-al="ig" ${busy ? 'disabled' : ''}>${busy === 'ig' ? '他在想要寫什麼⋯' : '請他發到 IG'}</button>` : ''}
@@ -166,7 +166,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
       if (p.prompt) await ensureAutoStyle(people, who.charKey);
       p.img = p.prompt ? await imagine(snapPrompt(p), { refs: snapRefs(p) }) : '';
-      note = drawnNote(p.img, snapRefs(p)) || (p.img ? '' : '沒有出圖：酒館可能還沒接生圖。可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。');
+      note = drawnNote(p.img) || (p.img ? '' : '沒有出圖：要聊天接 Google，或在證件照頁貼 AI Studio 金鑰。也可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。');
       if (who.key === ch?.key) { items.push(p); save(); }
       picked = new Set(); openId = p.id; view = 'one';
     } catch (e) { say(`拍照失敗：${e.message || e}`); }
@@ -176,10 +176,8 @@ export function createAlbum({ screen, say, onShare, onIG }) {
 
   // 快照的參考照片：他和妳一定帶，劇情裡出現名字的配角也帶
   const snapText = (p) => `${p.scene || ''}\n${p.desc || ''}`;
-  // 有證件照卻是酒館生圖畫的：講清楚臉為什麼不像、Gemini 卡在哪
-  const drawnNote = (url, refs) => (url && refs.length && imageInfo.by === 'imagine'
-    ? `這張是酒館的生圖畫的，它看不到證件照，臉會不像。Gemini 沒畫出來：${imageInfo.why || '原因不明'}`
-    : !url && imageInfo.why ? `沒有出圖：${imageInfo.why}` : '');
+  // 沒畫出來就講 Gemini 卡在哪
+  const drawnNote = (url) => (!url && imageInfo.why ? `沒有出圖：${imageInfo.why}` : '');
   const snapRefs = (p) => refsFor(people, ch, snapText(p), [HIM, ME]);
   const snapPrompt = (p) => finalPrompt(people, ch, p.prompt, idsFor(people, snapText(p), [HIM, ME]));
 
@@ -230,7 +228,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       await ensureAutoStyle(people, ch.charKey);
       const url = await imagine(snapPrompt(p), { refs: snapRefs(p) });
       if (url) { p.img = url; save(); }
-      note = drawnNote(url, snapRefs(p)) || (url ? '' : '沒有出圖：酒館可能還沒接生圖，或這次失敗了。');
+      note = drawnNote(url) || (url ? '' : '沒有出圖：要聊天接 Google，或在證件照頁貼 AI Studio 金鑰。');
       if (mine()) renderOne();
     }
     if (a === 'ig' && p?.img && !busy) {

@@ -2,10 +2,11 @@
 // 回覆走酒館自己的 generateQuietPrompt，所以模型看得到角色卡、世界書與正文。
 
 import * as store from './store.js';
-import { currentChar, generate, ctx, writeLore, canSeeImages, imagine } from './st.js';
+import { currentChar, generate, ctx, writeLore, canSeeImages, imagine, canDraw } from './st.js';
 import * as data from './data.js';
 import * as stage from './stage.js';
 import { findUrls, readLink, linkForPrompt } from './link.js';
+import { HIM, ME, loadCast } from './cast.js';
 
 const OLD_STORE = 'brume-phone:line:'; // v0.2.0 存在 localStorage，第一次打開時搬進 IndexedDB
 
@@ -531,7 +532,7 @@ export function createLine({ screen, say, onUnread, onData }) {
       <div class="bp-line-pop"></div></div>`;
   }
 
-  // 情侶頭貼：兩格各自選圖，或一張切兩半，或請酒館的生圖做一組
+  // 情侶頭貼：兩格各自選圖，或一張切兩半，或請 Gemini 做一組
   let coupleDraft = null;
   function coupleSheet() {
     coupleDraft = coupleDraft || { his: couple?.his || '', mine: couple?.mine || '' };
@@ -540,7 +541,7 @@ export function createLine({ screen, say, onUnread, onData }) {
       <div class="bp-line-cpair">${slot('mine', esc(ch.user))}<i>♥</i>${slot('his', esc(ch.name))}</div>
       <div class="bp-line-list">
         <button data-line="csplit">一張圖切成兩半（左邊給妳、右邊給他）</button>
-        ${ctx()?.executeSlashCommandsWithOptions ? '<button data-line="cgen">✨ 用酒館的生圖做一組</button>' : ''}
+        ${canDraw() ? '<button data-line="cgen">✨ 用 Gemini 做一組</button>' : ''}
         ${couple ? '<button data-line="coff" class="danger">換回原本的頭貼</button>' : ''}
       </div>
       <div class="bp-line-edit-btns"><button data-line="cancelcouple">取消</button><button class="ok" data-line="csave">換上</button></div></div>`, 'bp-center-mode');
@@ -871,14 +872,16 @@ export function createLine({ screen, say, onUnread, onData }) {
       f.dataset.for = a === 'csplit' ? 'csplit' : 'c-' + e.target.closest('[data-k]').dataset.k; f.click();
     }
     if (a === 'cgen') {
-      const look = (await store.get('look:' + ch.charKey).catch(() => null)) || {};
+      // 照相本證件照畫：他、妳各自帶自己的參考照片，臉才會是本人
+      const { cast, look, cardAvatar } = await loadCast(ch.charKey);
+      const himRef = cast[HIM]?.photo || cardAvatar; const meRef = cast[ME]?.photo;
       say('生圖中，要等一下⋯');
-      const style = 'matching couple profile picture, same art style, same pastel background, soft light, head and shoulders, square';
+      const style = `matching couple profile picture, same art style, same pastel background, soft light, head and shoulders, square${look.style ? `, ${look.style}` : ''}`;
       const [his, mine] = await Promise.all([
-        imagine(`${style}, ${look.him || ch.name}, holding the left half of a heart`),
-        imagine(`${style}, ${look.me || 'a young woman'}, holding the right half of a heart`),
+        imagine(`${style}, ${look.him || ch.name}, holding the left half of a heart`, { refs: himRef ? [{ name: ch.name, url: himRef }] : [] }),
+        imagine(`${style}, ${look.me || 'a young woman'}, holding the right half of a heart`, { refs: meRef ? [{ name: ch.user, url: meRef }] : [] }),
       ]);
-      if (!his || !mine) { say('生圖沒成功，酒館要先接好生圖（相本的快照用的那個）'); return; }
+      if (!his || !mine) { say('生圖沒成功：要聊天接 Google，或在相本證件照頁貼 AI Studio 金鑰'); return; }
       coupleDraft = { his, mine }; coupleSheet();
     }
     if (a === 'csave') {

@@ -105,43 +105,26 @@ export async function generate(prompt, image) {
 }
 
 /**
- * 生一張圖，回傳圖片網址；都失敗回空字串。
- *   一、玩家自己接了酒館的生圖（Image Generation 擴充）→ 走 /imagine
- *   二、沒接、或接了沒出圖，而聊天是接 Google（Vertex／AI Studio）→ 借酒館的連線叫 Gemini 生圖
- * 酒館擴充裡的 Google 只有 Imagen，Imagen 2026 年中已經停用，所以第二條才是 Google 玩家真正會走的路
+ * 生一張圖，回傳圖片網址；都失敗回空字串。只用 Gemini（10/14 比比定的：不要別家的生圖）：
+ *   一、聊天接 Google（Vertex／AI Studio）→ 借酒館的連線叫 Gemini
+ *   二、酒館那條叫不到 → 用玩家貼在手機裡的 AI Studio 金鑰直接問 Google
+ * 酒館擴充的 /imagine（Imagen、GPT、Pollinations⋯）不用：看不到證件照，畫出來是另一張臉
  */
 /** 上一張圖是誰畫的、Gemini 為什麼沒畫（相本、IG 顯示給玩家看） */
 export const imageInfo = { by: '', why: '' };
 
-export async function imagine(prompt, { refs = [], aspect = '1:1' } = {}) {
-  // 有參考圖（相本證件照區的照片）時先走 Gemini：/imagine 吃不了參考圖，畫出來會是另一張臉
-  refs = refs.filter((r) => r?.url);
-  imageInfo.by = ''; imageInfo.why = '';
-  if (refs.length) {
-    const g = (await viaGemini(prompt, refs, aspect)) || (await viaKey(prompt, refs, aspect));
-    if (g) { imageInfo.by = 'gemini'; return g; }
-    // Gemini 沒畫出來才退回酒館的生圖；那邊看不到證件照，臉會不一樣，要讓玩家知道（10/14 企鵝館那張就是這樣）
-    const i = await viaImagine(prompt);
-    if (i) imageInfo.by = 'imagine';
-    return i;
-  }
-  const i = await viaImagine(prompt);
-  if (i) { imageInfo.by = 'imagine'; return i; }
-  const g = (await viaGemini(prompt, [], aspect)) || (await viaKey(prompt, [], aspect));
-  if (g) imageInfo.by = 'gemini';
-  return g;
+/** 手機現在畫得出圖嗎：聊天接 Google，或貼了 AI Studio 金鑰 */
+export function canDraw() {
+  const src = ctx()?.chatCompletionSettings?.chat_completion_source;
+  return src === 'vertexai' || src === 'makersuite' || !!geminiKeyGet();
 }
 
-async function viaImagine(prompt) {
-  const c = ctx();
-  // 生圖擴充關著的時候沒有 /imagine，硬叫會跳「不認得的指令」
-  if (!c?.executeSlashCommandsWithOptions || !c.SlashCommandParser?.commands?.imagine) return '';
-  // | 會被當成指令分隔、{{ }} 會被當成巨集，先換掉
-  const safe = String(prompt).replace(/[|{}]/g, ' ').replace(/\s+/g, ' ').trim();
-  try {
-    const r = await c.executeSlashCommandsWithOptions(`/imagine quiet=true ${safe}`, { handleParserErrors: true });
-    return String(r?.pipe || '').trim();
-  } catch { return ''; }
+export async function imagine(prompt, { refs = [], aspect = '1:1' } = {}) {
+  refs = refs.filter((r) => r?.url);
+  imageInfo.by = ''; imageInfo.why = '';
+  const g = (await viaGemini(prompt, refs, aspect)) || (await viaKey(prompt, refs, aspect));
+  if (g) imageInfo.by = 'gemini';
+  return g;
 }
 
 // flash 快（十幾秒），pro 慢一點但細；flash 叫不到才換 pro
