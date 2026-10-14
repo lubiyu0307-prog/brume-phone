@@ -104,16 +104,66 @@ export async function generate(prompt, image) {
   return stripBlocks(out);
 }
 
-/** 叫酒館的生圖（Image Generation 擴充）。回傳圖片網址；沒接生圖或失敗回空字串 */
+/**
+ * 生一張圖，回傳圖片網址；都失敗回空字串。
+ *   一、玩家自己接了酒館的生圖（Image Generation 擴充）→ 走 /imagine
+ *   二、沒接、或接了沒出圖，而聊天是接 Google（Vertex／AI Studio）→ 借酒館的連線叫 Gemini 生圖
+ * 酒館擴充裡的 Google 只有 Imagen，Imagen 2026 年中已經停用，所以第二條才是 Google 玩家真正會走的路
+ */
 export async function imagine(prompt) {
+  return (await viaImagine(prompt)) || (await viaGemini(prompt));
+}
+
+async function viaImagine(prompt) {
   const c = ctx();
-  if (!c?.executeSlashCommandsWithOptions) return '';
+  // 生圖擴充關著的時候沒有 /imagine，硬叫會跳「不認得的指令」
+  if (!c?.executeSlashCommandsWithOptions || !c.SlashCommandParser?.commands?.imagine) return '';
   // | 會被當成指令分隔、{{ }} 會被當成巨集，先換掉
   const safe = String(prompt).replace(/[|{}]/g, ' ').replace(/\s+/g, ' ').trim();
   try {
     const r = await c.executeSlashCommandsWithOptions(`/imagine quiet=true ${safe}`, { handleParserErrors: true });
     return String(r?.pipe || '').trim();
   } catch { return ''; }
+}
+
+// flash 快（十幾秒），pro 慢一點但細；flash 叫不到才換 pro
+const GEMINI_IMAGE_MODELS = ['gemini-3.1-flash-image', 'gemini-3-pro-image'];
+
+async function viaGemini(prompt) {
+  const c = ctx(); const o = c?.chatCompletionSettings || {};
+  const src = o.chat_completion_source;
+  if (src !== 'vertexai' && src !== 'makersuite') return '';
+  const ask = `Generate one photo. No text in the image, no captions.\n${String(prompt).trim()}`;
+  for (const model of GEMINI_IMAGE_MODELS) {
+    try {
+      const r = await fetch('/api/backends/chat-completions/generate', {
+        method: 'POST', headers: c.getRequestHeaders(),
+        body: JSON.stringify({
+          messages: [{ role: 'user', content: ask }], model, chat_completion_source: src, stream: false,
+          request_images: true, request_image_aspect_ratio: '1:1', request_image_resolution: '1K', max_tokens: 4096, temperature: 1,
+          vertexai_auth_mode: o.vertexai_auth_mode, vertexai_region: o.vertexai_region, vertexai_express_project_id: o.vertexai_express_project_id,
+          reverse_proxy: o.reverse_proxy, proxy_password: o.proxy_password,
+        }),
+      });
+      if (!r.ok) continue;
+      const j = await r.json();
+      const img = (j?.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData?.data)?.inlineData;
+      if (!img) return ''; // 只回了文字＝這張被擋了（多半是太露骨），換模型也一樣，交給玩家拿 prompt 去外面生
+      return await saveImage(img.data, (img.mimeType || 'image/png').split('/')[1] || 'png');
+    } catch { /* 換下一個模型 */ }
+  }
+  return '';
+}
+
+// 圖存到酒館伺服器的使用者圖片資料夾，手機只記網址。直接存 base64 會把瀏覽器的空間（約 5MB）一張就吃掉三分之一
+async function saveImage(base64, ext) {
+  const c = ctx(); const ch = c.characters?.[c.characterId];
+  const r = await fetch('/api/images/upload', {
+    method: 'POST', headers: c.getRequestHeaders(),
+    body: JSON.stringify({ image: base64, format: ext === 'jpeg' ? 'jpg' : ext, ch_name: ch?.name || 'Brume Phone', filename: `brume-phone_${Date.now()}` }),
+  });
+  if (!r.ok) return '';
+  return String((await r.json())?.path || '');
 }
 
 /** 正文最近幾則（給快照挑劇情用） */
