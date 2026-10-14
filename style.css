@@ -763,10 +763,13 @@
 .bp-ig-sbars i.done, .bp-ig-sbars i.now { background: #fff; }
 .bp-ig-storyv header { display: flex; align-items: center; gap: 8px; padding: 4px 12px 10px; font-size: 13px; }
 .bp-ig-storyv header span { color: rgba(255, 255, 255, .7); }
-.bp-ig-storyv img, .bp-ig-storyv .card { flex: 1; min-height: 0; width: 100%; object-fit: cover; }
+/* 只撐開限動的照片本身，header 裡的頭像不能被撐成橢圓 */
+.bp-ig-storyv > img, .bp-ig-storyv > .card { flex: 1; min-height: 0; width: 100%; object-fit: cover; }
 .bp-ig-storyv .card { display: grid; place-items: center; padding: 40px; background: linear-gradient(160deg, hsl(var(--h) 30% 45%), hsl(calc(var(--h) + 60) 30% 20%)); }
 .bp-ig-storyv .card span { font-size: 18px; line-height: 1.7; text-align: center; }
 .bp-ig-storyv p { position: absolute; left: 20px; right: 20px; bottom: 90px; text-align: center; font-size: 17px; background: rgba(0, 0, 0, .45); padding: 10px 14px; border-radius: 12px; }
+.bp-ig-sgen { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); padding: 9px 18px; border: 0; border-radius: 20px; background: rgba(255, 255, 255, .9); color: #000; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.bp-ig-sgen:disabled { opacity: .7; }
 .bp-ig-storyv small { text-align: center; padding: 14px; color: rgba(255, 255, 255, .6); font-size: 12px; }
 
 /* ---------- 小遊戲 ---------- */

@@ -211,7 +211,8 @@ export function createIG({ screen, say }) {
     const ids = idsFor(people, p.desc, always);
     return { prompt: finalPrompt(people, who, `${p.desc}, instagram photo, natural light`, ids), refs: refsFor(people, who, p.desc, always) };
   }
-  const draw = (p, who) => { const { prompt, refs } = photoPrompt(p, who); return imagine(prompt, { refs }); };
+  // 限動是直的（9:16），貼文是方的
+  const draw = (p, who, aspect = '1:1') => { const { prompt, refs } = photoPrompt(p, who); return imagine(prompt.replace('instagram photo', aspect === '9:16' ? 'vertical instagram story photo' : 'instagram photo'), { refs, aspect }); };
 
   // 配角的證件照：一張照片（當大頭貼，也是生圖的參考）＋長相文字。相本的證件照區是同一份
   function castSheet(name) {
@@ -233,6 +234,11 @@ export function createIG({ screen, say }) {
       p.drawn = true; // 失敗也不重試，免得每次重整都卡在同一張
       const url = await draw(p, who);
       if (url) { p.img = url; if (who.key === ch?.key) { save(); if (mine() && view === 'feed') renderFeed(); } else store.set('ig:' + who.key, dd).catch(() => {}); }
+    }
+    for (const s of dd.stories.filter((x) => x.author.kind === 'him' && !x.img && !x.drawn).slice(-1)) {
+      s.drawn = true;
+      const url = await draw(s, who, '9:16');
+      if (url) { s.img = url; if (who.key === ch?.key) save(); else store.set('ig:' + who.key, dd).catch(() => {}); }
     }
   }
 
@@ -292,6 +298,13 @@ export function createIG({ screen, say }) {
     if (op && view !== 'post') { back = view; openId = op.dataset.post; renderPost(); const p = find(openId); if (!p.comments) loadComments(p); return; }
     const st = e.target.closest('[data-story]');
     if (st) { const list = d.stories.filter((s) => s.author.handle === st.dataset.story && Date.now() - s.ts < 864e5); story = { list, i: 0 }; showStory(); return; }
+    if (e.target.closest('[data-ig="sgen"]')) {
+      const s = story.list[story.i]; const btn = e.target.closest('button'); btn.disabled = true; btn.textContent = '生圖中⋯';
+      const url = await draw(s, ch, '9:16');
+      if (url) { s.img = url; save(); } else say('沒有出圖：可能被擋了，或酒館還沒接生圖');
+      if (screen.querySelector('.bp-ig-storyv') && story.list[story.i] === s) showStory();
+      return;
+    }
     if (e.target.closest('.bp-ig-storyv')) { story.list[story.i].seen = true; story.i++; save(); if (story.i >= story.list.length) { screen.querySelector('.bp-ig-storyv')?.remove(); renderFeed(); } else showStory(); return; }
     const a = e.target.closest('[data-ig]')?.dataset.ig;
     if (!a) return;
@@ -345,6 +358,7 @@ export function createIG({ screen, say }) {
       <div class="bp-ig-sbars">${story.list.map((_, i) => `<i class="${i < story.i ? 'done' : i === story.i ? 'now' : ''}"></i>`).join('')}</div>
       <header>${av(s.author, 'xs')}<b>${esc(s.author.handle)}</b><span>${ago(s.ts)}</span></header>
       ${s.img ? `<img src="${esc(s.img)}" alt="">` : `<div class="card" style="--h:${hue(s.desc)}"><span>${esc(s.desc)}</span></div>`}
+      ${!s.img && s.author.kind !== 'me' ? '<button class="bp-ig-sgen" data-ig="sgen">生出這張照片</button>' : ''}
       ${s.text ? `<p>${esc(s.text)}</p>` : ''}<small>點一下看下一則</small></div>`);
   }
 
