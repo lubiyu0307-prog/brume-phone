@@ -70,7 +70,8 @@ export function createCalendar({ screen, say }) {
       cells += `<span data-day="${k}" class="${k === data.today() ? 'today' : ''}${k === sel ? ' sel' : ''}">${d}${has.has(k) ? '<i></i>' : ''}</span>`;
     }
     const dayEvs = evs.filter((e) => e.date === sel);
-    const upcoming = evs.filter((e) => e.date >= data.today()).slice(0, 8);
+    // 接下來：今天以後的所有安排，上面選的那天已經列過的不重複
+    const upcoming = evs.filter((e) => e.date >= data.today() && e.date !== sel).slice(0, 8);
     screen.innerHTML = `<div class="bp-ap bp-ap-cal">${head('行事曆')}
       <div class="bp-ap-scroll">
         <div class="bp-ap-month"><i data-mon="-1">‹</i><b>${y} 年 ${m + 1} 月</b><i data-mon="1">›</i></div>
@@ -78,8 +79,8 @@ export function createCalendar({ screen, say }) {
         <h4>${sel.slice(5).replace('-', '/')}（${WEEK[new Date(sel).getDay()]}）</h4>
         ${dayEvs.length ? dayEvs.map(ev).join('') : '<p class="bp-ap-hint">這天沒有安排。</p>'}
         <form class="bp-ap-add inline"><input placeholder="在這天加一件事⋯" maxlength="24"><button>加</button></form>
-        <h4>接下來</h4>
-        ${upcoming.length ? upcoming.map((e) => ev(e, true)).join('') : `<p class="bp-ap-hint">還沒有安排。跟${esc(ch.name)}約好的事，他會記上來。</p>`}
+        <h4>之後的安排</h4>
+        ${upcoming.length ? upcoming.map((e) => ev(e, true)).join('') : `<p class="bp-ap-hint">${evs.some((e) => e.date >= data.today()) ? '其他天還沒有安排。' : `還沒有安排。跟${esc(ch.name)}約好的事，他會記上來。`}</p>`}
       </div></div>`;
   }
 
