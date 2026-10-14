@@ -63,9 +63,14 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
   function takeTag(id) {
     const c = ctx(); const m = c?.chat?.[id];
     if (!m || m.is_user) return null;
-    const hit = String(m.mes || '').match(TAG);
-    if (!hit) return null;
-    m.mes = m.mes.replace(TAG, '').trim();
+    // 只拿最後一個真正的區塊：模型的思考、預設的檢查清單常會先提到「<phone>」這個字，
+    // 從第一次提到一路抓到結尾，會把整段計畫當成 LINE 送出去（10/15 阿愷傳了「區塊輸出⋯節拍單⋯」）
+    const mes = String(m.mes || '');
+    const close = mes.toLowerCase().lastIndexOf('</phone>');
+    const open = close < 0 ? -1 : mes.toLowerCase().lastIndexOf('<phone>', close);
+    if (open < 0) return null;
+    const hit = [null, mes.slice(open + 7, close)];
+    m.mes = (mes.slice(0, open) + mes.slice(close + 8)).trim();
     const sw = m.swipe_id ?? 0;
     if (Array.isArray(m.swipes) && m.swipes[sw] != null) m.swipes[sw] = m.mes;
     try { c.updateMessageBlock?.(id, m); } catch { /* 還沒畫出來的話，畫的時候就是乾淨的 */ }
@@ -80,11 +85,15 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     const body = takeTag(id);
     const ch = currentChar();
     if (!body || !ch) return;
-    const lines = []; const posts = []; const cals = []; const notes = []; let rel = null; let mode = 'LINE';
+    const lines = []; const posts = []; const cals = []; const notes = []; let rel = null; let mode = null;
+    // 看起來像寫作計畫、檢查清單的行不收（拍、節拍、玩家、區塊、輸出、正文、標籤）
+    const META = /節拍|厚拍|\d+\s*拍|玩家|區塊|輸出|正文|主詞|prompt|<|>|\{\{/i;
     for (const raw of body.split('\n')) {
       const l = raw.trim(); if (!l) continue;
       const m = l.match(/^(LINE|脆|Threads|關係|行事曆|便條|便利貼)\s*[｜|:：]\s*(.*)$/i);
       if (m) { mode = m[1].toUpperCase() === 'THREADS' ? '脆' : m[1] === '便利貼' ? '便條' : m[1]; if (!m[2]) continue; }
+      else if (!mode || mode === '關係' || l.length > 80) continue; // 開頭沒標是哪一種、或太長的，不是要放進手機的東西
+      if (META.test(l)) continue;
       const text = (m ? m[2].trim() : l).replace(/^[-・*]\s*/, '');
       if (mode === '關係') rel = stage.fromWord(text);
       else if (mode === '脆') posts.push(text);
