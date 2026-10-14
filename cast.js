@@ -11,7 +11,9 @@ export const ME = '@me';
 export async function loadCast(charKey) {
   const cast = (await store.get('cast:' + charKey).catch(() => null)) || {};
   const look = { him: '', me: '', style: '', ...((await store.get('look:' + charKey).catch(() => null)) || {}) };
-  return { cast, look };
+  // 證件照沒放他的照片時，拿角色卡的頭像當參考，不然 Gemini 會自己捏一張臉（10/14 企鵝那張）
+  const cardAvatar = /\.(png|webp|jpe?g)$/i.test(charKey) ? `/characters/${encodeURIComponent(charKey)}` : '';
+  return { cast, look, cardAvatar };
 }
 
 export function saveCast(charKey, { cast, look }) {
@@ -46,7 +48,8 @@ export function idsFor(data, text, always = []) {
 
 /** 入鏡的人的參考照片（最多三張） */
 export function refsFor(data, ch, text, always = []) {
-  return idsFor(data, text, always).map((id) => person(data, ch, id)).filter((p) => p.photo).slice(0, 3).map((p) => ({ name: p.name, url: p.photo }));
+  return idsFor(data, text, always).map((id) => ({ ...person(data, ch, id), url: person(data, ch, id).photo || (id === HIM ? data.cardAvatar : '') }))
+    .filter((p) => p.url).slice(0, 3).map((p) => ({ name: p.name, url: p.url }));
 }
 
 /**
@@ -55,11 +58,13 @@ export function refsFor(data, ch, text, always = []) {
  */
 export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
   const notes = ids.map((id) => person(data, ch, id)).filter((p) => p.look).map((p) => `${p.name}: ${p.look}`);
-  // 拍照的人：他自己拍的照片常常只有手入鏡（托著東西、拿著杯子），不講是誰的手，模型會隨便畫一隻（10/14 阿愷的企鵝變成女生的手）
-  const cam = by ? person(data, ch, by) : null;
+  // 拍照的人：他自己拍的照片常常只有手入鏡（托著東西、拿著杯子），不講是誰的手，模型會隨便畫一隻（10/14 阿愷的企鵝變成女生的手）。
+  // 只講性別，不貼整段長相：貼了模型會把整個人畫進去（同一天第二張，冒出一個陌生男人）
+  const cam = by && !ids.includes(by) ? person(data, ch, by) : null;
+  const sex = cam && (/\b(1boy|male|man|boy)\b/i.test(cam.look) || /男/.test(cam.look) ? "a man's" : /\b(1girl|female|woman|girl)\b/i.test(cam.look) || /女/.test(cam.look) ? "a woman's" : '');
   return [
     String(prompt).trim(),
-    cam ? `Taken by ${cam.name} on their own phone. Any hands, arms or body of the photographer visible in the frame belong to ${cam.name}${cam.look ? ` and must match: ${cam.look}` : ''}.` : '',
+    cam ? `First-person shot taken by ${cam.name} on their own phone. ${cam.name} is NOT in the photo: no face, no body. If a hand or arm reaches into the frame, it is ${cam.name}'s own${sex ? ` (${sex} hand)` : ''}.` : '',
     notes.length ? `Appearance to keep exactly (hair colour, body shape, clothes):\n${notes.join('\n')}` : '',
     data.look.style ? `Photo style / filter: ${data.look.style}` : '',
   ].filter(Boolean).join('\n');

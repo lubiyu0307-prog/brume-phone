@@ -206,9 +206,9 @@ export function createIG({ screen, say }) {
 
   // 照片的生圖 prompt：照片裡有誰入鏡，就帶誰的長相和證件照，最後套上玩家寫的照片風格
   function photoPrompt(p, who) {
-    const self = /自拍|本人|鏡|他|她|合照|我/.test(p.desc);
-    const always = p.author.kind === 'other' ? (self || p.desc.includes(p.author.name) ? [p.author.name] : [])
-      : p.author.kind === 'him' && /他|自拍|本人|鏡/.test(p.desc) ? [HIM] : [];
+    // 發文的人本人入鏡（自拍、對鏡、合照）才帶他的長相和照片；描述裡只有「他的手」不算，那是第一人稱視角
+    const self = /自拍|鏡子|鏡中|對鏡|合照|入鏡|露臉|全身照/.test(p.desc);
+    const always = !self ? [] : p.author.kind === 'other' ? [p.author.name] : p.author.kind === 'him' ? [HIM] : [];
     const ids = idsFor(people, p.desc, always);
     const by = p.author.kind === 'him' ? HIM : p.author.kind === 'other' ? p.author.name : null;
     return { prompt: finalPrompt(people, who, `${p.desc}, instagram photo, natural light`, ids, { by }), refs: refsFor(people, who, p.desc, always) };

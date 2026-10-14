@@ -140,7 +140,7 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
   // 參考圖一張一張標上是誰，畫出來的人才會對得上
   const content = refs.length
     ? [{ type: 'text', text: `${ask}\nReference photos of the people in this photo follow. Keep each person's face, hair and overall look.` },
-      ...refs.flatMap((r) => [{ type: 'text', text: `Reference: ${r.name}` }, { type: 'image_url', image_url: { url: r.url } }])]
+      ...(await Promise.all(refs.map(async (r) => { const url = await asDataUrl(r.url); return url ? [{ type: 'text', text: `Reference: ${r.name}` }, { type: 'image_url', image_url: { url } }] : []; }))).flat()]
     : ask;
   for (const model of GEMINI_IMAGE_MODELS) {
     try {
@@ -163,6 +163,18 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
     } catch { /* 換下一個模型 */ }
   }
   return '';
+}
+
+// 參考圖要給 dataURL；角色卡頭像這種網址先抓下來縮到 768 寬（原檔常常一兩 MB）
+async function asDataUrl(url) {
+  if (String(url).startsWith('data:')) return url;
+  try {
+    const bmp = await createImageBitmap(await (await fetch(url)).blob());
+    const k = Math.min(1, 768 / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement('canvas'); cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+    cv.getContext('2d').drawImage(bmp, 0, 0, cv.width, cv.height);
+    return cv.toDataURL('image/jpeg', 0.85);
+  } catch { return ''; } // 抓不到就不帶這張參考
 }
 
 // 圖存到酒館伺服器的使用者圖片資料夾，手機只記網址。直接存 base64 會把瀏覽器的空間（約 5MB）一張就吃掉三分之一
