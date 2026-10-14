@@ -168,7 +168,7 @@ async function refRequest(prompt, refs) {
   const who = got.map((r, i) => `Image ${i + 1} is a reference photo of ${r.name} (it may show the same person from several angles side by side; it is still one person).`).join('\n');
   return {
     images: got.map((r) => r.url),
-    text: `${who}\nCreate a new picture with exactly these people: keep each person's face, eyes, nose, jawline, hair colour and hairstyle identical to their reference image. The reference images win over any text below. Frame them close enough (half body or closer) that their faces are clearly visible and recognisable, never tiny distant figures. Unless a visual style is given below, draw in the same art style as the references (anime stays anime, photo stays photo).\n\n${ask}`,
+    text: `${who}\nCreate a new picture with exactly these people: keep each person's face, eyes, nose, jawline, hair colour and hairstyle identical to their reference image. The reference images win over any text below. Use the framing the scene describes (full body, half body or close-up); whenever a face is visible it must be recognisable as that person. Unless a visual style is given below, draw in the same art style as the references (anime stays anime, photo stays photo).\n\n${ask}`,
   };
 }
 

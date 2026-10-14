@@ -134,6 +134,7 @@ function photoLook(preset, hasPeople, anyRef) {
     hair,
     `Colour: natural, true-to-life colour and white balance. ${anyRef ? 'Skin tone like each person\'s reference photo, ' : 'Skin tone natural, '}never yellow-filtered. Only the light that really exists in the place (window light, daylight, street lights, restaurant light); no cinematic rim light, no studio fill.`,
     hasPeople ? 'Texture: real skin with visible pores, fine vellus hair, slight redness and subtle under-eye shadows; no beauty filter, no airbrushed or plastic skin, no CG sheen. Attractive but not model-perfect, keep natural slight asymmetry.' : '',
+    hasPeople ? 'Unless the scene says they look at the camera, the people are caught in the moment and not looking at the lens: talking, eating, walking, looking at each other or at something else.' : '',
     'Camera: an everyday smartphone snapshot taken by a friend or on a propped-up phone, the kind posted straight to social media. Ordinary phone image quality with slight noise and compression, not over-sharp; composition can be slightly tilted, off-centre or loosely cropped. Not an advert, wedding shoot, idol photo or studio shoot.',
   ].filter(Boolean);
   return [
@@ -141,7 +142,7 @@ function photoLook(preset, hasPeople, anyRef) {
     anyRef ? 'Match the rendering of the reference photos: the same smooth, soft, retouched skin texture and the same polished, clean finish.' : '',
     `Colour: neutral, clean white balance. ${anyRef ? 'Skin tone exactly like each person\'s reference photo: clear and luminous' : 'Skin looks clear and natural'}, with no yellow, orange or sallow cast, even under warm indoor light; keep any warmth in the background only.`,
     hasPeople
-      ? 'Photography: an intimate cinematic film still. Close framing, the people fill most of the frame. Shot on an 85mm lens at f/1.8, very shallow depth of field, background melts into creamy bokeh, only the people are sharp. Soft light, gentle muted colour grading, slightly lower saturation.'
+      ? 'Photography: an intimate cinematic film still, framed the way the scene describes. Shot on an 85mm lens at f/1.8, very shallow depth of field, background melts into creamy bokeh, only the people are sharp. Soft light, gentle muted colour grading, slightly lower saturation.'
       : 'Photography: cinematic phone photo, shallow depth of field with soft bokeh, soft light, gentle muted colour grading, slightly lower saturation.',
   ];
 }

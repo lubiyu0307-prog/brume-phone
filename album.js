@@ -167,7 +167,8 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         people.look.me ? `${who.user} 的長相：${people.look.me}` : '',
         ...sideNames(people).map((n) => person(people, who, n)).filter((c) => c.look).map((c) => `${c.name} 的長相（他有入鏡才寫）：${c.look}`),
         '', '劇情：', scenes.join('\n\n').slice(0, 3000), extra ? `\n她想拍的：${extra}` : '', '',
-        `- in 列出照片裡看得到臉的人（${who.name}、${who.user} 或配角的名字），拍照的人沒入鏡就不要列；有人入鏡時鏡頭要近到臉看得清楚（半身、近景），不要拍成遠遠的小人`,
+        `- in 列出照片裡看得到臉的人（${who.name}、${who.user} 或配角的名字），拍照的人沒入鏡就不要列`,
+        '- 鏡頭照這一刻最自然的拍法選：全身、半身、近景、背影都可以，prompt 裡要寫明是哪一種；看不看鏡頭也照情境，多半是被拍的人沒注意到鏡頭、正在做自己的事',
         '只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","in":["入鏡的人名"],"prompt":"生圖用的英文 prompt，逗號分隔：人物（照上面的長相）、動作、表情、場景、光線、鏡頭，寫實手機照片風格"}',
       ].filter(Boolean).join('\n')));
       const inFrame = Array.isArray(r.in) ? r.in.map(String) : null;
