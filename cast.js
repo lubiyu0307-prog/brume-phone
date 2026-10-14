@@ -103,5 +103,22 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
     // 玩家寫的風格蓋過上面的「photo」「realistic」：動漫風的卡寫 anime style 就要畫成動漫，不是寫實照片。
     // 玩家沒寫就用看頭像判斷的；判斷是寫實照片就不用加
     style && !/^realistic photo\.?$/i.test(style) ? `Visual style (this overrides any "photo" or "realistic" wording above): ${style}` : '',
+    ...(realistic(style) ? photoLook(inFrame.length > 0, anyRef) : []),
   ].filter(Boolean).join('\n');
+}
+
+// 寫實照片才加攝影手法和調色；玩家寫了動漫、插畫這類風格就不加（不然動漫圖會被要求拍成電影劇照）
+const realistic = (style) => !style || /^realistic photo\.?$/i.test(style) || (/photo|film|realistic|寫實|照片|底片/i.test(style) && !/anime|manga|cartoon|illustrat|cel|3d|render|動漫|動畫|插畫|漫畫|卡通/i.test(style));
+
+/**
+ * 預設的照片質感（10/14 跟露比對照 GPT 調出來的，E 版）：Gemini 的膚色常常偏黃、背景太清楚、鏡頭太遠。
+ * 膚色寫「跟參考照片一樣」不寫一律白皙：膚色深的角色不會被洗白
+ */
+function photoLook(hasPeople, anyRef) {
+  return [
+    `Colour: neutral, clean white balance. ${anyRef ? 'Skin tone exactly like each person\'s reference photo: clear and luminous' : 'Skin looks clear and natural'}, with no yellow, orange or sallow cast, even under warm indoor light; keep any warmth in the background only.`,
+    hasPeople
+      ? 'Photography: an intimate cinematic film still. Close framing, the people fill most of the frame. Shot on an 85mm lens at f/1.8, very shallow depth of field, background melts into creamy bokeh, only the people are sharp. Soft light, gentle muted colour grading, slightly lower saturation.'
+      : 'Photography: cinematic phone photo, shallow depth of field with soft bokeh, soft light, gentle muted colour grading, slightly lower saturation.',
+  ];
 }

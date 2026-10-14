@@ -170,7 +170,8 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       const inFrame = Array.isArray(r.in) ? r.in.map(String) : null;
       const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), ...(inFrame ? { in: inFrame } : {}), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
       if (p.prompt) await ensureAutoStyle(people, who.charKey);
-      p.img = p.prompt ? await imagine(snapPrompt(p), { refs: snapRefs(p) }) : '';
+      // 快照用橫的 4:3，像真的相機拍的（跟 GPT 對照時比正方形自然）
+      p.img = p.prompt ? await imagine(snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' }) : '';
       note = drawnNote(p.img) || (p.img ? '' : '沒有出圖：要聊天接 Google，或在證件照頁貼 AI Studio 金鑰。也可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。');
       if (who.key === ch?.key) { items.push(p); save(); }
       picked = new Set(); openId = p.id; view = 'one';
@@ -237,7 +238,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if ((a === 'gen' || a === 'regen') && p) {
       note = '生圖中⋯'; renderOne();
       await ensureAutoStyle(people, ch.charKey);
-      const url = await imagine(snapPrompt(p), { refs: snapRefs(p) });
+      const url = await imagine(snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' });
       if (url) { p.img = url; save(); }
       note = drawnNote(url) || (url ? '' : '沒有出圖：要聊天接 Google，或在證件照頁貼 AI Studio 金鑰。');
       if (mine()) renderOne();
