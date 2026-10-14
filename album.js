@@ -161,9 +161,11 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         people.look.me ? `${who.user} 的長相：${people.look.me}` : '',
         ...sideNames(people).map((n) => person(people, who, n)).filter((c) => c.look).map((c) => `${c.name} 的長相（他有入鏡才寫）：${c.look}`),
         '', '劇情：', scenes.join('\n\n').slice(0, 3000), extra ? `\n她想拍的：${extra}` : '', '',
-        '只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","prompt":"生圖用的英文 prompt，逗號分隔：人物（照上面的長相）、動作、表情、場景、光線、鏡頭，寫實手機照片風格"}',
+        `- in 列出照片裡看得到臉的人（${who.name}、${who.user} 或配角的名字），拍照的人沒入鏡就不要列；有人入鏡時鏡頭要近到臉看得清楚（半身、近景），不要拍成遠遠的小人`,
+        '只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","in":["入鏡的人名"],"prompt":"生圖用的英文 prompt，逗號分隔：人物（照上面的長相）、動作、表情、場景、光線、鏡頭，寫實手機照片風格"}',
       ].filter(Boolean).join('\n')));
-      const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
+      const inFrame = Array.isArray(r.in) ? r.in.map(String) : null;
+      const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), ...(inFrame ? { in: inFrame } : {}), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
       if (p.prompt) await ensureAutoStyle(people, who.charKey);
       p.img = p.prompt ? await imagine(snapPrompt(p), { refs: snapRefs(p) }) : '';
       note = drawnNote(p.img) || (p.img ? '' : '沒有出圖：要聊天接 Google，或在證件照頁貼 AI Studio 金鑰。也可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。');
@@ -174,12 +176,17 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (mine()) render();
   }
 
-  // 快照的參考照片：他和妳一定帶，劇情裡出現名字的配角也帶
-  const snapText = (p) => `${p.scene || ''}\n${p.desc || ''}`;
   // 沒畫出來就講 Gemini 卡在哪
   const drawnNote = (url) => (!url && imageInfo.why ? `沒有出圖：${imageInfo.why}` : '');
-  const snapRefs = (p) => refsFor(people, ch, snapText(p), [HIM, ME]);
-  const snapPrompt = (p) => finalPrompt(people, ch, p.prompt, idsFor(people, snapText(p), [HIM, ME]));
+  // 只帶真的入鏡的人：畫面只有他卻連妳的照片一起送，他的頭髮會被染成妳的髮色（10/14 企鵝館那張）。
+  // 舊的快照沒有 in，照描述裡有沒有提到名字判斷；都沒提到就當他入鏡
+  function snapWho(p) {
+    if (Array.isArray(p.in)) return p.in.map((n) => (n === ch.name ? HIM : n === ch.user ? ME : n)).filter((id) => id === HIM || id === ME || people.cast[id]);
+    const ids = [p.desc.includes(ch.user) || /她|妳|你/.test(p.desc) ? ME : null, p.desc.includes(ch.name) || /他/.test(p.desc) ? HIM : null].filter(Boolean);
+    return ids.length ? ids : [HIM];
+  }
+  const snapRefs = (p) => refsFor(people, ch, p.desc || '', snapWho(p));
+  const snapPrompt = (p) => finalPrompt(people, ch, p.prompt, idsFor(people, p.desc || '', snapWho(p)));
 
   async function lookAuto() {
     busy = true; renderPerson();
