@@ -2,7 +2,8 @@
 // 「證件照」分頁放他、妳、配角的參考照片和長相，每張快照都帶著，同一個人才不會每張長得不一樣。
 
 import * as store from './store.js';
-import { currentChar, generate, imagine, recentChat, imageInfo, imageModelPref } from './st.js';
+import { currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref } from './st.js';
+import { imagineAndPick } from './pick.js';
 import { HIM, ME, loadCast, saveCast, person, setPerson, sideNames, refsFor, idsFor, finalPrompt, ensureAutoStyle, splitLook } from './cast.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -130,6 +131,9 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <label>生圖模型</label>
         <div class="bp-al-seg">${[['flash', 'Flash・快'], ['pro', 'Pro・細']].map(([v, n]) => `<b data-al="imgmodel" data-v="${v}" class="${imageModelPref.get() === v ? 'on' : ''}">${n}</b>`).join('')}</div>
         <p class="bp-al-hint">Flash 一張十幾秒；Pro 二十秒上下，光影和細節比較細，費用也比較高。選的那個叫不到時，會自動換另一個。</p>
+        <label>一次生幾張</label>
+        <div class="bp-al-seg three">${[1, 2, 4].map((v) => `<b data-al="imgcount" data-v="${v}" class="${imageCountPref.get() === v ? 'on' : ''}">${v} 張</b>`).join('')}</div>
+        <p class="bp-al-hint">生好排成格子讓妳挑最像的那張，沒選的會自動刪掉。張數越多越好挑，費用也是幾倍。</p>
         <label>AI Studio 金鑰（酒館那邊叫不到 Gemini 生圖時，手機直接用這把；跟電話的聲音共用）</label>
         <input class="bp-al-gkey" type="password" autocomplete="off" placeholder="${(() => { try { return localStorage.getItem('brume-phone:gemini-key') ? '已經貼好了（重貼會換掉）' : '貼上 AI Studio 金鑰'; } catch { return '貼上 AI Studio 金鑰'; } })()}">
       </div></div>`;
@@ -179,7 +183,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), ...(inFrame ? { in: inFrame } : {}), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
       if (p.prompt) await ensureAutoStyle(people, who.charKey);
       // 快照用橫的 4:3，像真的相機拍的（跟 GPT 對照時比正方形自然）
-      p.img = p.prompt ? await imagine(snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' }) : '';
+      p.img = p.prompt ? await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' }) : '';
       note = drawnNote(p.img) || (p.img ? '' : '沒有出圖：要聊天接 Google，或在證件照頁貼 AI Studio 金鑰。也可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。');
       if (who.key === ch?.key) { items.push(p); save(); }
       picked = new Set(); openId = p.id; view = 'one';
@@ -228,6 +232,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (a === 'ids') { view = 'grid'; tab = 'id'; editing = null; render(); }
     if (a === 'lookauto') lookAuto();
     if (a === 'preset') { people.look.preset = e.target.closest('[data-v]').dataset.v; saveCast(ch.charKey, people); say(people.look.preset === 'candid' ? '之後拍成生活感' : '之後拍成精修'); renderIds(); return; }
+    if (a === 'imgcount') { imageCountPref.set(e.target.closest('[data-v]').dataset.v); say(`之後一次生 ${imageCountPref.get()} 張`); renderIds(); return; }
     if (a === 'imgmodel') { imageModelPref.set(e.target.closest('[data-v]').dataset.v); say(imageModelPref.get() === 'pro' ? '之後用 Pro 生圖' : '之後用 Flash 生圖'); renderIds(); return; }
     if (a === 'idpic') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'idpic'; f.click(); }
     if (a === 'idok' && editing) {
@@ -247,7 +252,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if ((a === 'gen' || a === 'regen') && p) {
       note = '生圖中⋯'; renderOne();
       await ensureAutoStyle(people, ch.charKey);
-      const url = await imagine(snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' });
+      const url = await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' });
       if (url) { p.img = url; save(); }
       note = drawnNote(url) || (url ? '' : '沒有出圖：要聊天接 Google，或在證件照頁貼 AI Studio 金鑰。');
       if (mine()) renderOne();

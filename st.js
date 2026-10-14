@@ -134,6 +134,21 @@ export const imageModelPref = {
   get() { try { return localStorage.getItem(PREF) === 'pro' ? 'pro' : 'flash'; } catch { return 'flash'; } },
   set(v) { try { localStorage.setItem(PREF, v === 'pro' ? 'pro' : 'flash'); } catch { /* 存不了就照預設 */ } },
 };
+// 一次生幾張讓玩家挑（1、2、4），每台裝置各自記
+const COUNT = 'brume-phone:imgcount';
+export const imageCountPref = {
+  get() { try { const n = +localStorage.getItem(COUNT); return [2, 4].includes(n) ? n : 1; } catch { return 1; } },
+  set(n) { try { localStorage.setItem(COUNT, String([2, 4].includes(+n) ? +n : 1)); } catch { /* 存不了就照預設 */ } },
+};
+
+/** 刪掉存在酒館伺服器上、沒用到的圖（挑圖時沒選中的） */
+export async function dropImage(url) {
+  try {
+    const c = ctx();
+    await fetch('/api/images/delete', { method: 'POST', headers: c.getRequestHeaders(), body: JSON.stringify({ path: String(url).replace(/^\//, '') }) });
+  } catch { /* 刪不掉就留著 */ }
+}
+
 const byPref = (list) => (imageModelPref.get() === 'pro' ? [...list].sort((a, b) => /pro/.test(b) - /pro/.test(a)) : list);
 
 // 第二條路：玩家貼在手機裡的 AI Studio 金鑰（跟電話的 Gemini 聲音共用同一把）。

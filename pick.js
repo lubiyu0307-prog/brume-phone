@@ -1,0 +1,44 @@
+// 一次生好幾張讓玩家挑：Gemini 不是每張都歪，是有時準有時歪，多給幾張挑最像的。
+// 兩張兩張一起叫（同時叫太多張會被 Google 擋速度）；先出來的先顯示，玩家可以不等全部生完就挑。
+// 沒選中的圖從酒館伺服器刪掉，不然每次都留三張用不到的
+
+import { imagine, imageInfo, imageCountPref, dropImage } from './st.js';
+
+export async function imagineAndPick(screen, prompt, opts = {}) {
+  const n = imageCountPref.get();
+  if (n <= 1) return imagine(prompt, opts);
+  const ar = { '4:3': '4 / 3', '9:16': '9 / 16' }[opts.aspect] || '1 / 1';
+  const box = document.createElement('div');
+  box.className = 'bp-pick';
+  box.innerHTML = `<div class="bp-pick-in"><b>挑一張</b><small>生圖中⋯ 0/${n}</small>
+    <div class="bp-pick-grid" style="--ar:${ar}">${'<i></i>'.repeat(n)}</div>
+    <button data-pk="none">都不要</button></div>`;
+  screen.appendChild(box);
+  const cells = [...box.querySelectorAll('.bp-pick-grid i')];
+  const note = box.querySelector('small');
+  const urls = []; let done = 0; let chosen = null; let finish;
+  const result = new Promise((r) => { finish = r; });
+  const settle = (url) => {
+    if (chosen !== null) return;
+    chosen = url; box.remove();
+    for (const u of urls) if (u !== url) dropImage(u);
+    finish(url);
+  };
+  box.addEventListener('click', (e) => {
+    const cell = e.target.closest('[data-i]');
+    if (cell) { settle(urls[+cell.dataset.i]); return; }
+    if (e.target.closest('[data-pk="none"]')) { imageInfo.why = '這次都沒選'; settle(''); }
+  });
+  const one = async () => {
+    const u = await imagine(prompt, opts);
+    done++;
+    if (u && chosen !== null) { dropImage(u); return; } // 已經挑好了，晚到的直接刪
+    if (u) { const i = urls.push(u) - 1; cells[i].innerHTML = `<img src="${u}" alt="">`; cells[i].dataset.i = i; }
+    note.textContent = done < n ? `生圖中⋯ ${done}/${n}${urls.length ? '（可以先挑）' : ''}` : urls.length ? '點一張用它' : `沒有出圖：${imageInfo.why || '這次失敗了'}`;
+  };
+  (async () => {
+    for (let k = 0; k < n; k += 2) await Promise.all([one(), k + 1 < n ? one() : null]);
+    if (!urls.length) setTimeout(() => settle(''), 2500); // 一張都沒有：讓玩家看一下原因再關
+  })();
+  return result;
+}

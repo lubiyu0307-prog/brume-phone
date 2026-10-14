@@ -5,6 +5,7 @@
 
 import * as store from './store.js';
 import { currentChar, generate, imagine, canSeeImages, imageInfo, canDraw } from './st.js';
+import { imagineAndPick } from './pick.js';
 import { HIM, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
 
 // 自動生圖：打開的話，他新發的貼文用 Gemini 畫成真的照片（一張要等一下）
@@ -214,9 +215,11 @@ export function createIG({ screen, say }) {
     return { prompt: finalPrompt(people, who, `${p.desc}, instagram photo, natural light`, ids, { by }), refs: refsFor(people, who, p.desc, always) };
   }
   // 限動是直的（9:16），貼文是方的
-  const draw = async (p, who, aspect = '1:1') => {
+  // pick：玩家自己按的才讓她挑（一次生幾張照證件照頁的設定）；自動生圖在背景跑，只生一張
+  const draw = async (p, who, aspect = '1:1', pick = false) => {
     await ensureAutoStyle(people, who.charKey); const { prompt, refs } = photoPrompt(p, who);
-    const url = await imagine(prompt.replace('instagram photo', aspect === '9:16' ? 'vertical instagram story photo' : 'instagram photo'), { refs, aspect });
+    const full = prompt.replace('instagram photo', aspect === '9:16' ? 'vertical instagram story photo' : 'instagram photo');
+    const url = pick ? await imagineAndPick(screen, full, { refs, aspect }) : await imagine(full, { refs, aspect });
     if (!url && imageInfo.why) say(`沒有出圖：${imageInfo.why}`);
     return url;
   };
@@ -307,7 +310,7 @@ export function createIG({ screen, say }) {
     if (st) { const list = d.stories.filter((s) => s.author.handle === st.dataset.story && Date.now() - s.ts < 864e5); story = { list, i: 0 }; showStory(); return; }
     if (e.target.closest('[data-ig="sgen"]')) {
       const s = story.list[story.i]; const btn = e.target.closest('button'); btn.disabled = true; btn.textContent = '生圖中⋯';
-      const url = await draw(s, ch, '9:16');
+      const url = await draw(s, ch, '9:16', true);
       if (url) { s.img = url; save(); } else say('沒有出圖：可能被擋了，或酒館還沒接生圖');
       if (screen.querySelector('.bp-ig-storyv') && story.list[story.i] === s) showStory();
       return;
@@ -352,7 +355,7 @@ export function createIG({ screen, say }) {
     }
     if (a === 'gen') {
       const p = find(openId); const btn = screen.querySelector('.bp-ig-gen'); if (btn) btn.textContent = '生圖中⋯';
-      const url = await draw(p, ch);
+      const url = await draw(p, ch, '1:1', true);
       if (url) { p.img = url; save(); } else say('沒有出圖：酒館可能還沒接生圖');
       if (mine() && view === 'post') renderPost();
     }

@@ -1179,3 +1179,15 @@
 .bp-al-seg { display: grid; grid-template-columns: 1fr 1fr; margin: 6px 16px 4px; background: rgba(0, 0, 0, .06); border-radius: 10px; padding: 3px; }
 .bp-al-seg b { text-align: center; font-size: 13px; font-weight: 500; padding: 7px 0; border-radius: 8px; cursor: pointer; }
 .bp-al-seg b.on { background: #fff; font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
+/* 一次生好幾張讓玩家挑 */
+.bp-pick { position: absolute; inset: 0; z-index: 30; background: rgba(0, 0, 0, .86); display: flex; align-items: center; justify-content: center; padding: 16px; color: #fff; }
+.bp-pick-in { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 8px; max-height: 100%; overflow-y: auto; }
+.bp-pick-in b { font-size: 16px; }
+.bp-pick-in small { font-size: 12px; color: rgba(255, 255, 255, .7); }
+.bp-pick-grid { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.bp-pick-grid i { aspect-ratio: var(--ar, 1 / 1); border-radius: 8px; background: rgba(255, 255, 255, .08); overflow: hidden; cursor: pointer; }
+.bp-pick-grid i:not([data-i]) { animation: bp-pick-wait 1.4s ease-in-out infinite; cursor: default; }
+.bp-pick-grid img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bp-pick-in button { margin-top: 4px; padding: 8px 18px; border: 1px solid rgba(255, 255, 255, .4); border-radius: 18px; background: none; color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
+@keyframes bp-pick-wait { 50% { background: rgba(255, 255, 255, .16); } }
+.bp-al-seg.three { grid-template-columns: repeat(3, 1fr); }
