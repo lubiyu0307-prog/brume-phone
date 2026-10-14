@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.12.1';
+const VERSION = '0.13.0';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -471,7 +471,7 @@ function build() {
     document.getElementById('bp-launcher')?.setAttribute('data-n', list.length ? String(Math.min(list.length, 99)) : '');
     const hhmm = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
     overlay.querySelector('.bp-notifs').innerHTML = list.slice(-3).reverse().map((m) => `<div class="bp-notif" data-act="notif">
-      <i>${ICON.line}</i><div><b>${m.who}</b><span>${String(m.text || (m.sticker ? '傳了貼圖' : '')).replace(/</g, '&lt;')}</span></div><small>${hhmm(m.ts)}</small></div>`).join('')
+      <i>${ICON.line}</i><div><b>${m.who}</b><span>${String(m.text || (m.sticker ? '傳了貼圖' : m.gift ? '送妳一份禮物 🎁' : m.loc ? `傳了位置：${m.loc.place}` : m.img ? '傳了照片' : '')).replace(/</g, '&lt;')}</span></div><small>${hhmm(m.ts)}</small></div>`).join('')
       + (list.length > 3 ? `<div class="bp-notif-more">還有 ${list.length - 3} 則</div>` : '');
   }
   const life = createLife({

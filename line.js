@@ -34,6 +34,9 @@ const IC = {
   send: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3.4 20.4 21 12 3.4 3.6l.1 6.5L15 12l-11.5 1.9z"/></svg>',
   photo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="15" rx="3"/><circle cx="9" cy="10.5" r="1.8"/><path d="m21 16-5-5-8 9"/></svg>',
   save: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M6 3.5h12v17l-6-4-6 4z"/></svg>',
+  undo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg>',
+  pin: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 10v4h3l6 4V6L7 10z"/><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
+  down: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
   alarm: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="12" cy="13" r="7.5"/><path d="M12 9v4l2.5 2M4.5 5 7 3M19.5 5 17 3"/></svg>',
 };
 
@@ -92,7 +95,15 @@ function herPositions(msgs) {
 // 舊紀錄兩個都沒有，照原本的現實時間顯示。現實聊天預設不給劇情看，t.nowSync 打開才給。
 const storySees = (m, t) => !m.now || !!t.nowSync;
 
+// 禮物看品項猜一個圖示
+const GIFT_EMOJI = [[/咖啡|拿鐵|美式|卡布/, '☕'], [/奶茶|珍珠|茶/, '🧋'], [/蛋糕|甜點|布丁|塔/, '🍰'], [/花/, '💐'], [/電影/, '🎬'], [/冰淇淋|霜淇淋/, '🍦'], [/巧克力/, '🍫'], [/餅乾/, '🍪'], [/書/, '📚'], [/便當|宵夜|晚餐|午餐|拉麵|火鍋|飯/, '🍱'], [/酒/, '🍷'], [/戒指|項鍊|手鍊|耳環/, '💍'], [/香水/, '🌸'], [/票/, '🎫']];
+export const giftEmoji = (item) => (GIFT_EMOJI.find(([re]) => re.test(item)) || [0, '🎁'])[1];
+export const GIFT_PRESETS = ['一杯熱拿鐵', '一杯珍珠奶茶', '一塊草莓蛋糕', '一束花', '電影票兩張', '一份宵夜', '一盒巧克力'];
+
 function msgText(m) {
+  if (m.unsent) return m.peek ? `（收回了一則訊息；收回前你已經看到了：「${m.was}」）` : '（收回了一則訊息）';
+  if (m.gift) return `［送了禮物：${m.gift.item}${m.gift.note ? `，附一句「${m.gift.note}」` : ''}${m.me ? '' : m.gift.opened ? '（她拆開了）' : '（她還沒拆）'}］`;
+  if (m.loc) return `［傳了位置：${m.loc.place}${m.loc.note ? `「${m.loc.note}」` : ''}］`;
   if (m.sticker) return `［貼圖：${m.sticker.tag}］`;
   if (m.alarm) return `［鬧鐘卡 ${m.alarm.time}「${m.alarm.label}」］`;
   if (m.moment) return `（動態：${m.moment}）`;
@@ -146,6 +157,7 @@ function buildPrompt(ch, msgs, x = {}) {
     x.sleep ? `\n【陪睡模式】${ch.user} 躺在床上準備睡了，要你陪她入睡。講話輕、短、慢，像在耳邊說；不問問題、不開新話題、不要讓她更清醒。她說晚安就溫柔收尾。` : '',
     x.memory?.length ? `\n${ch.name} 記得的事：\n${x.memory.map((m) => '- ' + m.text).join('\n')}` : '',
     x.notes?.length ? `\n她冰箱上的便條（你貼過的也在裡面）：\n${x.notes.map((n) => `- ${n.text}${n.date ? `（${n.date}）` : ''}${n.done ? '（已完成）' : ''}`).join('\n')}` : '',
+    x.pin ? `\n聊天室公告（釘在最上面的）：${x.pin}` : '',
     x.cal?.length ? `\n你們共用的行事曆（之後的）：\n${x.cal.map((e) => `- ${e.date} ${e.title}`).join('\n')}` : '',
     '',
     `最近的 LINE 對話（舊→新；${ch.user} 名字後面的［數字］是她那則訊息的位置，0 是最新的）：`,
@@ -174,6 +186,8 @@ function buildPrompt(ch, msgs, x = {}) {
     '- 她明確請你設鬧鐘或提醒時（例如「明天六點叫我」），先答應，再在最後獨立一行寫 [[ALARM|HH:MM|鬧鐘名稱]]，24 小時制，名稱是你留給她的一句話，10 字內、不用 emoji。她沒要求就不要寫',
     x.notesOn ? '- 在她冰箱上貼便條：最後獨立一行寫 [[NOTE|內容]] 或 [[NOTE|內容|YYYY-MM-DD]]，20 字內。她提到身體、作息、天氣、要吃的藥或補品、要帶的東西，你放不下心就貼一張，貼了在訊息裡順口提一下' : '',
     '- 記上你們共用的行事曆：最後獨立一行寫 [[CAL|YYYY-MM-DD|標題]]，標題 12 字內。約好的事、紀念日、回診檢查、兩人之間的「第一次」都記；行事曆上已經有的不要再記',
+    '- 想送她小禮物（她說累了、餓了、心情不好、值得慶祝，或你單純想寵她）：最後獨立一行寫 [[GIFT|品項|附一句話]]，品項像「一杯熱拿鐵」「電影票兩張」，一句話 20 字內。偶爾才送，送了不用在訊息裡再講一次',
+    '- 想讓她知道你在哪（到了、在等她、路過想到她）：最後獨立一行寫 [[LOC|地點名稱|一句話]]，地點照劇情和你們的世界寫。很偶爾才用',
     '- 想讓她知道你正在做什麼（不是對她說話，像「他去洗澡了」那種旁白小字）：寫 [[MOMENT|一句話]]。很偶爾才用',
   ].filter((l) => l !== '').join('\n');
 }
@@ -190,6 +204,9 @@ function parseReply(raw, ch) {
   text = text.replace(/\[\[NOTE\|([^|\]]+)(?:\|(\d{4}-\d{2}-\d{2}))?\]\]/gi, (_, t, d) => { notes.push({ text: t.trim(), ...(d ? { date: d } : {}) }); return ''; });
   text = text.replace(/\[\[CAL\|(\d{4}-\d{2}-\d{2})\|([^\]]+)\]\]/gi, (_, d, t) => { cals.push({ date: d, title: t.trim() }); return ''; });
   text = text.replace(/\[\[MOMENT\|([^\]]+)\]\]/gi, (_, t) => { moments.push(t.trim()); return ''; });
+  const gifts = []; const locs = [];
+  text = text.replace(/\[\[GIFT\|([^|\]]+)(?:\|([^\]]*))?\]\]/gi, (_, it, n) => { gifts.push({ item: it.trim().slice(0, 24), ...(n?.trim() ? { note: n.trim().slice(0, 40) } : {}) }); return ''; });
+  text = text.replace(/\[\[LOC\|([^|\]]+)(?:\|([^\]]*))?\]\]/gi, (_, pl, n) => { locs.push({ place: pl.trim().slice(0, 40), ...(n?.trim() ? { note: n.trim().slice(0, 40) } : {}) }); return ''; });
   const pics = [];
   text = text.replace(/\[\[PIC\|([^\]]+)\]\]/gi, (_, t) => { pics.push(t.trim().slice(0, 60)); return ''; });
   text = text.replace(/\[\[[^\]]*\]\]/g, '');
@@ -199,7 +216,7 @@ function parseReply(raw, ch) {
     .map((l) => l.trim().replace(namePrefix, '').replace(/^[「『"]+|[」』"]+$/g, '').trim())
     .filter((l) => l && !/^[-*_]{3,}$/.test(l))
     .slice(0, 6);
-  return { lines, quote, react, alarm, sticker, notes, cals, moments, time, pics };
+  return { lines, quote, react, alarm, sticker, notes, cals, moments, time, pics, gifts, locs };
 }
 
 export function createLine({ screen, say, onUnread, onData }) {
@@ -251,7 +268,7 @@ export function createLine({ screen, say, onUnread, onData }) {
   function renderList() {
     const last = [...thread.msgs].reverse().find((m) => !m.err);
     const n = unreadCount();
-    const lastText = !last ? '' : last.sticker ? (last.me ? '妳傳送了貼圖' : `${ch.name}傳送了貼圖`) : last.alarm ? '鬧鐘' : (last.moment || last.notice) ? (last.moment || last.notice) : last.img && !last.text ? (last.me ? '妳傳送了照片' : `${ch.name}傳送了照片`) : last.text;
+    const lastText = !last ? '' : last.unsent ? `${last.me ? '妳' : ch.name}已收回訊息` : last.gift ? (last.me ? '妳送了一份禮物' : `${ch.name}送妳一份禮物`) : last.loc ? `${last.me ? '妳' : ch.name}傳送了位置` : last.sticker ? (last.me ? '妳傳送了貼圖' : `${ch.name}傳送了貼圖`) : last.alarm ? '鬧鐘' : (last.moment || last.notice) ? (last.moment || last.notice) : last.img && !last.text ? (last.me ? '妳傳送了照片' : `${ch.name}傳送了照片`) : last.text;
     screen.innerHTML = `<div class="bp-line bp-line-listv">
       <div class="bp-line-lhead"><span class="bp-back" data-line="home">‹</span><b>聊天</b>
         <span class="bp-line-tools"><i>${IC.search}</i></span></div>
@@ -279,7 +296,13 @@ export function createLine({ screen, say, onUnread, onData }) {
 
   function bubble(m) {
     const react = m.me ? m.hisReact : m.myReact;
-    const body = m.sticker
+    const body = m.gift
+      ? `<div class="bp-line-gift${m.gift.opened || m.me ? ' bp-open' : ''}" data-gift="${m.id}">${m.gift.opened || m.me
+        ? `<i>${giftEmoji(m.gift.item)}</i><b>${esc(m.gift.item)}</b>${m.gift.note ? `<span>${esc(m.gift.note)}</span>` : ''}${m.me ? `<small>${m.gift.opened ? '他收下了' : '送出了'}</small>` : ''}`
+        : `<i>🎁</i><b>${m.me ? '妳送了一份禮物' : '送妳一份禮物'}</b><span>${m.me ? '等他拆開' : '點一下拆開'}</span>`}</div>`
+      : m.loc
+      ? `<div class="bp-line-loc"><div class="bp-line-map"><i>📍</i></div><b>${esc(m.loc.place)}</b>${m.loc.note ? `<span>${esc(m.loc.note)}</span>` : ''}</div>`
+      : m.sticker
       ? `<img class="bp-line-sticker" src="${m.sticker.img}" alt="${esc(m.sticker.tag)}">`
       : m.alarm
       ? `<div class="bp-line-alarm" data-alarm="${m.id}"><i>${IC.alarm}</i><div><b>${esc(m.alarm.time)}</b><span>${esc(m.alarm.label)}</span><small>點一下設定鬧鐘</small></div></div>`
@@ -300,7 +323,10 @@ export function createLine({ screen, say, onUnread, onData }) {
       const when = m.story ? (m.st || '') : hm(m.ts);
       const prev = prevHim; const prevMine = prevMe;
       prevHim = !m.me && !m.err; prevMe = !!m.me;
-      if (m.moment || m.notice) {
+      if (m.unsent) {
+        out += `<div class="bp-line-sys bp-unsent">${m.me ? '妳' : esc(ch.name)}已收回訊息</div>`;
+        prevHim = false; prevMe = false;
+      } else if (m.moment || m.notice) {
         out += `<div class="bp-line-moment${m.notice ? ' bp-notice' : ''}"${m.goto ? ` data-goto="${m.goto}"` : ''}><span>${esc(m.moment || m.notice)}</span></div>`;
         prevHim = false; prevMe = false;
       } else if (m.me) {
@@ -323,12 +349,14 @@ export function createLine({ screen, say, onUnread, onData }) {
         <span class="bp-line-tools"><i data-line="search">${IC.search}</i><i data-line="more">${IC.more}</i></span></div>
       ${thread.sleep ? '<div class="bp-line-sleepbar" data-line="sleep">🌙 陪睡模式中・點這裡結束</div>' : ''}
       <div class="bp-line-modebar${thread.mode === 'now' ? ' bp-now' : ''}" data-line="mode">${thread.mode === 'now' ? '現實時間・他知道現在幾點　<u>換回劇情</u>' : '劇情時間・跟著正文走　<u>換成現實</u>'}</div>
+      <div class="bp-line-pinbar"></div>
       <div class="bp-line-body"${bg && !thread.sleep ? ` style="background-image:url('${bg}')"` : ''}>
         <div class="bp-line-log">${bubbles()}</div>
+        <i class="bp-line-down" data-line="down" hidden>${IC.down}</i>
       </div>
       <div class="bp-line-quoting" hidden></div>
       <form class="bp-line-bar">
-        <i class="bp-line-plus" data-line="photo">${IC.plus}</i>
+        <i class="bp-line-plus" data-line="plus">${IC.plus}</i>
         <i class="bp-line-plus bp-hide-typing" data-line="photo">${IC.camera}</i>
         <i class="bp-line-plus bp-hide-typing" data-line="photo">${IC.photo}</i>
         <span class="bp-line-field"><input class="bp-line-input" placeholder="Aa" enterkeyhint="send" autocomplete="off"><i data-line="stickers">${IC.smile}</i></span>
@@ -339,7 +367,21 @@ export function createLine({ screen, say, onUnread, onData }) {
     showQuoting();
     stickerOpen = false;
     showMilestone();
+    pinBar();
     const log = screen.querySelector('.bp-line-log'); log.scrollTop = log.scrollHeight;
+    // 往上翻舊訊息時，右下角出現往下的箭頭
+    const down = screen.querySelector('.bp-line-down');
+    log.addEventListener('scroll', () => { down.hidden = log.scrollHeight - log.scrollTop - log.clientHeight < 300; }, { passive: true });
+  }
+
+  // 公告：釘在聊天室最上面的一則
+  function pinBar() {
+    const bar = screen.querySelector('.bp-line-pinbar');
+    if (!bar) return;
+    const m = thread.pin && find(thread.pin);
+    if (thread.pin && (!m || m.unsent)) delete thread.pin;
+    bar.hidden = !m || m.unsent;
+    bar.innerHTML = m && !m.unsent ? `<i>${IC.pin}</i><span data-jump="${m.id}">${esc(msgText(m)).slice(0, 80)}</span><u data-line="unpin">✕</u>` : '';
   }
 
   function refreshLog() {
@@ -385,6 +427,8 @@ export function createLine({ screen, say, onUnread, onData }) {
         ${m.text ? btn('edit', 'edit', '編輯') : ''}
         ${canRegen ? btn('regen', 'regen', '重新生成') : ''}
         ${m.me && m.text ? btn('resend', 'resend', '改了再傳') : ''}
+        ${m.me ? btn('unsend', 'undo', '收回') : ''}
+        ${m.text || m.gift || m.loc ? btn('pin', 'pin', thread.pin === id ? '取消公告' : '設為公告') : ''}
         ${m.text && stage.unlocked(curStage, 'cards') ? btn('keep', 'save', '收藏') : ''}
         ${btn('del', 'del', '刪除')}
       </div>`, 'bp-sheet-mode');
@@ -607,16 +651,17 @@ export function createLine({ screen, say, onUnread, onData }) {
       const today = data.today();
       const [notes, cal, memory, stks] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key), data.stickers.all()]);
       const cur = await stage.get(who.key);
-      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => x.tag))], photos: roundPhotos.length, photosSeen: !!image };
+      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => x.tag))], photos: roundPhotos.length, photosSeen: !!image, pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
       out = parseReply(await generate(buildPrompt(who, t.msgs, extra), image), who);
       out.stickerObj = out.sticker ? stks.find((x) => x.tag === out.sticker) : null;
-      if (!out.lines.length && !out.stickerObj && !out.alarm && !out.moments.length) throw new Error('他沒有回出字來');
+      if (!out.lines.length && !out.stickerObj && !out.alarm && !out.moments.length && !out.gifts.length && !out.locs.length) throw new Error('他沒有回出字來');
     } catch (e) {
       busy = false;
       t.msgs.push({ id: uid(), me: false, err: true, text: `沒有回覆（${e.message || e}）`, ts: Date.now() });
       saveThread(who.key, t); if (view === 'room') refreshLog();
       return;
     }
+    for (let i = t.msgs.length - 1; i >= 0 && t.msgs[i].me; i--) if (t.msgs[i].gift) t.msgs[i].gift.opened = true; // 他回了就是收下了
     out.pics.forEach((d, i) => { if (roundPhotos[i]) roundPhotos[i].seen = d; }); // 他看過的照片記一句，之後提到才接得上
     const flag = t.mode === 'now' ? { now: true } : { story: true, ...(out.time ? { st: out.time } : {}) };
     const pos = herPositions(t.msgs);
@@ -635,11 +680,13 @@ export function createLine({ screen, say, onUnread, onData }) {
     const extras = [];
     if (out.stickerObj) extras.push({ sticker: { tag: out.stickerObj.tag, img: out.stickerObj.img } });
     if (out.alarm) extras.push({ alarm: out.alarm });
+    for (const g of out.gifts.slice(0, 1)) extras.push({ gift: g });
+    for (const l of out.locs.slice(0, 1)) extras.push({ loc: l });
     for (const mo of out.moments) extras.push({ moment: mo });
     for (const n of out.notes) { await data.notes.add(who.key, { ...n, by: 'him' }); extras.push({ notice: `📌 ${who.name}在便條上寫了：${n.text}`, goto: 'notes' }); }
     for (const c of out.cals) { await data.cal.add(who.key, { ...c, by: 'him' }); extras.push({ notice: `📅 ${who.name}記上行事曆：${c.date.slice(5).replace('-', '/')} ${c.title}`, goto: 'calendar' }); }
     for (const x of extras) {
-      if (x.sticker || x.alarm) { busy = 'typing'; if (view === 'room') refreshLog(); await sleep(700); }
+      if (x.sticker || x.alarm || x.gift || x.loc) { busy = 'typing'; if (view === 'room') refreshLog(); await sleep(700); }
       t.msgs.push({ id: uid(), me: false, text: '', ts: Date.now(), ...flag, ...x });
       saveThread(who.key, t);
       if (view === 'room') refreshLog();
@@ -701,6 +748,16 @@ export function createLine({ screen, say, onUnread, onData }) {
         thread.msgs = thread.msgs.filter((x) => !drop.has(x.id) && !x.err);
         save(); refreshLog(); reply();
       }
+      if (a === 'unsend') {
+        // 他已讀過的，他其實看到了；收回之後他只知道收回了什麼樣的東西
+        m.was = (m.text || (m.img ? '一張照片' : m.sticker ? '一張貼圖' : m.gift ? `禮物（${m.gift.item}）` : m.loc ? `位置（${m.loc.place}）` : '')).slice(0, 60);
+        m.peek = (thread.readTs || 0) >= m.ts;
+        m.unsent = true;
+        for (const k of ['text', 'img', 'sticker', 'links', 'gift', 'loc', 'quote', 'alarm', 'seen']) delete m[k];
+        if (thread.pin === id) delete thread.pin;
+        save(); unpop(); refreshLog(); pinBar(); syncMain();
+      }
+      if (a === 'pin') { if (thread.pin === id) delete thread.pin; else thread.pin = id; save(); unpop(); pinBar(); say(thread.pin ? '設為公告了' : '公告拿掉了'); }
       if (a === 'del') { thread.msgs = thread.msgs.filter((x) => x.id !== id); save(); unpop(); refreshLog(); }
       if (a === 'keep') askSheet('收藏成字卡', m.text, 'dokeep', id, '可以刪到只剩想留下的那一段。', 4);
       return;
@@ -715,6 +772,12 @@ export function createLine({ screen, say, onUnread, onData }) {
     if (memDel) { await data.memory.remove(ch.key, memDel.dataset.memdel); syncMain(); renderMemory(); return; }
     const cardDel = e.target.closest('[data-carddel]');
     if (cardDel) { await data.cards.remove(ch.key, cardDel.dataset.carddel); renderCards(); return; }
+    const gift = e.target.closest('[data-gift]');
+    if (gift) {
+      const m = find(gift.dataset.gift);
+      if (m && !m.me && !m.gift.opened) { m.gift.opened = true; save(); refreshLog(); say(`拆開了：${m.gift.item}`); }
+      return;
+    }
     const alarm = e.target.closest('[data-alarm]');
     if (alarm) {
       const m = find(alarm.dataset.alarm);
@@ -733,6 +796,39 @@ export function createLine({ screen, say, onUnread, onData }) {
     if (a === 'list') { view = 'list'; quoting = null; render(); }
     if (a === 'retry') { thread.msgs = thread.msgs.filter((m) => !m.err); save(); refreshLog(); reply(); }
     if (a === 'unquote') { quoting = null; showQuoting(); }
+    if (a === 'unpin') { delete thread.pin; save(); pinBar(); }
+    if (a === 'down') { const log = screen.querySelector('.bp-line-log'); log.scrollTo({ top: log.scrollHeight, behavior: 'smooth' }); }
+    if (a === 'plus') {
+      pop(`<div class="bp-line-list">
+        <button data-line="photo">📷　傳照片</button>
+        <button data-line="giftpick">🎁　送禮物</button>
+        <button data-line="locpick">📍　傳位置</button>
+        <button data-line="unpop" class="muted">取消</button></div>`, 'bp-sheet-mode');
+    }
+    if (a === 'giftpick') {
+      const card = pop(`<div class="bp-line-edit"><b>送他一份禮物</b>
+        <div class="bp-line-giftgrid">${GIFT_PRESETS.map((g) => `<span data-line="giftitem" data-item="${esc(g)}">${giftEmoji(g)}<small>${esc(g)}</small></span>`).join('')}</div>
+        <input class="bp-line-giftitem" placeholder="或自己寫：一杯熱可可">
+        <textarea rows="2" placeholder="附一句話（可以不寫）"></textarea>
+        <div class="bp-line-edit-btns"><button data-line="unpop">取消</button><button class="ok" data-line="dogift">送出</button></div></div>`, 'bp-center-mode');
+      card.querySelector('.bp-line-giftitem').focus();
+    }
+    if (a === 'giftitem') {
+      screen.querySelectorAll('.bp-line-giftgrid span').forEach((x) => x.classList.toggle('on', x === e.target.closest('[data-item]')));
+      screen.querySelector('.bp-line-giftitem').value = e.target.closest('[data-item]').dataset.item;
+    }
+    if (a === 'dogift') {
+      const item = screen.querySelector('.bp-line-giftitem').value.trim().slice(0, 24);
+      const note = screen.querySelector('.bp-line-edit textarea').value.trim().slice(0, 40);
+      if (!item) { say('選一個禮物，或自己寫一個'); return; }
+      unpop(); send({ text: '', gift: { item, ...(note ? { note } : {}) } });
+    }
+    if (a === 'locpick') askSheet('傳位置給他', '', 'doloc', '', '寫地點名稱，例如：公司樓下的全家', 2);
+    if (a === 'doloc') {
+      const place = screen.querySelector('.bp-line-edit textarea').value.trim().slice(0, 40);
+      if (!place) return;
+      unpop(); send({ text: '', loc: { place } });
+    }
     if (a === 'unpop') unpop();
     if (a === 'stickers') toggleStickers();
     if (a === 'sync') {
@@ -786,7 +882,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     }
     if (a === 'more') moreMenu();
     if (a === 'search') searchPanel();
-    if (a === 'photo') { screen.querySelector('.bp-line-file').dataset.for = 'msg'; screen.querySelector('.bp-line-file').click(); }
+    if (a === 'photo') { unpop(); screen.querySelector('.bp-line-file').dataset.for = 'msg'; screen.querySelector('.bp-line-file').click(); }
     if (a === 'bg') { unpop(); screen.querySelector('.bp-line-file').dataset.for = 'bg'; screen.querySelector('.bp-line-file').click(); }
     if (a === 'bgreset') { bg = null; await store.del('linebg:' + ch.key).catch(() => {}); unpop(); renderRoom(); }
     if (a === 'clear') {

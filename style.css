@@ -1092,3 +1092,39 @@
 .bp-line-link img { display: block; width: 100%; height: 116px; object-fit: cover; background: #eee; }
 .bp-line-link b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; padding: 8px 11px 2px; font-size: 13.5px; font-weight: 600; line-height: 1.35; }
 .bp-line-link small { display: block; padding: 0 11px 9px; font-size: 11.5px; color: #8a8a8a; }
+
+/* LINE：收回、公告、禮物、位置、跳到最新 */
+.bp-line-sys.bp-unsent { color: rgba(255, 255, 255, .85); font-size: 12px; text-align: center; margin: 8px 0; }
+.bp-line-pinbar { display: flex; align-items: center; gap: 10px; margin: 6px 10px 0; padding: 9px 12px; border-radius: 12px; background: rgba(255, 255, 255, .94); color: #222; font-size: 13.5px; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); position: relative; z-index: 2; }
+.bp-line-pinbar[hidden] { display: none; }
+.bp-line-pinbar i { flex: none; width: 20px; height: 20px; color: #4a6cf7; }
+.bp-line-pinbar i svg { width: 20px; height: 20px; }
+.bp-line-pinbar span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.bp-line-pinbar u { text-decoration: none; color: #999; cursor: pointer; padding: 0 2px; }
+.bp-line-down { position: absolute; right: 12px; bottom: 12px; width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: rgba(40, 40, 40, .72); color: #fff; cursor: pointer; z-index: 3; }
+.bp-line-down[hidden] { display: none; }
+.bp-line-down svg { width: 22px; height: 22px; }
+.bp-line-gift { width: 200px; border-radius: 16px; overflow: hidden; background: #fff; color: #222; text-align: center; padding: 16px 12px 14px; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .04); }
+.bp-line-gift i { display: block; font-style: normal; font-size: 46px; line-height: 1.1; }
+.bp-line-gift b { display: block; margin-top: 6px; font-size: 14.5px; }
+.bp-line-gift span { display: block; margin-top: 3px; font-size: 12.5px; color: #8a8a8a; }
+.bp-line-gift:not(.bp-open) { background: linear-gradient(160deg, #fff6f0, #ffe7da); }
+.bp-line-gift:not(.bp-open) i { animation: bp-giftwiggle 2.4s ease-in-out infinite; }
+.bp-line-gift.bp-open i { animation: bp-giftpop .5s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes bp-giftwiggle { 0%, 80%, 100% { transform: rotate(0); } 85% { transform: rotate(-9deg); } 90% { transform: rotate(8deg); } 95% { transform: rotate(-4deg); } }
+@keyframes bp-giftpop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.bp-line-loc { width: 210px; border-radius: 16px; overflow: hidden; background: #fff; color: #222; }
+.bp-line-map { height: 96px; display: grid; place-items: center; background:
+  linear-gradient(90deg, transparent 46%, #fff 46%, #fff 52%, transparent 52%),
+  linear-gradient(0deg, transparent 40%, #fff 40%, #fff 47%, transparent 47%),
+  linear-gradient(30deg, transparent 70%, #f6e9a6 70%, #f6e9a6 75%, transparent 75%), #e3eadf; }
+.bp-line-map i { font-style: normal; font-size: 30px; transform: translateY(-8px); filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .25)); }
+.bp-line-loc b { display: block; padding: 8px 12px 2px; font-size: 14px; }
+.bp-line-loc span { display: block; padding: 0 12px 10px; font-size: 12.5px; color: #777; }
+.bp-line-loc b:last-child { padding-bottom: 10px; }
+.bp-line-giftgrid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 10px; }
+.bp-line-giftgrid span { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 8px 2px; border-radius: 12px; background: #f4f1ec; font-size: 24px; cursor: pointer; }
+.bp-line-giftgrid span.on { background: #dff0d4; box-shadow: inset 0 0 0 2px #8fb98a; }
+.bp-line-giftgrid small { font-size: 10.5px; color: #555; text-align: center; line-height: 1.2; }
+.bp-line-edit .bp-line-giftitem { width: 100%; height: 40px; margin-bottom: 8px; border: 1px solid rgba(0, 0, 0, .1); border-radius: 12px; padding: 0 12px; background: #fff; color: #33302b; outline: none; }
+.bp-line-gift small { display: block; margin-top: 8px; font-size: 11px; color: #8fb98a; }
