@@ -14,6 +14,8 @@ export async function imagineAndPick(screen, prompt, opts = {}) {
     <div class="bp-pick-grid" style="--ar:${ar}">${'<i></i>'.repeat(n)}</div>
     <button data-pk="none">都不要</button></div>`;
   screen.appendChild(box);
+  // 保險：畫面在生圖途中被重畫（innerHTML 換掉）時，把格子放回去，不然玩家看不到、永遠卡在生圖中
+  const keep = setInterval(() => { if (chosen !== null) clearInterval(keep); else if (!box.isConnected) screen.appendChild(box); }, 400);
   const cells = [...box.querySelectorAll('.bp-pick-grid i')];
   const note = box.querySelector('small');
   const urls = []; let done = 0; let chosen = null; let finish;

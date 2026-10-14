@@ -250,7 +250,8 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     // 複製的是完整的 prompt（帶長相和照片風格），拿去外面生也一樣像
     if (a === 'copy' && p) { try { await navigator.clipboard.writeText(snapPrompt(p)); say('複製了'); } catch { say('這裡不能複製，長按文字自己選'); } }
     if ((a === 'gen' || a === 'regen') && p) {
-      note = '生圖中⋯'; renderOne();
+      // 先等畫面重畫完再叫挑圖：renderOne 是非同步的，晚一步寫 innerHTML 會把挑圖的格子蓋掉（10/14 卡在「生圖中⋯」）
+      note = '生圖中⋯'; await renderOne();
       await ensureAutoStyle(people, ch.charKey);
       const url = await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' });
       if (url) { p.img = url; save(); }
