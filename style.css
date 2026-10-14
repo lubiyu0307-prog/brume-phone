@@ -1191,3 +1191,12 @@
 .bp-pick-in button { margin-top: 4px; padding: 8px 18px; border: 1px solid rgba(255, 255, 255, .4); border-radius: 18px; background: none; color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
 @keyframes bp-pick-wait { 50% { background: rgba(255, 255, 255, .16); } }
 .bp-al-seg.three { grid-template-columns: repeat(3, 1fr); }
+.bp-pick { background: rgba(0, 0, 0, .94); }
+.bp-pick-view { position: absolute; inset: 0; background: #000; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 16px; }
+.bp-pick-view[hidden] { display: none; }
+.bp-pick-view img { width: 100%; max-height: 70%; object-fit: contain; border-radius: 8px; }
+.bp-pick-nav { display: flex; align-items: center; justify-content: center; gap: 24px; font-size: 13px; color: rgba(255, 255, 255, .7); }
+.bp-pick-nav button { width: 40px; height: 40px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, .35); background: none; color: #fff; font-size: 22px; line-height: 1; cursor: pointer; }
+.bp-pick-acts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.bp-pick-acts button { padding: 11px 0; border-radius: 22px; border: 1px solid rgba(255, 255, 255, .4); background: none; color: #fff; font: inherit; font-size: 14px; cursor: pointer; }
+.bp-pick-acts button.ok { background: #fff; color: #000; border-color: #fff; font-weight: 600; }

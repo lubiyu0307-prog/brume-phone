@@ -12,7 +12,9 @@ export async function imagineAndPick(screen, prompt, opts = {}) {
   box.className = 'bp-pick';
   box.innerHTML = `<div class="bp-pick-in"><b>挑一張</b><small>生圖中⋯ 0/${n}</small>
     <div class="bp-pick-grid" style="--ar:${ar}">${'<i></i>'.repeat(n)}</div>
-    <button data-pk="none">都不要</button></div>`;
+    <button data-pk="none">都不要</button></div>
+    <div class="bp-pick-view" hidden><img alt=""><div class="bp-pick-nav"><button data-pk="prev">‹</button><span></span><button data-pk="next">›</button></div>
+    <div class="bp-pick-acts"><button data-pk="back">回去看全部</button><button data-pk="use" class="ok">用這張</button></div></div>`;
   screen.appendChild(box);
   // 保險：畫面在生圖途中被重畫（innerHTML 換掉）時，把格子放回去，不然玩家看不到、永遠卡在生圖中
   const keep = setInterval(() => { if (chosen !== null) clearInterval(keep); else if (!box.isConnected) screen.appendChild(box); }, 400);
@@ -26,10 +28,23 @@ export async function imagineAndPick(screen, prompt, opts = {}) {
     for (const u of urls) if (u !== url) dropImage(u);
     finish(url);
   };
+  // 格子太小看不出差別（10/14 露比說看不清楚）：點一下先放大，喜歡再按「用這張」，左右可以切換
+  const view = box.querySelector('.bp-pick-view'); let at = 0;
+  const show = (i) => {
+    at = (i + urls.length) % urls.length;
+    view.querySelector('img').src = urls[at];
+    view.querySelector('span').textContent = `${at + 1} / ${urls.length}`;
+    view.hidden = false;
+  };
   box.addEventListener('click', (e) => {
     const cell = e.target.closest('[data-i]');
-    if (cell) { settle(urls[+cell.dataset.i]); return; }
-    if (e.target.closest('[data-pk="none"]')) { imageInfo.why = '這次都沒選'; settle(''); }
+    if (cell) { show(+cell.dataset.i); return; }
+    const k = e.target.closest('[data-pk]')?.dataset.pk;
+    if (k === 'none') { imageInfo.why = '這次都沒選'; settle(''); }
+    if (k === 'back') view.hidden = true;
+    if (k === 'prev') show(at - 1);
+    if (k === 'next') show(at + 1);
+    if (k === 'use') settle(urls[at]);
   });
   const one = async () => {
     const u = await imagine(prompt, opts);
