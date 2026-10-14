@@ -2,7 +2,7 @@
 // 回覆走酒館自己的 generateQuietPrompt，所以模型看得到角色卡、世界書與正文。
 
 import * as store from './store.js';
-import { currentChar, generate, ctx, writeLore } from './st.js';
+import { currentChar, generate, ctx, writeLore, canSeeImages } from './st.js';
 import * as data from './data.js';
 import * as stage from './stage.js';
 import { findUrls, readLink, linkForPrompt } from './link.js';
@@ -97,7 +97,7 @@ function msgText(m) {
   if (m.alarm) return `［鬧鐘卡 ${m.alarm.time}「${m.alarm.label}」］`;
   if (m.moment) return `（動態：${m.moment}）`;
   const links = (m.links || []).filter((l) => !l.fail && l.title).map((l) => `［連結：${l.title}］`).join('');
-  return (m.img ? `［照片］${m.text ? ' ' + m.text : ''}` : m.text) + links;
+  return (m.img ? `［照片${m.seen ? `：${m.seen}` : ''}］${m.text ? ' ' + m.text : ''}` : m.text) + links;
 }
 
 // 正文那邊要看的：最近的 LINE 與記憶書（「讓正文知道」打開時才送）
@@ -156,6 +156,9 @@ function buildPrompt(ch, msgs, x = {}) {
       for (let i = shown.length - 1; i >= 0 && shown[i].me; i--) for (const l of shown[i].links || []) fresh.unshift(linkForPrompt(l));
       return fresh.length ? `\n${fresh.join('\n\n')}` : '';
     })(),
+    x.photos ? (x.photosSeen
+      ? `\n她這一輪傳了 ${x.photos} 張照片，附在這則訊息裡${x.photos > 1 ? `（拼成一張：由左到右、由上到下是她傳的順序）` : ''}。你看得到，照片裡的東西照實際看到的回。\n回完之後每張照片各寫一行 [[PIC|照片裡有什麼，一句客觀描述，30 字內]]，照順序寫 ${x.photos} 行，之後你才記得照片內容`
+      : `\n她這一輪傳了 ${x.photos} 張照片，但照片沒有送到你這裡，你看不到。不要假裝看到、不要猜內容，可以老實說照片沒載入、問她拍了什麼`) : '',
     '',
     x.proactive || `請以 ${ch.name} 的身分回 LINE：`,
     '- 只寫他會傳出去的訊息文字，不寫動作、旁白、心理描寫',
@@ -187,6 +190,8 @@ function parseReply(raw, ch) {
   text = text.replace(/\[\[NOTE\|([^|\]]+)(?:\|(\d{4}-\d{2}-\d{2}))?\]\]/gi, (_, t, d) => { notes.push({ text: t.trim(), ...(d ? { date: d } : {}) }); return ''; });
   text = text.replace(/\[\[CAL\|(\d{4}-\d{2}-\d{2})\|([^\]]+)\]\]/gi, (_, d, t) => { cals.push({ date: d, title: t.trim() }); return ''; });
   text = text.replace(/\[\[MOMENT\|([^\]]+)\]\]/gi, (_, t) => { moments.push(t.trim()); return ''; });
+  const pics = [];
+  text = text.replace(/\[\[PIC\|([^\]]+)\]\]/gi, (_, t) => { pics.push(t.trim().slice(0, 60)); return ''; });
   text = text.replace(/\[\[[^\]]*\]\]/g, '');
   const namePrefix = new RegExp(`^(${reEsc(ch.name)}|${reEsc(ch.user)})\\s*[:：]\\s*`);
   const lines = text
@@ -194,7 +199,7 @@ function parseReply(raw, ch) {
     .map((l) => l.trim().replace(namePrefix, '').replace(/^[「『"]+|[」』"]+$/g, '').trim())
     .filter((l) => l && !/^[-*_]{3,}$/.test(l))
     .slice(0, 6);
-  return { lines, quote, react, alarm, sticker, notes, cals, moments, time };
+  return { lines, quote, react, alarm, sticker, notes, cals, moments, time, pics };
 }
 
 export function createLine({ screen, say, onUnread, onData }) {
@@ -550,6 +555,7 @@ export function createLine({ screen, say, onUnread, onData }) {
   // ---------- 送出、回覆 ----------
   // 她貼的連結：送出當下就請伺服器去讀，讀好了泡泡底下長出預覽卡；他回之前會等讀完
   const linkJobs = new Map();
+  let roundPhotos = []; let warnedImages = false;
   function readLinks(m, t, key) {
     const urls = findUrls(m.text);
     if (!urls.length) return;
@@ -591,13 +597,17 @@ export function createLine({ screen, say, onUnread, onData }) {
     try {
       t.msgs = t.msgs.filter((m) => !m.err);
       if (linkJobs.size) await Promise.all([...linkJobs.values()]); // 連結還在讀就等一下，他要看過才回
-      // 這一輪她傳的最後一張照片給模型看（酒館一次只吃一張圖）
-      let image = null;
-      for (let i = t.msgs.length - 1; i >= 0 && t.msgs[i].me; i--) if (t.msgs[i].img) { image = t.msgs[i].img; break; }
+      // 這一輪她傳的照片全部給他看。酒館一次只吃一張圖，兩張以上拼成一張
+      roundPhotos = [];
+      for (let i = t.msgs.length - 1; i >= 0 && t.msgs[i].me; i--) if (t.msgs[i].img) roundPhotos.unshift(t.msgs[i]);
+      roundPhotos = roundPhotos.slice(-4);
+      const seeing = roundPhotos.length > 0 && canSeeImages();
+      if (roundPhotos.length && !seeing && !warnedImages) { warnedImages = true; say('酒館沒開「Send inline images」，他看不到照片'); }
+      const image = seeing ? await collage(roundPhotos.map((m) => m.img)) : null;
       const today = data.today();
       const [notes, cal, memory, stks] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key), data.stickers.all()]);
       const cur = await stage.get(who.key);
-      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => x.tag))] };
+      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => x.tag))], photos: roundPhotos.length, photosSeen: !!image };
       out = parseReply(await generate(buildPrompt(who, t.msgs, extra), image), who);
       out.stickerObj = out.sticker ? stks.find((x) => x.tag === out.sticker) : null;
       if (!out.lines.length && !out.stickerObj && !out.alarm && !out.moments.length) throw new Error('他沒有回出字來');
@@ -607,6 +617,7 @@ export function createLine({ screen, say, onUnread, onData }) {
       saveThread(who.key, t); if (view === 'room') refreshLog();
       return;
     }
+    out.pics.forEach((d, i) => { if (roundPhotos[i]) roundPhotos[i].seen = d; }); // 他看過的照片記一句，之後提到才接得上
     const flag = t.mode === 'now' ? { now: true } : { story: true, ...(out.time ? { st: out.time } : {}) };
     const pos = herPositions(t.msgs);
     const atPos = (p) => t.msgs.find((m) => m.me && pos.get(m.id) === p);
@@ -924,4 +935,20 @@ export function createLine({ screen, say, onUnread, onData }) {
     forget() { ch = null; thread = null; }, // 換聊天或資料搬家之後，下次重讀
     get busy() { return !!busy; },
   };
+}
+
+// 好幾張照片拼成一張（2 張左右並排，3～4 張田字格），每張整張縮進格子裡
+async function collage(srcs) {
+  if (srcs.length <= 1) return srcs[0] || null;
+  const imgs = await Promise.all(srcs.map((src) => new Promise((ok) => { const i = new Image(); i.onload = () => ok(i); i.onerror = () => ok(null); i.src = src; })));
+  const list = imgs.filter(Boolean);
+  if (list.length <= 1) return srcs[0];
+  const cols = 2; const rows = list.length > 2 ? 2 : 1; const S = 640; const gap = 8;
+  const cv = document.createElement('canvas'); cv.width = cols * S + gap; cv.height = rows * S + (rows - 1) * gap;
+  const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height);
+  list.forEach((im, k) => {
+    const r = Math.min(S / im.width, S / im.height); const w = im.width * r; const h = im.height * r; // 整張放進去不裁，截圖的字才不會被切掉
+    g.drawImage(im, (k % cols) * (S + gap) + (S - w) / 2, Math.floor(k / cols) * (S + gap) + (S - h) / 2, w, h);
+  });
+  return cv.toDataURL('image/jpeg', 0.82);
 }

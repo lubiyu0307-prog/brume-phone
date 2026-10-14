@@ -72,6 +72,18 @@ export function stripBlocks(text) {
 }
 
 /**
+ * 酒館這邊能不能把圖片送給模型：要用 Chat Completion，而且 AI 回應設定裡的「Send inline images」要打開。
+ * 讀不到設定（舊版酒館）就當作可以，讓模型自己試
+ */
+export function canSeeImages() {
+  const c = ctx();
+  if (!c) return false;
+  if (c.mainApi && c.mainApi !== 'openai') return false;
+  const s = c.chatCompletionSettings;
+  return !s || s.media_inlining !== false;
+}
+
+/**
  * 叫模型寫東西。省 token 模式走 generateRaw（只帶角色卡、世界書、正文最後幾則）；
  * 關掉或有附圖時走 generateQuietPrompt（整份預設＋整段正文，跟正文一樣貴）。image 是 dataURL，酒館一次只吃一張
  */
