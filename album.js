@@ -124,6 +124,9 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <label>照片風格（每張生圖都會套用，可以不寫）</label>
         <textarea class="bp-al-style" rows="3" placeholder="${people.look.autoStyle ? `沒寫的話照頭像判斷的：${esc(people.look.autoStyle)}` : '沒寫的話，第一次生圖會看角色卡頭像自己判斷寫實或動漫。也可以自己寫：anime style, cel shading／film photo, warm tone'}">${esc(people.look.style)}</textarea>
         <p class="bp-al-hint">畫風、濾鏡、色調寫在這裡，寫了就以這裡為準（例如寫動漫風，就不會畫成寫實照片）。某個人的髮色、身形要寫在那個人的證件照裡。</p>
+        <label>照片質感（寫實照片才套用）</label>
+        <div class="bp-al-seg">${[['polished', '精修・像 GPT'], ['candid', '生活感・手機隨手拍']].map(([v, n]) => `<b data-al="preset" data-v="${v}" class="${(people.look.preset || 'polished') === v ? 'on' : ''}">${n}</b>`).join('')}</div>
+        <p class="bp-al-hint">精修：皮膚光滑、淺景深、電影劇照感。生活感：保留毛孔和手機雜訊，像朋友隨手拍、發在 SNS 上的照片。</p>
         <label>生圖模型</label>
         <div class="bp-al-seg">${[['flash', 'Flash・快'], ['pro', 'Pro・細']].map(([v, n]) => `<b data-al="imgmodel" data-v="${v}" class="${imageModelPref.get() === v ? 'on' : ''}">${n}</b>`).join('')}</div>
         <p class="bp-al-hint">Flash 一張十幾秒；Pro 二十秒上下，光影和細節比較細，費用也比較高。選的那個叫不到時，會自動換另一個。</p>
@@ -219,6 +222,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (a === 'snap') { view = 'snap'; renderSnap(); }
     if (a === 'ids') { view = 'grid'; tab = 'id'; editing = null; render(); }
     if (a === 'lookauto') lookAuto();
+    if (a === 'preset') { people.look.preset = e.target.closest('[data-v]').dataset.v; saveCast(ch.charKey, people); say(people.look.preset === 'candid' ? '之後拍成生活感' : '之後拍成精修'); renderIds(); return; }
     if (a === 'imgmodel') { imageModelPref.set(e.target.closest('[data-v]').dataset.v); say(imageModelPref.get() === 'pro' ? '之後用 Pro 生圖' : '之後用 Flash 生圖'); renderIds(); return; }
     if (a === 'idpic') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'idpic'; f.click(); }
     if (a === 'idok' && editing) {

@@ -103,19 +103,42 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
     // 玩家寫的風格蓋過上面的「photo」「realistic」：動漫風的卡寫 anime style 就要畫成動漫，不是寫實照片。
     // 玩家沒寫就用看頭像判斷的；判斷是寫實照片就不用加
     style && !/^realistic photo\.?$/i.test(style) ? `Visual style (this overrides any "photo" or "realistic" wording above): ${style}` : '',
-    ...(realistic(style) ? photoLook(inFrame.length > 0, anyRef) : []),
+    ...people(inFrame.length),
+    ...(realistic(style) ? photoLook(data.look.preset, inFrame.length > 0, anyRef) : []),
   ].filter(Boolean).join('\n');
 }
 
 // 寫實照片才加攝影手法和調色；玩家寫了動漫、插畫這類風格就不加（不然動漫圖會被要求拍成電影劇照）
 const realistic = (style) => !style || /^realistic photo\.?$/i.test(style) || (/photo|film|realistic|寫實|照片|底片/i.test(style) && !/anime|manga|cartoon|illustrat|cel|3d|render|動漫|動畫|插畫|漫畫|卡通/i.test(style));
 
+// 人入鏡時一定要的（精修、生活感、動漫都適用）：人體結構、各自的臉、衣服、互動不擺拍
+function people(n) {
+  if (!n) return [];
+  return [
+    'Anatomy must be real: correct hands and finger count, natural joints, believable weight and contact; clothes wrinkle and compress where bodies touch or overlap.',
+    'Clothes are ordinary everyday outfits with natural folds and fabric weight; people do not wear matching outfits unless the scene says so.',
+    ...(n > 1 ? ['Each person keeps their own distinct face; never two people with the same AI face. Natural interaction, not posing for the camera: glances and smiles do not have to be in sync, like a moment caught in passing.'] : []),
+  ];
+}
+
 /**
- * 預設的照片質感（10/14 跟露比對照 GPT 調出來的，E 版）：Gemini 的膚色常常偏黃、背景太清楚、鏡頭太遠。
+ * 照片質感，玩家在證件照頁二選一（look.preset）：
+ *   polished 精修（預設）：10/14 跟露比對照 GPT 調出來的 E 版。Gemini 膚色常偏黃、背景太清楚、鏡頭太遠
+ *   candid 生活感：露比給的長 prompt 濃縮的，像朋友用手機隨手拍、發在 SNS 上的照片
  * 膚色寫「跟參考照片一樣」不寫一律白皙：膚色深的角色不會被洗白
  */
-function photoLook(hasPeople, anyRef) {
+function photoLook(preset, hasPeople, anyRef) {
+  // 頭髮兩種都要：自然髮束、碎髮，不要 CG 那種整齊光滑的髮絲
+  const hair = hasPeople ? 'Hair: natural strands, wisps, flyaways and baby hairs moved by the air and by movement; never perfectly arranged, never CG-smooth.' : '';
+  if (preset === 'candid') return [
+    hair,
+    `Colour: natural, true-to-life colour and white balance. ${anyRef ? 'Skin tone like each person\'s reference photo, ' : 'Skin tone natural, '}never yellow-filtered. Only the light that really exists in the place (window light, daylight, street lights, restaurant light); no cinematic rim light, no studio fill.`,
+    hasPeople ? 'Texture: real skin with visible pores, fine vellus hair, slight redness and subtle under-eye shadows; no beauty filter, no airbrushed or plastic skin, no CG sheen. Attractive but not model-perfect, keep natural slight asymmetry.' : '',
+    'Camera: an everyday smartphone snapshot taken by a friend or on a propped-up phone, the kind posted straight to social media. Ordinary phone image quality with slight noise and compression, not over-sharp; composition can be slightly tilted, off-centre or loosely cropped. Not an advert, wedding shoot, idol photo or studio shoot.',
+  ].filter(Boolean);
   return [
+    hair,
+    anyRef ? 'Match the rendering of the reference photos: the same smooth, soft, retouched skin texture and the same polished, clean finish.' : '',
     `Colour: neutral, clean white balance. ${anyRef ? 'Skin tone exactly like each person\'s reference photo: clear and luminous' : 'Skin looks clear and natural'}, with no yellow, orange or sallow cast, even under warm indoor light; keep any warmth in the background only.`,
     hasPeople
       ? 'Photography: an intimate cinematic film still. Close framing, the people fill most of the frame. Shot on an 85mm lens at f/1.8, very shallow depth of field, background melts into creamy bokeh, only the people are sharp. Soft light, gentle muted colour grading, slightly lower saturation.'
