@@ -171,6 +171,7 @@ export function createIG({ screen, say }) {
         `- 貼文 1～2 篇是 ${who.name} 本人發的，照他的個性、生活和最近發生的事；其他是角色卡、世界書裡的配角或路人`,
         `- 限時動態至少 1 則是 ${who.name} 的，比貼文更隨性`,
         WORLD, `- 不要寫 ${who.user} 發的`,
+        '- photo 會拿去生圖，要寫清楚畫面裡有誰；發文的人的手、手臂、腳或身體入鏡時，寫明是誰的、男生還是女生的（例如「他骨節分明的男生手掌托著⋯」），不要只寫「手」',
         `- ${who.name} 的帳號用：${dd.him.handle === who.name ? '幫他取一個英文小寫帳號' : dd.him.handle}`,
         have ? `已經有的（不要重複）：\n${have}` : '',
         album.length ? `${who.name} 和 ${who.user} 相本裡的合照（${who.name} 想曬的話，可以拿其中一張發，在那篇加 "album":編號；不想就不用）：\n${album.map((p, i) => `${i + 1}. ${p.desc}`).join('\n')}` : '',
@@ -209,7 +210,8 @@ export function createIG({ screen, say }) {
     const always = p.author.kind === 'other' ? (self || p.desc.includes(p.author.name) ? [p.author.name] : [])
       : p.author.kind === 'him' && /他|自拍|本人|鏡/.test(p.desc) ? [HIM] : [];
     const ids = idsFor(people, p.desc, always);
-    return { prompt: finalPrompt(people, who, `${p.desc}, instagram photo, natural light`, ids), refs: refsFor(people, who, p.desc, always) };
+    const by = p.author.kind === 'him' ? HIM : p.author.kind === 'other' ? p.author.name : null;
+    return { prompt: finalPrompt(people, who, `${p.desc}, instagram photo, natural light`, ids, { by }), refs: refsFor(people, who, p.desc, always) };
   }
   // 限動是直的（9:16），貼文是方的
   const draw = (p, who, aspect = '1:1') => { const { prompt, refs } = photoPrompt(p, who); return imagine(prompt.replace('instagram photo', aspect === '9:16' ? 'vertical instagram story photo' : 'instagram photo'), { refs, aspect }); };

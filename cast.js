@@ -53,10 +53,13 @@ export function refsFor(data, ch, text, always = []) {
  * 送去生圖的完整 prompt：場景 prompt＋入鏡的人的長相（髮色、身形這些要照做）＋玩家寫的照片風格。
  * 長相直接接在最後，不靠寫 prompt 的模型轉述，轉述常把髮色、身材改掉
  */
-export function finalPrompt(data, ch, prompt, ids = []) {
+export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
   const notes = ids.map((id) => person(data, ch, id)).filter((p) => p.look).map((p) => `${p.name}: ${p.look}`);
+  // 拍照的人：他自己拍的照片常常只有手入鏡（托著東西、拿著杯子），不講是誰的手，模型會隨便畫一隻（10/14 阿愷的企鵝變成女生的手）
+  const cam = by ? person(data, ch, by) : null;
   return [
     String(prompt).trim(),
+    cam ? `Taken by ${cam.name} on their own phone. Any hands, arms or body of the photographer visible in the frame belong to ${cam.name}${cam.look ? ` and must match: ${cam.look}` : ''}.` : '',
     notes.length ? `Appearance to keep exactly (hair colour, body shape, clothes):\n${notes.join('\n')}` : '',
     data.look.style ? `Photo style / filter: ${data.look.style}` : '',
   ].filter(Boolean).join('\n');

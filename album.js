@@ -134,7 +134,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       <div class="bp-al-scroll">
         <div class="bp-al-idpic" data-al="idpic">${editing.photo ? `<img src="${esc(editing.photo)}" alt="">` : '<span>點這裡放照片</span>'}</div>
         ${isNew ? '<label>名字（跟劇情、IG 裡出現的一樣）</label><input class="bp-al-idname" maxlength="20">' : ''}
-        <label>長相與身形（生圖會照這段，英文 tag 最好，可以不寫）</label><textarea class="bp-al-idlook" rows="4" placeholder="髮色髮型、眼睛、身高身材、常穿的衣服。例如：ash-gray messy short hair, gray eyes, tall and slim, broad shoulders, black knit sweater">${esc(p.look)}</textarea>
+        <label>長相與身形（生圖會照這段，英文 tag 最好，可以不寫）</label><textarea class="bp-al-idlook" rows="4" placeholder="性別年紀、髮色髮型、眼睛、身高身材、常穿的衣服。例如：a man in his late 20s, ash-gray messy short hair, gray eyes, tall and slim, broad shoulders, black knit sweater">${esc(p.look)}</textarea>
         ${editing.id === HIM ? `<button class="bp-al-ghost" data-al="lookauto" ${busy ? 'disabled' : ''}>${busy ? '整理中⋯' : '從角色卡幫我整理'}</button>` : ''}
         ${!isNew && editing.id !== HIM && editing.id !== ME ? '<button class="bp-al-ghost danger" data-al="iddel">刪掉這個配角</button>' : ''}
       </div>
