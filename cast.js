@@ -76,7 +76,8 @@ export function refsFor(data, ch, text, always = []) {
  */
 // 長相裡講臉、髮色、髮型、眼睛、膚色、年紀的詞：有參考照片的人，這些交給照片決定，文字留著反而會蓋過照片
 // （10/14 企鵝館：文字寫 honey brown hair，Gemini 照字畫成橘髮，臉也跑掉）
-const FACE_TAG = /hair|bang|fringe|undercut|eye|face|skin|freckle|beard|mustache|lips?\b|nose|eyebrow|\d+\s*(years?|yo)\b|\bage\b|髮|瀏海|眼|臉|膚|歲|鬍/i;
+// 年紀、成熟這類字也拿掉：有照片時年紀照片看得出來，「mature male」會被 Pro 照字面畫成中年大叔（10/14 兩次）
+const FACE_TAG = /hair|bang|fringe|undercut|eye|face|skin|freckle|beard|mustache|lips?\b|nose|eyebrow|\d+\s*(years?|yo)\b|\bage\b|\bmature\b|middle[- ]aged|elderly|\bold(er)?\b|\byoung\b|youthful|\bteen|\b1(boy|girl)\b|\bsolo\b|髮|瀏海|眼|臉|膚|歲|鬍|成熟|中年|年輕|少年/i;
 const stripFace = (text) => String(text).split(/[,，、]/).map((t) => t.trim()).filter((t) => t && !FACE_TAG.test(t)).join(', ');
 // 長相裡的衣服當「衣櫃」：玩家常把他會穿的衣服全列上去，整串送去生圖會被混搭成一身（10/14 員工 Polo 衫配灰色運動褲）
 const CLOTHES = /shirt|polo|tee|t-shirt|top|jeans|pants|trousers|shorts|sweatpants|jogger|jacket|coat|hoodie|sweater|cardigan|knit|vest|dress|skirt|suit|uniform|lanyard|badge|apron|scarf|tie|socks|shoes|sneakers|boots|cap|hat|衣|衫|褲|裙|外套|帽|鞋|圍裙|制服|識別證/i;
