@@ -205,7 +205,7 @@
 .bp-line-head { grid-template-columns: 44px 1fr 80px !important; }
 .bp-line-bwrap { position: relative; max-width: 72%; display: flex; flex-direction: column; gap: 4px; }
 .bp-me .bp-line-bwrap { align-items: flex-end; }
-.bp-line-bwrap .bp-line-bub { max-width: 100%; }
+.bp-line-bwrap .bp-line-bub { max-width: 100%; overflow-wrap: anywhere; }
 .bp-line-bwrap, .bp-line-bwrap .bp-line-bub { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .bp-line-img { max-width: 100%; max-height: 260px; border-radius: 14px; display: block; }
 .bp-line-react {
@@ -1086,3 +1086,9 @@
 #bp-overlay input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="range"]),
 #bp-overlay textarea { font-size: 16px !important; }
 .bp-dbgbox { display: block; width: 100%; height: 120px; margin-top: 8px; font-size: 16px; border-radius: 10px; border: 1px solid #0002; }
+
+/* LINE：她貼的連結長出預覽卡 */
+.bp-line-link { display: block; width: 220px; max-width: 100%; border-radius: 14px; overflow: hidden; background: #fff; color: #000; cursor: pointer; }
+.bp-line-link img { display: block; width: 100%; height: 116px; object-fit: cover; background: #eee; }
+.bp-line-link b { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; padding: 8px 11px 2px; font-size: 13.5px; font-weight: 600; line-height: 1.35; }
+.bp-line-link small { display: block; padding: 0 11px 9px; font-size: 11.5px; color: #8a8a8a; }

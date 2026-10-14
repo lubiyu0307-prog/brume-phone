@@ -5,6 +5,7 @@ import * as store from './store.js';
 import { currentChar, generate, ctx, writeLore } from './st.js';
 import * as data from './data.js';
 import * as stage from './stage.js';
+import { findUrls, readLink, linkForPrompt } from './link.js';
 
 const OLD_STORE = 'brume-phone:line:'; // v0.2.0 存在 localStorage，第一次打開時搬進 IndexedDB
 
@@ -95,7 +96,8 @@ function msgText(m) {
   if (m.sticker) return `［貼圖：${m.sticker.tag}］`;
   if (m.alarm) return `［鬧鐘卡 ${m.alarm.time}「${m.alarm.label}」］`;
   if (m.moment) return `（動態：${m.moment}）`;
-  return m.img ? `［照片］${m.text ? ' ' + m.text : ''}` : m.text;
+  const links = (m.links || []).filter((l) => !l.fail && l.title).map((l) => `［連結：${l.title}］`).join('');
+  return (m.img ? `［照片］${m.text ? ' ' + m.text : ''}` : m.text) + links;
 }
 
 // 正文那邊要看的：最近的 LINE 與記憶書（「讓正文知道」打開時才送）
@@ -148,6 +150,12 @@ function buildPrompt(ch, msgs, x = {}) {
     '',
     `最近的 LINE 對話（舊→新；${ch.user} 名字後面的［數字］是她那則訊息的位置，0 是最新的）：`,
     log || '（還沒有對話）',
+    (() => {
+      // 她這一輪剛貼的連結：整段內容只在這次給，之後只留標題，免得每次都重送
+      const fresh = [];
+      for (let i = shown.length - 1; i >= 0 && shown[i].me; i--) for (const l of shown[i].links || []) fresh.unshift(linkForPrompt(l));
+      return fresh.length ? `\n${fresh.join('\n\n')}` : '';
+    })(),
     '',
     x.proactive || `請以 ${ch.name} 的身分回 LINE：`,
     '- 只寫他會傳出去的訊息文字，不寫動作、旁白、心理描寫',
@@ -273,7 +281,8 @@ export function createLine({ screen, say, onUnread, onData }) {
       : m.img
       ? `<img class="bp-line-img" src="${m.img}" alt="">${m.text ? `<div class="bp-line-bub">${esc(m.text)}</div>` : ''}`
       : `<div class="bp-line-bub">${quoteBox(m)}${esc(m.text)}</div>`;
-    return `<div class="bp-line-bwrap" data-id="${m.id}">${body}${react ? `<span class="bp-line-react">${REACTS[react]}</span>` : ''}</div>`;
+    const cards = (m.links || []).filter((l) => !l.fail && l.title).map((l) => `<div class="bp-line-link" data-href="${esc(l.url)}">${l.img ? `<img src="${esc(l.img)}" alt="" referrerpolicy="no-referrer" onerror="this.remove()">` : ''}<b>${esc(l.title)}</b><small>${esc(l.host)}</small></div>`).join('');
+    return `<div class="bp-line-bwrap" data-id="${m.id}">${body}${cards}${react ? `<span class="bp-line-react">${REACTS[react]}</span>` : ''}</div>`;
   }
 
   function bubbles() {
@@ -539,9 +548,23 @@ export function createLine({ screen, say, onUnread, onData }) {
   }
 
   // ---------- 送出、回覆 ----------
+  // 她貼的連結：送出當下就請伺服器去讀，讀好了泡泡底下長出預覽卡；他回之前會等讀完
+  const linkJobs = new Map();
+  function readLinks(m, t, key) {
+    const urls = findUrls(m.text);
+    if (!urls.length) return;
+    const job = Promise.all(urls.map(readLink)).then((links) => {
+      m.links = links; saveThread(key, t);
+      if (view === 'room' && ch?.key === key) refreshLog();
+    }).finally(() => linkJobs.delete(m.id));
+    linkJobs.set(m.id, job);
+  }
+
   function send(msg) {
     thread.msgs = thread.msgs.filter((m) => !m.err);
-    thread.msgs.push({ id: uid(), me: true, ts: Date.now(), ...(thread.mode === 'now' ? { now: true } : { story: true }), ...msg, ...(quoting ? { quote: quoting } : {}) });
+    const m = { id: uid(), me: true, ts: Date.now(), ...(thread.mode === 'now' ? { now: true } : { story: true }), ...msg, ...(quoting ? { quote: quoting } : {}) };
+    thread.msgs.push(m);
+    readLinks(m, thread, ch.key);
     quoting = null; showQuoting();
     if (stickerOpen) toggleStickers();
     checkMilestones();
@@ -567,6 +590,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     let out;
     try {
       t.msgs = t.msgs.filter((m) => !m.err);
+      if (linkJobs.size) await Promise.all([...linkJobs.values()]); // 連結還在讀就等一下，他要看過才回
       // 這一輪她傳的最後一張照片給模型看（酒館一次只吃一張圖）
       let image = null;
       for (let i = t.msgs.length - 1; i >= 0 && t.msgs[i].me; i--) if (t.msgs[i].img) { image = t.msgs[i].img; break; }
@@ -645,6 +669,8 @@ export function createLine({ screen, say, onUnread, onData }) {
   screen.addEventListener('click', async (e) => {
     if (!mine()) return;
     if (pressed) { pressed = false; return; }
+    const href = e.target.closest('[data-href]');
+    if (href) { window.open(href.dataset.href, '_blank', 'noopener'); return; }
     const react = e.target.closest('[data-react]');
     if (react) {
       const m = find(react.dataset.id);
