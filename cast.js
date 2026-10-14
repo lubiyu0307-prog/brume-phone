@@ -5,6 +5,7 @@
 
 import * as store from './store.js';
 import { lookAt, asDataUrl } from './st.js';
+import { P } from './prompts.js';
 
 export const HIM = '@him';
 export const ME = '@me';
@@ -78,7 +79,7 @@ export function refsFor(data, ch, text, always = []) {
 // （10/14 企鵝館：文字寫 honey brown hair，Gemini 照字畫成橘髮，臉也跑掉）
 // 年紀、成熟這類字也拿掉：有照片時年紀照片看得出來，「mature male」會被 Pro 照字面畫成中年大叔（10/14 兩次）
 const FACE_TAG = /hair|bang|fringe|undercut|eye|face|skin|freckle|beard|mustache|lips?\b|nose|eyebrow|\d+\s*(years?|yo)\b|\bage\b|\bmature\b|middle[- ]aged|elderly|\bold(er)?\b|\byoung\b|youthful|\bteen|\b1(boy|girl)\b|\bsolo\b|髮|瀏海|眼|臉|膚|歲|鬍|成熟|中年|年輕|少年/i;
-const stripFace = (text) => String(text).split(/[,，、]/).map((t) => t.trim()).filter((t) => t && !FACE_TAG.test(t)).join(', ');
+const stripFace = (text) => String(text).split(/[,，、]/).map((t) => t.trim()).filter((t) => t && !FACE_TAG.test(t)).join(/[\u4e00-\u9fff]/.test(text) ? '，' : ', ');
 // 長相裡的衣服當「衣櫃」：玩家常把他會穿的衣服全列上去，整串送去生圖會被混搭成一身（10/14 員工 Polo 衫配灰色運動褲）
 const CLOTHES = /shirt|polo|tee|t-shirt|top|jeans|pants|trousers|shorts|sweatpants|jogger|jacket|coat|hoodie|sweater|cardigan|knit|vest|dress|skirt|suit|uniform|lanyard|badge|apron|scarf|tie|socks|shoes|sneakers|boots|cap|hat|衣|衫|褲|裙|外套|帽|鞋|圍裙|制服|識別證/i;
 export const splitLook = (text) => {
@@ -87,7 +88,7 @@ export const splitLook = (text) => {
 };
 const lookNote = (text) => {
   const { body, wardrobe } = splitLook(text);
-  return [body ? `body: ${body}` : '', wardrobe ? `clothes he/she might own (wear only what the scene describes; if the scene says nothing, pick ONE coherent outfit from these, never mix them all): ${wardrobe}` : ''].filter(Boolean).join('; ');
+  return [body ? P.BODY(body) : '', wardrobe ? P.WARDROBE(wardrobe) : ''].filter(Boolean).join(P.SEP);
 };
 const hasRef = (data, p) => !!(p.photo || (p.id === HIM && data.cardAvatar));
 
@@ -96,8 +97,8 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
   const anyRef = inFrame.some((p) => hasRef(data, p));
   // 有照片的人：臉和頭髮照照片，文字只留身形、衣著；沒照片的人照舊整段長相
   const notes = inFrame.filter((p) => p.look || hasRef(data, p)).map((p) => (hasRef(data, p)
-    ? `${p.name}: face, hair colour and hairstyle exactly as in ${p.name}'s reference photo (ignore any text that says otherwise)${lookNote(p.look) ? `; ${lookNote(p.look)}` : ''}`
-    : `${p.name}: ${lookNote(p.look) || p.look}`));
+    ? `${P.PERSON_WITH_REF(p.name)}${lookNote(p.look) ? `${P.SEP}${lookNote(p.look)}` : ''}`
+    : `${p.name}${P.COLON}${lookNote(p.look) || p.look}`));
   // 場景 prompt 裡寫長相的詞也拿掉（寫 prompt 的模型會把長相抄進去），沒照片的人的長相上面 notes 會補回來
   if (anyRef) prompt = stripFace(prompt);
   // 拍照的人：他自己拍的照片常常只有手入鏡（托著東西、拿著杯子），不講是誰的手，模型會隨便畫一隻（10/14 阿愷的企鵝變成女生的手）。
@@ -106,14 +107,14 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
   const style = data.look.style || data.look.autoStyle || '';
   // 長相裡跟手有關的詞（膚色、手指、指節、青筋、手毛）也帶上，只講「男生的手」會被畫成刻板的毛手（10/14 第三張）
   const hand = cam ? cam.look.split(/[,，、]/).map((t) => t.trim()).filter((t) => /skin|finger|knuckle|vein|hand|nail|wrist|arm|hair(less|y)|膚|手|指|腕|毛/i.test(t) && !/head|hair\b(?!less)/i.test(t)).join(', ') : '';
-  const sex = cam && (/\b(1boy|male|man|boy)\b/i.test(cam.look) || /男/.test(cam.look) ? "a man's" : /\b(1girl|female|woman|girl)\b/i.test(cam.look) || /女/.test(cam.look) ? "a woman's" : '');
+  const sex = cam && (/\b(1boy|male|man|boy)\b/i.test(cam.look) || /男/.test(cam.look) ? P.HAND_MAN : /\b(1girl|female|woman|girl)\b/i.test(cam.look) || /女/.test(cam.look) ? P.HAND_WOMAN : '');
   return [
     String(prompt).trim(),
-    cam ? `First-person shot taken by ${cam.name} on their own phone. ${cam.name} is NOT in the photo: no face, no body. If a hand or arm reaches into the frame, it is ${cam.name}'s own${sex || hand ? ` (${[sex ? `${sex} hand` : '', hand].filter(Boolean).join(': ')})` : ''}.` : '',
-    notes.length ? `People in the picture:\n${notes.join('\n')}` : '',
+    cam ? P.POV(cam.name, [sex, hand].filter(Boolean).join(P.COLON)) : '',
+    notes.length ? `${P.PEOPLE_TITLE}\n${notes.join('\n')}` : '',
     // 玩家寫的風格蓋過上面的「photo」「realistic」：動漫風的卡寫 anime style 就要畫成動漫，不是寫實照片。
     // 玩家沒寫就用看頭像判斷的；判斷是寫實照片就不用加
-    style && !/^realistic photo\.?$/i.test(style) ? `Visual style (this overrides any "photo" or "realistic" wording above): ${style}` : '',
+    style && !/^realistic photo\.?$/i.test(style) ? P.STYLE(style) : '',
     ...people(inFrame.length),
     ...(realistic(style) ? photoLook(data.look.preset, inFrame.length > 0, anyRef) : []),
   ].filter(Boolean).join('\n');
@@ -125,35 +126,17 @@ const realistic = (style) => !style || /^realistic photo\.?$/i.test(style) || (/
 // 人入鏡時一定要的（精修、生活感、動漫都適用）：人體結構、各自的臉、衣服、互動不擺拍
 function people(n) {
   if (!n) return [];
-  return [
-    'Anatomy must be real: correct hands and finger count, natural joints, believable weight and contact; clothes wrinkle and compress where bodies touch or overlap.',
-    'Clothes are ordinary everyday outfits with natural folds and fabric weight; people do not wear matching outfits unless the scene says so.',
-    ...(n > 1 ? ['Each person keeps their own distinct face; never two people with the same AI face. Natural interaction, not posing for the camera: glances and smiles do not have to be in sync, like a moment caught in passing.'] : []),
-  ];
+  return [P.ANATOMY, P.CLOTHES, ...(n > 1 ? [P.TWO_PEOPLE] : [])];
 }
 
 /**
  * 照片質感，玩家在證件照頁二選一（look.preset）：
  *   polished 精修（預設）：10/14 跟露比對照 GPT 調出來的 E 版。Gemini 膚色常偏黃、背景太清楚、鏡頭太遠
  *   candid 生活感：露比給的長 prompt 濃縮的，像朋友用手機隨手拍、發在 SNS 上的照片
- * 膚色寫「跟參考照片一樣」不寫一律白皙：膚色深的角色不會被洗白
+ * 文字都在 prompts.js
  */
 function photoLook(preset, hasPeople, anyRef) {
-  // 頭髮兩種都要：自然髮束、碎髮，不要 CG 那種整齊光滑的髮絲
-  const hair = hasPeople ? 'Hair: natural strands, wisps, flyaways and baby hairs moved by the air and by movement; never perfectly arranged, never CG-smooth.' : '';
-  if (preset === 'candid') return [
-    hair,
-    `Colour: natural, true-to-life colour and white balance. ${anyRef ? 'Skin tone like each person\'s reference photo, ' : 'Skin tone natural, '}never yellow-filtered. Only the light that really exists in the place (window light, daylight, street lights, restaurant light); no cinematic rim light, no studio fill.`,
-    hasPeople ? 'Texture: real skin with visible pores, fine vellus hair, slight redness and subtle under-eye shadows; no beauty filter, no airbrushed or plastic skin, no CG sheen. Attractive but not model-perfect, keep natural slight asymmetry.' : '',
-    hasPeople ? 'Unless the scene says they look at the camera, the people are caught in the moment and not looking at the lens: talking, eating, walking, looking at each other or at something else.' : '',
-    'Camera: an everyday smartphone snapshot taken by a friend or on a propped-up phone, the kind posted straight to social media. Ordinary phone image quality with slight noise and compression, not over-sharp; composition can be slightly tilted, off-centre or loosely cropped. Not an advert, wedding shoot, idol photo or studio shoot.',
-  ].filter(Boolean);
-  return [
-    hair,
-    anyRef ? 'Match the rendering of the reference photos: the same smooth, soft, retouched skin texture and the same polished, clean finish.' : '',
-    `Colour: neutral, clean white balance. ${anyRef ? 'Skin tone exactly like each person\'s reference photo: clear and luminous' : 'Skin looks clear and natural'}, with no yellow, orange or sallow cast, even under warm indoor light; keep any warmth in the background only.`,
-    hasPeople
-      ? 'Photography: an intimate cinematic film still, framed the way the scene describes. Shot on an 85mm lens at f/1.8, very shallow depth of field, background melts into creamy bokeh, only the people are sharp. Soft light, gentle muted colour grading, slightly lower saturation.'
-      : 'Photography: cinematic phone photo, shallow depth of field with soft bokeh, soft light, gentle muted colour grading, slightly lower saturation.',
-  ];
+  const hair = hasPeople ? P.HAIR : '';
+  if (preset === 'candid') return [hair, P.CANDID.colour(anyRef), hasPeople ? P.CANDID.skin : '', hasPeople ? P.CANDID.gaze : '', P.CANDID.camera];
+  return [hair, anyRef ? P.POLISHED.match : '', P.POLISHED.colour(anyRef), hasPeople ? P.POLISHED.people : P.POLISHED.things];
 }

@@ -1,5 +1,7 @@
 // 跟酒館打交道的共用小工具
 
+import { P } from './prompts.js';
+
 export const ctx = () => window.SillyTavern?.getContext?.();
 
 /** 現在開著的角色；沒選角色或在群組聊天時回 null */
@@ -176,15 +178,11 @@ async function imageModels(key) {
  * 回傳 { images: [dataURL...], text }，兩條路各自包成自己的格式
  */
 async function refRequest(prompt, refs) {
-  const ask = `Generate one image. No text in the image, no captions.\n${String(prompt).trim()}`;
+  const ask = `${P.ASK}\n${String(prompt).trim()}`;
   const got = [];
   for (const r of refs) { const url = await asDataUrl(r.url); if (url) got.push({ name: r.name, url }); }
   if (!got.length) return { images: [], text: ask };
-  const who = got.map((r, i) => `Image ${i + 1} is a reference photo of ${r.name} (it may show the same person from several angles side by side; it is still one person).`).join('\n');
-  return {
-    images: got.map((r) => r.url),
-    text: `${who}\nCreate a new picture with exactly these people: keep each person's face, eyes, nose, jawline, hair colour and hairstyle identical to their reference image. The reference images win over any text below. Use the framing the scene describes (full body, half body or close-up); whenever a face is visible it must be recognisable as that person. Unless a visual style is given below, draw in the same art style as the references (anime stays anime, photo stays photo).\n\n${ask}`,
-  };
+  return { images: got.map((r) => r.url), text: `${got.map((r, i) => P.REF_INTRO(r.name, i)).join('\n')}\n${P.REF_RULE}\n\n${ask}` };
 }
 
 async function viaKey(prompt, refs = [], aspect = '1:1') {

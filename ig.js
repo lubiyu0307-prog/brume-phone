@@ -6,6 +6,7 @@
 import * as store from './store.js';
 import { currentChar, generate, imagine, canSeeImages, imageInfo, canDraw } from './st.js';
 import { imagineAndPick } from './pick.js';
+import { P } from './prompts.js';
 import { HIM, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
 
 // 自動生圖：打開的話，他新發的貼文用 Gemini 畫成真的照片（一張要等一下）
@@ -206,19 +207,19 @@ export function createIG({ screen, say }) {
   }
 
   // 照片的生圖 prompt：照片裡有誰入鏡，就帶誰的長相和證件照，最後套上玩家寫的照片風格
-  function photoPrompt(p, who) {
+  function photoPrompt(p, who, story = false) {
     // 發文的人本人入鏡（自拍、對鏡、合照）才帶他的長相和照片；描述裡只有「他的手」不算，那是第一人稱視角
     const self = /自拍|鏡子|鏡中|對鏡|合照|入鏡|露臉|全身照/.test(p.desc);
     const always = !self ? [] : p.author.kind === 'other' ? [p.author.name] : p.author.kind === 'him' ? [HIM] : [];
     const ids = idsFor(people, p.desc, always);
     const by = p.author.kind === 'him' ? HIM : p.author.kind === 'other' ? p.author.name : null;
-    return { prompt: finalPrompt(people, who, `${p.desc}, instagram photo, natural light`, ids, { by }), refs: refsFor(people, who, p.desc, always) };
+    return { prompt: finalPrompt(people, who, `${p.desc}${story ? P.IG_STORY : P.IG_POST}`, ids, { by }), refs: refsFor(people, who, p.desc, always) };
   }
   // 限動是直的（9:16），貼文是方的
   // pick：玩家自己按的才讓她挑（一次生幾張照證件照頁的設定）；自動生圖在背景跑，只生一張
   const draw = async (p, who, aspect = '1:1', pick = false) => {
-    await ensureAutoStyle(people, who.charKey); const { prompt, refs } = photoPrompt(p, who);
-    const full = prompt.replace('instagram photo', aspect === '9:16' ? 'vertical instagram story photo' : 'instagram photo');
+    await ensureAutoStyle(people, who.charKey); const { prompt, refs } = photoPrompt(p, who, aspect === '9:16');
+    const full = prompt;
     const url = pick ? await imagineAndPick(screen, full, { refs, aspect }) : await imagine(full, { refs, aspect });
     if (!url && imageInfo.why) say(`沒有出圖：${imageInfo.why}`);
     return url;
@@ -231,7 +232,7 @@ export function createIG({ screen, say }) {
     screen.insertAdjacentHTML('beforeend', `<div class="bp-ig-sheet"><div>
       <div class="bp-ig-sheet-top"><u data-ig="unsheet">取消</u><b>${esc(name)}</b><u data-ig="savecast" class="ok">完成</u></div>
       <div class="bp-ig-pick round bp-ig-castpic" data-ig="castpic">${c.photo ? `<img src="${c.photo}" alt="">` : '<span>放一張照片</span>'}</div>
-      <label>長相與身形（生圖會照這段，選填）</label><textarea class="bp-ig-look" rows="3" placeholder="髮色髮型、身材、常穿的衣服。例如：short black hair, round glasses, petite, gray hoodie">${esc(c.look)}</textarea>
+      <label>長相與身形（生圖會照這段，選填）</label><textarea class="bp-ig-look" rows="3" placeholder="髮色髮型、身材、常穿的衣服。例如：黑色短髮，圓框眼鏡，嬌小，常穿灰色帽 T">${esc(c.look)}</textarea>
       <p class="bp-ig-casthint">照片會當 ${esc(name)} 的大頭貼，生 ${esc(name)} 入鏡的照片時也會給 Gemini 看，長得比較像。同一張角色卡的每個聊天都用這份，相本的「證件照」也看得到。</p>
       ${c.photo || c.look ? '<p class="bp-ig-casthint"><u data-ig="castclear">清掉</u></p>' : ''}
       <input class="bp-ig-file" type="file" accept="image/*" hidden></div></div>`);

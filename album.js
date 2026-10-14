@@ -4,6 +4,7 @@
 import * as store from './store.js';
 import { currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref } from './st.js';
 import { imagineAndPick } from './pick.js';
+import { P, promptLang } from './prompts.js';
 import { HIM, ME, loadCast, saveCast, person, setPerson, sideNames, refsFor, idsFor, finalPrompt, ensureAutoStyle, splitLook } from './cast.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -123,11 +124,14 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <p class="bp-al-hint">放每個人的參考照片，快照和 IG 生圖時會拿給 Gemini 看，同一個人才會每張都長一樣。配角的照片也是他在 IG 的大頭貼。</p>
         <div class="bp-al-ids">${[HIM, ME, ...sideNames(people)].map(card).join('')}<div class="bp-al-id add" data-person=""><span class="bp-al-idnone">＋</span><b>加配角</b><small>名字要跟劇情裡一樣</small></div></div>
         <label>照片風格（每張生圖都會套用，可以不寫）</label>
-        <textarea class="bp-al-style" rows="3" placeholder="${people.look.autoStyle ? `沒寫的話照頭像判斷的：${esc(people.look.autoStyle)}` : '沒寫的話，第一次生圖會看角色卡頭像自己判斷寫實或動漫。也可以自己寫：anime style, cel shading／film photo, warm tone'}">${esc(people.look.style)}</textarea>
+        <textarea class="bp-al-style" rows="3" placeholder="${people.look.autoStyle ? `沒寫的話照頭像判斷的：${esc(people.look.autoStyle)}` : '沒寫的話，第一次生圖會看角色卡頭像自己判斷寫實或動漫。也可以自己寫：日系動畫風、賽璐璐上色／底片感、暖色調'}">${esc(people.look.style)}</textarea>
         <p class="bp-al-hint">畫風、濾鏡、色調寫在這裡，寫了就以這裡為準（例如寫動漫風，就不會畫成寫實照片）。某個人的髮色、身形要寫在那個人的證件照裡。</p>
         <label>照片質感（寫實照片才套用）</label>
         <div class="bp-al-seg">${[['polished', '精修・像 GPT'], ['candid', '生活感・手機隨手拍']].map(([v, n]) => `<b data-al="preset" data-v="${v}" class="${(people.look.preset || 'polished') === v ? 'on' : ''}">${n}</b>`).join('')}</div>
         <p class="bp-al-hint">精修：皮膚光滑、淺景深、電影劇照感。生活感：保留毛孔和手機雜訊，像朋友隨手拍、發在 SNS 上的照片。</p>
+        <label>生圖指令的語言</label>
+        <div class="bp-al-seg">${[['zh', '中文'], ['en', 'English']].map(([v, n]) => `<b data-al="lang" data-v="${v}" class="${promptLang.get() === v ? 'on' : ''}">${n}</b>`).join('')}</div>
+        <p class="bp-al-hint">送去生圖的指令、新快照的 prompt、複製出來的內容都會用這個語言。後台指令都寫在小手機資料夾的 prompts.js，想自己調可以改那裡。</p>
         <label>生圖模型</label>
         <div class="bp-al-seg">${[['flash', 'Flash・快'], ['pro', 'Pro・細']].map(([v, n]) => `<b data-al="imgmodel" data-v="${v}" class="${imageModelPref.get() === v ? 'on' : ''}">${n}</b>`).join('')}</div>
         <p class="bp-al-hint">Flash 一張十幾秒；Pro 二十秒上下，光影和細節比較細，費用也比較高。選的那個叫不到時，會自動換另一個。</p>
@@ -146,7 +150,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       <div class="bp-al-scroll">
         <div class="bp-al-idpic" data-al="idpic">${editing.photo ? `<img src="${esc(editing.photo)}" alt="">` : '<span>點這裡放照片</span>'}</div>
         ${isNew ? '<label>名字（跟劇情、IG 裡出現的一樣）</label><input class="bp-al-idname" maxlength="20">' : ''}
-        <label>長相與身形（生圖會照這段，英文 tag 最好，可以不寫）</label><textarea class="bp-al-idlook" rows="4" placeholder="性別年紀、髮色髮型、眼睛、身高身材、常穿的衣服。例如：a man in his late 20s, ash-gray messy short hair, gray eyes, tall and slim, broad shoulders, black knit sweater">${esc(p.look)}</textarea>
+        <label>長相與身形（生圖會照這段，中文英文都可以，可以不寫）</label><textarea class="bp-al-idlook" rows="4" placeholder="性別年紀、髮色髮型、眼睛、身高身材、常穿的衣服。例如：二十多歲的男生，灰棕色亂髮，灰色眼睛，高、寬肩、結實，常穿黑色針織衫">${esc(p.look)}</textarea>
         ${editing.id === HIM ? `<button class="bp-al-ghost" data-al="lookauto" ${busy ? 'disabled' : ''}>${busy ? '整理中⋯' : '從角色卡幫我整理'}</button>` : ''}
         ${!isNew && editing.id !== HIM && editing.id !== ME ? '<button class="bp-al-ghost danger" data-al="iddel">刪掉這個配角</button>' : ''}
       </div>
@@ -177,7 +181,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         '', '劇情：', scenes.join('\n\n').slice(0, 3000), extra ? `\n她想拍的：${extra}` : '', '',
         `- in 列出照片裡看得到臉的人（${who.name}、${who.user} 或配角的名字），拍照的人沒入鏡就不要列`,
         '- 鏡頭照這一刻最自然的拍法選：全身、半身、近景、背影都可以，prompt 裡要寫明是哪一種；看不看鏡頭也照情境，多半是被拍的人沒注意到鏡頭、正在做自己的事',
-        '只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","in":["入鏡的人名"],"prompt":"生圖用的英文 prompt，逗號分隔：人物（照上面的長相）、動作、表情、場景、光線、鏡頭，寫實手機照片風格"}',
+        `只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","in":["入鏡的人名"],"prompt":"${P.SNAP_PROMPT}"}`,
       ].filter(Boolean).join('\n')));
       const inFrame = Array.isArray(r.in) ? r.in.map(String) : null;
       const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), ...(inFrame ? { in: inFrame } : {}), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
@@ -207,7 +211,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
   async function lookAuto() {
     busy = true; renderPerson();
     try {
-      const t = await generate(`[Brume Phone · 長相]\n現在不是在寫劇情正文。請從角色卡整理出 ${ch.name} 的外貌，寫成生圖用的英文 tag：性別年齡感、髮型髮色、眼睛、臉部特徵、身材、常穿的衣服。只輸出一行，逗號分隔，不要其他文字。`);
+      const t = await generate(`[Brume Phone · 長相]\n現在不是在寫劇情正文。請從角色卡整理出 ${ch.name} 的外貌，寫成生圖用的中文描述：性別年齡感、髮型髮色、眼睛、臉部特徵、身材、常穿的衣服。只輸出一行，用逗號分隔，不要其他文字。`);
       const box = screen.querySelector('.bp-al-idlook');
       if (box) box.value = t.trim().split('\n')[0].slice(0, 400);
     } catch (e) { say(`整理失敗：${e.message || e}`); }
@@ -232,6 +236,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (a === 'ids') { view = 'grid'; tab = 'id'; editing = null; render(); }
     if (a === 'lookauto') lookAuto();
     if (a === 'preset') { people.look.preset = e.target.closest('[data-v]').dataset.v; saveCast(ch.charKey, people); say(people.look.preset === 'candid' ? '之後拍成生活感' : '之後拍成精修'); renderIds(); return; }
+    if (a === 'lang') { promptLang.set(e.target.closest('[data-v]').dataset.v); say(promptLang.get() === 'en' ? '生圖指令改用英文' : '生圖指令改用中文'); renderIds(); return; }
     if (a === 'imgcount') { imageCountPref.set(e.target.closest('[data-v]').dataset.v); say(`之後一次生 ${imageCountPref.get()} 張`); renderIds(); return; }
     if (a === 'imgmodel') { imageModelPref.set(e.target.closest('[data-v]').dataset.v); say(imageModelPref.get() === 'pro' ? '之後用 Pro 生圖' : '之後用 Flash 生圖'); renderIds(); return; }
     if (a === 'idpic') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'idpic'; f.click(); }
