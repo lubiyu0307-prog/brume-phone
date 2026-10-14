@@ -4,7 +4,7 @@
 // 配角的大頭貼由玩家自己放（點配角的頭像，或相本的證件照區）：卡片作者不一定會做，玩家可以拿作者宣傳時附的配角照片來用。
 
 import * as store from './store.js';
-import { currentChar, generate, imagine, canSeeImages, ctx } from './st.js';
+import { currentChar, generate, imagine, canSeeImages, ctx, imageInfo } from './st.js';
 import { HIM, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
 
 // 自動生圖：打開的話，他新發的貼文用酒館的生圖畫成真的照片（要接好生圖，一張要等一下）
@@ -214,7 +214,13 @@ export function createIG({ screen, say }) {
     return { prompt: finalPrompt(people, who, `${p.desc}, instagram photo, natural light`, ids, { by }), refs: refsFor(people, who, p.desc, always) };
   }
   // 限動是直的（9:16），貼文是方的
-  const draw = async (p, who, aspect = '1:1') => { await ensureAutoStyle(people, who.charKey); const { prompt, refs } = photoPrompt(p, who); return imagine(prompt.replace('instagram photo', aspect === '9:16' ? 'vertical instagram story photo' : 'instagram photo'), { refs, aspect }); };
+  const draw = async (p, who, aspect = '1:1') => {
+    await ensureAutoStyle(people, who.charKey); const { prompt, refs } = photoPrompt(p, who);
+    const url = await imagine(prompt.replace('instagram photo', aspect === '9:16' ? 'vertical instagram story photo' : 'instagram photo'), { refs, aspect });
+    // 有證件照卻退到酒館生圖畫：臉不會像，講一聲
+    if (url && refs.length && imageInfo.by === 'imagine') say(`這張是酒館生圖畫的，看不到證件照。Gemini 沒畫出來：${imageInfo.why || '原因不明'}`);
+    return url;
+  };
 
   // 配角的證件照：一張照片（當大頭貼，也是生圖的參考）＋長相文字。相本的證件照區是同一份
   function castSheet(name) {

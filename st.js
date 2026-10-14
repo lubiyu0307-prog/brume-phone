@@ -110,11 +110,26 @@ export async function generate(prompt, image) {
  *   二、沒接、或接了沒出圖，而聊天是接 Google（Vertex／AI Studio）→ 借酒館的連線叫 Gemini 生圖
  * 酒館擴充裡的 Google 只有 Imagen，Imagen 2026 年中已經停用，所以第二條才是 Google 玩家真正會走的路
  */
+/** 上一張圖是誰畫的、Gemini 為什麼沒畫（相本、IG 顯示給玩家看） */
+export const imageInfo = { by: '', why: '' };
+
 export async function imagine(prompt, { refs = [], aspect = '1:1' } = {}) {
   // 有參考圖（相本證件照區的照片）時先走 Gemini：/imagine 吃不了參考圖，畫出來會是另一張臉
   refs = refs.filter((r) => r?.url);
-  if (refs.length) return (await viaGemini(prompt, refs, aspect)) || (await viaImagine(prompt));
-  return (await viaImagine(prompt)) || (await viaGemini(prompt, [], aspect));
+  imageInfo.by = ''; imageInfo.why = '';
+  if (refs.length) {
+    const g = await viaGemini(prompt, refs, aspect);
+    if (g) { imageInfo.by = 'gemini'; return g; }
+    // Gemini 沒畫出來才退回酒館的生圖；那邊看不到證件照，臉會不一樣，要讓玩家知道（10/14 企鵝館那張就是這樣）
+    const i = await viaImagine(prompt);
+    if (i) imageInfo.by = 'imagine';
+    return i;
+  }
+  const i = await viaImagine(prompt);
+  if (i) { imageInfo.by = 'imagine'; return i; }
+  const g = await viaGemini(prompt, [], aspect);
+  if (g) imageInfo.by = 'gemini';
+  return g;
 }
 
 async function viaImagine(prompt) {
@@ -135,7 +150,7 @@ const GEMINI_IMAGE_MODELS = ['gemini-3.1-flash-image', 'gemini-3-pro-image'];
 async function viaGemini(prompt, refs = [], aspect = '1:1') {
   const c = ctx(); const o = c?.chatCompletionSettings || {};
   const src = o.chat_completion_source;
-  if (src !== 'vertexai' && src !== 'makersuite') return '';
+  if (src !== 'vertexai' && src !== 'makersuite') { imageInfo.why = '酒館聊天沒有接 Google（Vertex 或 AI Studio）'; return ''; }
   const ask = `Generate one image. No text in the image, no captions.\n${String(prompt).trim()}`;
   // 參考圖一張一張標上是誰，畫出來的人才會對得上
   const content = refs.length
@@ -153,14 +168,14 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
           reverse_proxy: o.reverse_proxy, proxy_password: o.proxy_password,
         }),
       });
-      if (!r.ok) continue;
+      if (!r.ok) { imageInfo.why = `${model} 回 ${r.status}${r.status === 404 ? '（這個地區沒有這個模型）' : r.status === 429 ? '（額度用完或太頻繁）' : ''}`; continue; }
       const j = await r.json();
       // 酒館把 Gemini 的回應整理成 responseContent；舊版直接轉 Google 原本的 candidates，兩種都看
       const parts = j?.responseContent?.parts || j?.candidates?.[0]?.content?.parts || [];
       const img = parts.find((p) => p.inlineData?.data)?.inlineData;
-      if (!img) return ''; // 只回了文字＝這張被擋了（多半是太露骨），換模型也一樣，交給玩家拿 prompt 去外面生
+      if (!img) { imageInfo.why = '這張被 Google 擋下來了（多半是太露骨）'; return ''; } // 只回了文字＝這張被擋了（多半是太露骨），換模型也一樣，交給玩家拿 prompt 去外面生
       return await saveImage(img.data, (img.mimeType || 'image/png').split('/')[1] || 'png');
-    } catch { /* 換下一個模型 */ }
+    } catch (e) { imageInfo.why = `${model} 連不上（${e.message || e}）`; /* 換下一個模型 */ }
   }
   return '';
 }

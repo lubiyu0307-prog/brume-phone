@@ -2,7 +2,7 @@
 // 「證件照」分頁放他、妳、配角的參考照片和長相，每張快照都帶著，同一個人才不會每張長得不一樣。
 
 import * as store from './store.js';
-import { currentChar, generate, imagine, recentChat } from './st.js';
+import { currentChar, generate, imagine, recentChat, imageInfo } from './st.js';
 import { HIM, ME, loadCast, saveCast, person, setPerson, sideNames, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -164,7 +164,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
       if (p.prompt) await ensureAutoStyle(people, who.charKey);
       p.img = p.prompt ? await imagine(snapPrompt(p), { refs: snapRefs(p) }) : '';
-      note = p.img ? '' : '沒有出圖：酒館可能還沒接生圖。可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。';
+      note = drawnNote(p.img, snapRefs(p)) || (p.img ? '' : '沒有出圖：酒館可能還沒接生圖。可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。');
       if (who.key === ch?.key) { items.push(p); save(); }
       picked = new Set(); openId = p.id; view = 'one';
     } catch (e) { say(`拍照失敗：${e.message || e}`); }
@@ -174,6 +174,10 @@ export function createAlbum({ screen, say, onShare, onIG }) {
 
   // 快照的參考照片：他和妳一定帶，劇情裡出現名字的配角也帶
   const snapText = (p) => `${p.scene || ''}\n${p.desc || ''}`;
+  // 有證件照卻是酒館生圖畫的：講清楚臉為什麼不像、Gemini 卡在哪
+  const drawnNote = (url, refs) => (url && refs.length && imageInfo.by === 'imagine'
+    ? `這張是酒館的生圖畫的，它看不到證件照，臉會不像。Gemini 沒畫出來：${imageInfo.why || '原因不明'}`
+    : !url && imageInfo.why ? `沒有出圖：${imageInfo.why}` : '');
   const snapRefs = (p) => refsFor(people, ch, snapText(p), [HIM, ME]);
   const snapPrompt = (p) => finalPrompt(people, ch, p.prompt, idsFor(people, snapText(p), [HIM, ME]));
 
@@ -223,7 +227,8 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       note = '生圖中⋯'; renderOne();
       await ensureAutoStyle(people, ch.charKey);
       const url = await imagine(snapPrompt(p), { refs: snapRefs(p) });
-      if (url) { p.img = url; note = ''; save(); } else note = '沒有出圖：酒館可能還沒接生圖，或這次失敗了。';
+      if (url) { p.img = url; save(); }
+      note = drawnNote(url, snapRefs(p)) || (url ? '' : '沒有出圖：酒館可能還沒接生圖，或這次失敗了。');
       if (mine()) renderOne();
     }
     if (a === 'ig' && p?.img && !busy) {
