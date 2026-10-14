@@ -122,8 +122,8 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <p class="bp-al-hint">放每個人的參考照片，快照和 IG 生圖時會拿給 Gemini 看，同一個人才會每張都長一樣。配角的照片也是他在 IG 的大頭貼。</p>
         <div class="bp-al-ids">${[HIM, ME, ...sideNames(people)].map(card).join('')}<div class="bp-al-id add" data-person=""><span class="bp-al-idnone">＋</span><b>加配角</b><small>名字要跟劇情裡一樣</small></div></div>
         <label>照片風格（每張生圖都會套用，可以不寫）</label>
-        <textarea class="bp-al-style" rows="3" placeholder="例如：film photo, warm tone, soft grain／日系清新、低飽和／韓系冷白、柔焦">${esc(people.look.style)}</textarea>
-        <p class="bp-al-hint">濾鏡、色調、畫風寫在這裡；某個人的髮色、身形要寫在那個人的證件照裡。</p>
+        <textarea class="bp-al-style" rows="3" placeholder="不寫就是寫實的手機照片。動漫風的卡寫：anime style, cel shading／濾鏡寫：film photo, warm tone, soft grain">${esc(people.look.style)}</textarea>
+        <p class="bp-al-hint">畫風、濾鏡、色調寫在這裡，寫了就以這裡為準（例如寫動漫風，就不會畫成寫實照片）。某個人的髮色、身形要寫在那個人的證件照裡。</p>
       </div></div>`;
   }
 

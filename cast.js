@@ -68,6 +68,7 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
     String(prompt).trim(),
     cam ? `First-person shot taken by ${cam.name} on their own phone. ${cam.name} is NOT in the photo: no face, no body. If a hand or arm reaches into the frame, it is ${cam.name}'s own${sex || hand ? ` (${[sex ? `${sex} hand` : '', hand].filter(Boolean).join(': ')})` : ''}.` : '',
     notes.length ? `Appearance to keep exactly (hair colour, body shape, clothes):\n${notes.join('\n')}` : '',
-    data.look.style ? `Photo style / filter: ${data.look.style}` : '',
+    // 玩家寫的風格蓋過上面的「photo」「realistic」：動漫風的卡寫 anime style 就要畫成動漫，不是寫實照片
+    data.look.style ? `Visual style (this overrides any "photo" or "realistic" wording above): ${data.look.style}` : '',
   ].filter(Boolean).join('\n');
 }

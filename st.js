@@ -136,7 +136,7 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
   const c = ctx(); const o = c?.chatCompletionSettings || {};
   const src = o.chat_completion_source;
   if (src !== 'vertexai' && src !== 'makersuite') return '';
-  const ask = `Generate one photo. No text in the image, no captions.\n${String(prompt).trim()}`;
+  const ask = `Generate one image. No text in the image, no captions.\n${String(prompt).trim()}`;
   // 參考圖一張一張標上是誰，畫出來的人才會對得上
   const content = refs.length
     ? [{ type: 'text', text: `${ask}\nReference photos of the people in this photo follow. Keep each person's face, hair and overall look.` },
