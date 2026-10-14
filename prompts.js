@@ -35,7 +35,8 @@ const ZH = {
   // 照片質感「精修」（像 GPT）
   POLISHED: {
     match: '質感照參考照片：一樣光滑柔和、有修過的皮膚，一樣乾淨精緻的成品感。',
-    colour: (anyRef) => `顏色：白平衡中性、乾淨。${anyRef ? '膚色跟各自的參考照片一樣，清透有光澤' : '膚色清透自然'}，不要偏黃、偏橘或暗沉，就算是室內暖光也一樣；暖色只留在背景。`,
+    // 情境寫「暖黃燈光」時，Gemini 會讓整張連皮膚都蒙一層黃（10/14 泡澡那張），所以這句要比情境更強
+    colour: (anyRef) => `顏色（優先於上面情境寫的燈光顏色）：整張照片白平衡中性、略偏冷，乾淨通透，不要整張蒙上黃色或橘色。情境寫暖光、燭光時，暖色只出現在燈具、燭火和背景的光斑上；人的皮膚維持乾淨白皙、帶自然的粉色調${anyRef ? '，跟各自的參考照片一樣' : ''}，不要偏黃、偏橘或暗沉。`,
     people: '攝影：像電影劇照一樣有親密感，鏡頭照情境描述的方式拍。85mm 鏡頭、f/1.8，景深很淺，背景糊成柔和的光斑，只有人是清楚的。柔光，調色柔和、飽和度稍低。',
     things: '攝影：有電影感的手機照片，淺景深、柔和的光斑，柔光，調色柔和、飽和度稍低。',
   },
@@ -86,7 +87,7 @@ const EN = {
 
   POLISHED: {
     match: 'Match the rendering of the reference photos: the same smooth, soft, retouched skin texture and the same polished, clean finish.',
-    colour: (anyRef) => `Colour: neutral, clean white balance. ${anyRef ? "Skin tone exactly like each person's reference photo: clear and luminous" : 'Skin looks clear and natural'}, with no yellow, orange or sallow cast, even under warm indoor light; keep any warmth in the background only.`,
+    colour: (anyRef) => `Colour (this overrides any light colour named in the scene above): neutral, slightly cool, clean white balance across the whole picture; never an overall yellow or orange cast. If the scene mentions warm light or candlelight, the warmth appears only in the lamps, flames and background bokeh; skin stays clean and fair with a natural pink undertone${anyRef ? ", exactly like each person's reference photo" : ''}, never yellow, orange or sallow.`,
     people: 'Photography: an intimate cinematic film still, framed the way the scene describes. Shot on an 85mm lens at f/1.8, very shallow depth of field, background melts into creamy bokeh, only the people are sharp. Soft light, gentle muted colour grading, slightly lower saturation.',
     things: 'Photography: cinematic phone photo, shallow depth of field with soft bokeh, soft light, gentle muted colour grading, slightly lower saturation.',
   },
