@@ -196,7 +196,7 @@ async function viaKey(prompt, refs = [], aspect = '1:1') {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST', referrerPolicy: 'strict-origin-when-cross-origin',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({ contents: [{ role: 'user', parts }], safetySettings: safety, generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: aspect } } }),
+        body: JSON.stringify({ contents: [{ role: 'user', parts }], safetySettings: safety, generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: aspect, ...(/gemini-3/.test(model) ? { imageSize: RESOLUTION } : {}) } } }),
       });
       if (!r.ok) { imageInfo.why = (prev ? prev + '；' : '') + `金鑰那條：${model} 回 ${r.status}${r.status === 429 ? '（額度用完或太頻繁）' : r.status === 400 ? '（金鑰或參數不對）' : r.status === 403 ? '（金鑰沒有權限，或限制了網站）' : ''}`; continue; }
       const img = (await r.json())?.candidates?.[0]?.content?.parts?.find((x) => x.inlineData?.data)?.inlineData;
@@ -214,13 +214,17 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
   if (src !== 'vertexai' && src !== 'makersuite') { imageInfo.why = '酒館聊天沒有接 Google（Vertex 或 AI Studio）'; return ''; }
   const req = await refRequest(prompt, refs);
   const content = req.images.length ? [...req.images.map((url) => ({ type: 'image_url', image_url: { url } })), { type: 'text', text: req.text }] : req.text;
-  for (const model of byPref(GEMINI_IMAGE_MODELS)) {
+  const order = byPref(GEMINI_IMAGE_MODELS);
+  // 第一順位（玩家選的）失敗先等六秒再試一次：Pro 常常是短暫被擋速度，馬上退回 Flash 質感就掉了（10/14 五張有兩張這樣）。
+  // 酒館把 Google 的錯誤一律回 500，分不出是不是被擋，所以只要失敗就重試
+  for (const model of [order[0], ...order]) {
+    if (model === order[0] && imageInfo.why) await new Promise((res) => setTimeout(res, 6000));
     try {
       const r = await fetch('/api/backends/chat-completions/generate', {
         method: 'POST', headers: c.getRequestHeaders(),
         body: JSON.stringify({
           messages: [{ role: 'user', content }], model, chat_completion_source: src, stream: false,
-          request_images: true, request_image_aspect_ratio: aspect, request_image_resolution: '1K', max_tokens: 4096, temperature: 1,
+          request_images: true, request_image_aspect_ratio: aspect, request_image_resolution: RESOLUTION, max_tokens: 4096, temperature: 1,
           vertexai_auth_mode: o.vertexai_auth_mode, vertexai_region: o.vertexai_region, vertexai_express_project_id: o.vertexai_express_project_id,
           reverse_proxy: o.reverse_proxy, proxy_password: o.proxy_password,
         }),
@@ -275,7 +279,23 @@ export async function asDataUrl(url) {
 }
 
 // 圖存到酒館伺服器的使用者圖片資料夾，手機只記網址。直接存 base64 會把瀏覽器的空間（約 5MB）一張就吃掉三分之一
+// 2K：全身照、遠景的臉才分得到夠多像素，五官不會糊掉（1K 時全身照的臉只有幾十個像素，10/14 測的）
+const RESOLUTION = '2K';
+
+// 存檔前轉成 JPG：2K 的 PNG 一張好幾 MB，相本整本會同步到伺服器
+async function toJpeg(base64, ext) {
+  try {
+    const bin = atob(base64); const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const bmp = await createImageBitmap(new Blob([bytes], { type: `image/${ext}` }));
+    const cv = document.createElement('canvas'); cv.width = bmp.width; cv.height = bmp.height;
+    cv.getContext('2d').drawImage(bmp, 0, 0);
+    return { data: cv.toDataURL('image/jpeg', 0.9).split(',')[1], ext: 'jpg' };
+  } catch { return { data: base64, ext }; }
+}
+
 async function saveImage(base64, ext) {
+  ({ data: base64, ext } = await toJpeg(base64, ext));
   const c = ctx(); const ch = c.characters?.[c.characterId];
   const r = await fetch('/api/images/upload', {
     method: 'POST', headers: c.getRequestHeaders(),
