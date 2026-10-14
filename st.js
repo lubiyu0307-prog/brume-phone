@@ -165,6 +165,30 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
   return '';
 }
 
+/**
+ * 給模型看一張圖、問一句話，只送這兩樣（不帶預設和正文），回傳文字；不是接 Google 或失敗回空字串。
+ * 用正文那條路帶圖會把整份預設一起送，又貴又容易 500（10/14 判斷畫風時踩到）
+ */
+export async function lookAt(text, img) {
+  const c = ctx(); const o = c?.chatCompletionSettings || {};
+  const src = o.chat_completion_source;
+  const model = src === 'vertexai' ? o.vertexai_model : src === 'makersuite' ? o.google_model : '';
+  if (!model || !img) return '';
+  try {
+    const r = await fetch('/api/backends/chat-completions/generate', {
+      method: 'POST', headers: c.getRequestHeaders(),
+      body: JSON.stringify({
+        messages: [{ role: 'user', content: [{ type: 'text', text }, { type: 'image_url', image_url: { url: img } }] }],
+        model, chat_completion_source: src, stream: false, max_tokens: 2048, temperature: 0.2,
+        vertexai_auth_mode: o.vertexai_auth_mode, vertexai_region: o.vertexai_region, vertexai_express_project_id: o.vertexai_express_project_id,
+        reverse_proxy: o.reverse_proxy, proxy_password: o.proxy_password,
+      }),
+    });
+    if (!r.ok) return '';
+    return String((await r.json())?.choices?.[0]?.message?.content || '').trim();
+  } catch { return ''; }
+}
+
 // 參考圖要給 dataURL；角色卡頭像這種網址先抓下來縮到 768 寬（原檔常常一兩 MB）
 export async function asDataUrl(url) {
   if (String(url).startsWith('data:')) return url;

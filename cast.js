@@ -4,7 +4,7 @@
 // look.style 是玩家寫的照片風格（濾鏡、畫風），每張生圖都套用。
 
 import * as store from './store.js';
-import { generate, asDataUrl } from './st.js';
+import { lookAt, asDataUrl } from './st.js';
 
 export const HIM = '@him';
 export const ME = '@me';
@@ -30,7 +30,7 @@ export async function ensureAutoStyle(data, charKey) {
   try {
     const img = await asDataUrl(data.cardAvatar);
     if (!img) return;
-    const t = await generate('[Brume Phone · 畫風]\n現在不是在寫劇情正文。看附上的角色圖片，用英文寫一行生圖用的畫風描述：寫實照片就只回 realistic photo；動漫、插畫、3D 就寫出畫風（例如 anime style, cel shading, soft colours）。只輸出那一行，不要其他文字。', img);
+    const t = await lookAt('Look at this character image. Reply with one line of image-generation style tags in English: if it is a realistic photo reply exactly "realistic photo"; if it is anime, illustration or 3D, describe the art style (e.g. "anime style, cel shading, soft colours"). Output only that line.', img);
     const line = String(t || '').trim().split('\n')[0].replace(/^["'`]+|["'`]+$/g, '').slice(0, 160);
     if (!line) return;
     data.look.autoStyle = line;
