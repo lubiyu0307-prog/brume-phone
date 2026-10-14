@@ -346,19 +346,19 @@
 .bp-line-av.sm { width: 36px; height: 36px; }
 .bp-line-msg { margin: 4px 0; }
 .bp-line-msg.bp-tail { margin-top: 10px; }
-/* 一串的第一則有小尾巴。
-   尾巴那側的上角改成小圓角，尾巴才接得上泡泡（大圓角會在中間缺一塊，看起來像多長一根角）。
-   尾巴用邊框畫三角形，不用 clip-path：iPhone 會把 clip-path 另外畫一層，護眼模式的暖色蓋不到，顏色會比泡泡淺。 */
+/* 一串的第一則有小尾巴：像真的 LINE，泡泡本身維持整顆圓，上角長出一個往外翹的彎勾。
+   彎勾用放射漸層挖出來（不用 clip-path：iPhone 會把 clip-path 另外畫一層，護眼模式的暖色蓋不到，顏色會比泡泡淺）。
+   顏色跟著 --tail，陪睡模式換色只要改這個。 */
 .bp-tail .bp-line-bwrap > .bp-line-bub:first-child, .bp-tail > .bp-line-bub.bp-typing { position: relative; }
-.bp-him.bp-tail .bp-line-bwrap > .bp-line-bub:first-child, .bp-him.bp-tail > .bp-line-bub.bp-typing { border-top-left-radius: 5px; }
-.bp-me.bp-tail .bp-line-bwrap > .bp-line-bub:first-child { border-top-right-radius: 5px; }
+.bp-him .bp-line-bub { --tail: #fff; }
+.bp-me .bp-line-bub { --tail: var(--line-bub); }
 .bp-him.bp-tail .bp-line-bwrap > .bp-line-bub:first-child::before, .bp-him.bp-tail > .bp-line-bub.bp-typing::before {
-  content: ""; position: absolute; top: 0; left: -6px; width: 0; height: 0;
-  border-top: 10px solid #fff; border-left: 8px solid transparent; border-top-left-radius: 2px;
+  content: ""; position: absolute; top: 0; left: -7px; width: 18px; height: 17px; border-top-right-radius: 18px 17px;
+  background: radial-gradient(ellipse 12px 16px at 0 100%, transparent 96%, var(--tail) 100%);
 }
 .bp-me.bp-tail .bp-line-bwrap > .bp-line-bub:first-child::after {
-  content: ""; position: absolute; top: 0; right: -6px; width: 0; height: 0;
-  border-top: 10px solid var(--line-bub); border-right: 8px solid transparent; border-top-right-radius: 2px;
+  content: ""; position: absolute; top: 0; right: -7px; width: 18px; height: 17px; border-top-left-radius: 18px 17px;
+  background: radial-gradient(ellipse 12px 16px at 100% 100%, transparent 96%, var(--tail) 100%);
 }
 .bp-line-qbox { color: #444; border-left-color: rgba(0, 0, 0, .25); }
 .bp-line-sys { color: #fff; }
@@ -405,10 +405,9 @@
 .bp-line-sleep { --line-bg: #1c2433; }
 .bp-line-sleep .bp-line-head, .bp-line-sleep .bp-line-head b, .bp-line-sleep .bp-back, .bp-line-sleep .bp-line-tools i { color: #c9d1e0 !important; }
 .bp-line-sleep .bp-him .bp-line-bub { background: #2c3546; color: #dfe5ef; }
-.bp-line-sleep.bp-him.bp-tail .bp-line-bub::before { border-top-color: #2c3546; }
-.bp-line-sleep .bp-him.bp-tail .bp-line-bwrap > .bp-line-bub:first-child::before { border-top-color: #2c3546; }
+.bp-line-sleep .bp-him .bp-line-bub { --tail: #2c3546; }
 .bp-line-sleep .bp-me .bp-line-bub { background: #5c7a4c; color: #eef3ea; }
-.bp-line-sleep .bp-me.bp-tail .bp-line-bwrap > .bp-line-bub:first-child::after { border-top-color: #5c7a4c; }
+.bp-line-sleep .bp-me .bp-line-bub { --tail: #5c7a4c; }
 .bp-line-sleep .bp-line-meta { color: #7d879a; }
 .bp-line-sleep .bp-line-bar, .bp-line-sleep .bp-line-quoting { background: #161d29; }
 .bp-line-sleep .bp-line-field { background: #262f40; }
