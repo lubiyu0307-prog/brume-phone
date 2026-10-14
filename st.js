@@ -127,8 +127,14 @@ export async function imagine(prompt, { refs = [], aspect = '1:1' } = {}) {
   return g;
 }
 
-// flash 快（十幾秒），pro 慢一點但細；flash 叫不到才換 pro
+// flash 快（十幾秒），pro 慢一點（二十秒上下）但光影細節比較細。玩家在證件照頁選先用哪個，叫不到才換另一個
 const GEMINI_IMAGE_MODELS = ['gemini-3.1-flash-image', 'gemini-3-pro-image'];
+const PREF = 'brume-phone:imgmodel';
+export const imageModelPref = {
+  get() { try { return localStorage.getItem(PREF) === 'pro' ? 'pro' : 'flash'; } catch { return 'flash'; } },
+  set(v) { try { localStorage.setItem(PREF, v === 'pro' ? 'pro' : 'flash'); } catch { /* 存不了就照預設 */ } },
+};
+const byPref = (list) => (imageModelPref.get() === 'pro' ? [...list].sort((a, b) => /pro/.test(b) - /pro/.test(a)) : list);
 
 // 第二條路：玩家貼在手機裡的 AI Studio 金鑰（跟電話的 Gemini 聲音共用同一把）。
 // 酒館那條路會卡在酒館版本太舊、Vertex 地區沒有生圖模型、快速模式碰不到；這條直接從瀏覽器問 Google，不經過酒館
@@ -157,7 +163,7 @@ async function viaKey(prompt, refs = [], aspect = '1:1') {
     parts.push({ text: `Reference: ${r.name}` }, { inline_data: { mime_type: url.slice(5, url.indexOf(';')), data: url.slice(url.indexOf(',') + 1) } });
   }
   const safety = ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT'].map((category) => ({ category, threshold: 'BLOCK_NONE' }));
-  for (const model of await imageModels(key)) {
+  for (const model of byPref(await imageModels(key))) {
     try {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST', referrerPolicy: 'strict-origin-when-cross-origin',
@@ -183,7 +189,7 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
     ? [{ type: 'text', text: `${ask}\nReference photos of the people in this picture follow. Each person must be clearly the same person as in their reference: same face, same hair colour, same hairstyle. The photo wins over any text. Frame them close enough (half body or closer) that their faces are clearly visible and recognisable, never tiny distant figures. A reference may show the same person from several angles side by side; it is still one person. Unless a visual style is given above, draw in the same art style as the references (anime stays anime, photo stays photo).` },
       ...(await Promise.all(refs.map(async (r) => { const url = await asDataUrl(r.url); return url ? [{ type: 'text', text: `Reference: ${r.name}` }, { type: 'image_url', image_url: { url } }] : []; }))).flat()]
     : ask;
-  for (const model of GEMINI_IMAGE_MODELS) {
+  for (const model of byPref(GEMINI_IMAGE_MODELS)) {
     try {
       const r = await fetch('/api/backends/chat-completions/generate', {
         method: 'POST', headers: c.getRequestHeaders(),
