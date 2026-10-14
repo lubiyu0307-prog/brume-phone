@@ -154,14 +154,29 @@ async function imageModels(key) {
   } catch { keyModels = ['gemini-2.5-flash-image']; }
   return keyModels;
 }
+/**
+ * 參考照片放最前面、一張一張講明是誰，文字放後面。
+ * Pro 會照順序讀：照片排在一大段文字後面、只標一行「Reference」，它會把照片當補充資料、照文字自己想像臉
+ * （10/14 同一張企鵝快照對照：照片在後三張兩張不像，照片在前兩張都像）。flash 不挑順序，這樣排也一樣好
+ * 回傳 { images: [dataURL...], text }，兩條路各自包成自己的格式
+ */
+async function refRequest(prompt, refs) {
+  const ask = `Generate one image. No text in the image, no captions.\n${String(prompt).trim()}`;
+  const got = [];
+  for (const r of refs) { const url = await asDataUrl(r.url); if (url) got.push({ name: r.name, url }); }
+  if (!got.length) return { images: [], text: ask };
+  const who = got.map((r, i) => `Image ${i + 1} is a reference photo of ${r.name} (it may show the same person from several angles side by side; it is still one person).`).join('\n');
+  return {
+    images: got.map((r) => r.url),
+    text: `${who}\nCreate a new picture with exactly these people: keep each person's face, eyes, nose, jawline, hair colour and hairstyle identical to their reference image. The reference images win over any text below. Frame them close enough (half body or closer) that their faces are clearly visible and recognisable, never tiny distant figures. Unless a visual style is given below, draw in the same art style as the references (anime stays anime, photo stays photo).\n\n${ask}`,
+  };
+}
+
 async function viaKey(prompt, refs = [], aspect = '1:1') {
   const key = geminiKeyGet(); const prev = imageInfo.why;
   if (!key) { imageInfo.why = (imageInfo.why ? imageInfo.why + '；' : '') + '手機裡也沒有貼 AI Studio 金鑰（電話的「他的聲音」或相本證件照頁可以貼）'; return ''; }
-  const parts = [{ text: `Generate one image. No text in the image, no captions.\n${String(prompt).trim()}${refs.length ? '\nReference photos of the people in this picture follow. Each person must be clearly the same person as in their reference: same face, same hair colour, same hairstyle. The photo wins over any text. Frame them close enough (half body or closer) that their faces are clearly visible and recognisable, never tiny distant figures. A reference may show the same person from several angles side by side; it is still one person. Unless a visual style is given above, draw in the same art style as the references (anime stays anime, photo stays photo).' : ''}` }];
-  for (const r of refs) {
-    const url = await asDataUrl(r.url); if (!url) continue;
-    parts.push({ text: `Reference: ${r.name}` }, { inline_data: { mime_type: url.slice(5, url.indexOf(';')), data: url.slice(url.indexOf(',') + 1) } });
-  }
+  const req = await refRequest(prompt, refs);
+  const parts = [...req.images.map((url) => ({ inline_data: { mime_type: url.slice(5, url.indexOf(';')), data: url.slice(url.indexOf(',') + 1) } })), { text: req.text }];
   const safety = ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT'].map((category) => ({ category, threshold: 'BLOCK_NONE' }));
   for (const model of byPref(await imageModels(key))) {
     try {
@@ -183,12 +198,8 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
   const c = ctx(); const o = c?.chatCompletionSettings || {};
   const src = o.chat_completion_source;
   if (src !== 'vertexai' && src !== 'makersuite') { imageInfo.why = '酒館聊天沒有接 Google（Vertex 或 AI Studio）'; return ''; }
-  const ask = `Generate one image. No text in the image, no captions.\n${String(prompt).trim()}`;
-  // 參考圖一張一張標上是誰，畫出來的人才會對得上
-  const content = refs.length
-    ? [{ type: 'text', text: `${ask}\nReference photos of the people in this picture follow. Each person must be clearly the same person as in their reference: same face, same hair colour, same hairstyle. The photo wins over any text. Frame them close enough (half body or closer) that their faces are clearly visible and recognisable, never tiny distant figures. A reference may show the same person from several angles side by side; it is still one person. Unless a visual style is given above, draw in the same art style as the references (anime stays anime, photo stays photo).` },
-      ...(await Promise.all(refs.map(async (r) => { const url = await asDataUrl(r.url); return url ? [{ type: 'text', text: `Reference: ${r.name}` }, { type: 'image_url', image_url: { url } }] : []; }))).flat()]
-    : ask;
+  const req = await refRequest(prompt, refs);
+  const content = req.images.length ? [...req.images.map((url) => ({ type: 'image_url', image_url: { url } })), { type: 'text', text: req.text }] : req.text;
   for (const model of byPref(GEMINI_IMAGE_MODELS)) {
     try {
       const r = await fetch('/api/backends/chat-completions/generate', {
