@@ -124,6 +124,8 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <label>照片風格（每張生圖都會套用，可以不寫）</label>
         <textarea class="bp-al-style" rows="3" placeholder="${people.look.autoStyle ? `沒寫的話照頭像判斷的：${esc(people.look.autoStyle)}` : '沒寫的話，第一次生圖會看角色卡頭像自己判斷寫實或動漫。也可以自己寫：anime style, cel shading／film photo, warm tone'}">${esc(people.look.style)}</textarea>
         <p class="bp-al-hint">畫風、濾鏡、色調寫在這裡，寫了就以這裡為準（例如寫動漫風，就不會畫成寫實照片）。某個人的髮色、身形要寫在那個人的證件照裡。</p>
+        <label>AI Studio 金鑰（酒館那邊叫不到 Gemini 生圖時，手機直接用這把；跟電話的聲音共用）</label>
+        <input class="bp-al-gkey" type="password" autocomplete="off" placeholder="${(() => { try { return localStorage.getItem('brume-phone:gemini-key') ? '已經貼好了（重貼會換掉）' : '貼上 AI Studio 金鑰'; } catch { return '貼上 AI Studio 金鑰'; } })()}">
       </div></div>`;
   }
 
@@ -246,6 +248,11 @@ export function createAlbum({ screen, say, onShare, onIG }) {
   });
 
   screen.addEventListener('change', async (e) => {
+    if (mine() && e.target.classList.contains('bp-al-gkey')) {
+      const v = e.target.value.trim(); if (!v) return;
+      try { localStorage.setItem('brume-phone:gemini-key', v); } catch { /* 存不了 */ }
+      e.target.value = ''; e.target.placeholder = '已經貼好了（重貼會換掉）'; say('金鑰存好了，只存在這台'); return;
+    }
     if (mine() && e.target.classList.contains('bp-al-style')) { people.look.style = e.target.value.trim(); saveCast(ch.charKey, people); say('照片風格存好了'); return; }
     if (mine() && e.target.classList.contains('bp-al-cap')) {
       const p = items.find((x) => x.id === openId);

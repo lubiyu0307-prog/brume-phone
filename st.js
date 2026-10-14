@@ -118,7 +118,7 @@ export async function imagine(prompt, { refs = [], aspect = '1:1' } = {}) {
   refs = refs.filter((r) => r?.url);
   imageInfo.by = ''; imageInfo.why = '';
   if (refs.length) {
-    const g = await viaGemini(prompt, refs, aspect);
+    const g = (await viaGemini(prompt, refs, aspect)) || (await viaKey(prompt, refs, aspect));
     if (g) { imageInfo.by = 'gemini'; return g; }
     // Gemini 沒畫出來才退回酒館的生圖；那邊看不到證件照，臉會不一樣，要讓玩家知道（10/14 企鵝館那張就是這樣）
     const i = await viaImagine(prompt);
@@ -127,7 +127,7 @@ export async function imagine(prompt, { refs = [], aspect = '1:1' } = {}) {
   }
   const i = await viaImagine(prompt);
   if (i) { imageInfo.by = 'imagine'; return i; }
-  const g = await viaGemini(prompt, [], aspect);
+  const g = (await viaGemini(prompt, [], aspect)) || (await viaKey(prompt, [], aspect));
   if (g) imageInfo.by = 'gemini';
   return g;
 }
@@ -146,6 +146,49 @@ async function viaImagine(prompt) {
 
 // flash 快（十幾秒），pro 慢一點但細；flash 叫不到才換 pro
 const GEMINI_IMAGE_MODELS = ['gemini-3.1-flash-image', 'gemini-3-pro-image'];
+
+// 第二條路：玩家貼在手機裡的 AI Studio 金鑰（跟電話的 Gemini 聲音共用同一把）。
+// 酒館那條路會卡在酒館版本太舊、Vertex 地區沒有生圖模型、快速模式碰不到；這條直接從瀏覽器問 Google，不經過酒館
+const KEY = 'brume-phone:gemini-key';
+const geminiKeyGet = () => { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } };
+let keyModels = null;
+async function imageModels(key) {
+  if (keyModels) return keyModels;
+  try {
+    const r = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', { headers: { 'x-goog-api-key': key }, referrerPolicy: 'strict-origin-when-cross-origin' });
+    const list = ((await r.json()).models || [])
+      .filter((m) => /image/.test(m.name) && !/imagen/.test(m.name) && (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map((m) => m.name.replace(/^models\//, ''));
+    // flash 先（快），pro 後；新的版本號排前面
+    list.sort((a, b) => (/flash/.test(b) - /flash/.test(a)) || b.localeCompare(a, 'en', { numeric: true }));
+    keyModels = list.length ? list.slice(0, 3) : ['gemini-2.5-flash-image'];
+  } catch { keyModels = ['gemini-2.5-flash-image']; }
+  return keyModels;
+}
+async function viaKey(prompt, refs = [], aspect = '1:1') {
+  const key = geminiKeyGet(); const prev = imageInfo.why;
+  if (!key) { imageInfo.why = (imageInfo.why ? imageInfo.why + '；' : '') + '手機裡也沒有貼 AI Studio 金鑰（電話的「他的聲音」或相本證件照頁可以貼）'; return ''; }
+  const parts = [{ text: `Generate one image. No text in the image, no captions.\n${String(prompt).trim()}${refs.length ? '\nReference images of the people in this picture follow. Keep each person\'s face, hair and overall look. Unless a visual style is given above, draw in the same art style as the references.' : ''}` }];
+  for (const r of refs) {
+    const url = await asDataUrl(r.url); if (!url) continue;
+    parts.push({ text: `Reference: ${r.name}` }, { inline_data: { mime_type: url.slice(5, url.indexOf(';')), data: url.slice(url.indexOf(',') + 1) } });
+  }
+  const safety = ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT'].map((category) => ({ category, threshold: 'BLOCK_NONE' }));
+  for (const model of await imageModels(key)) {
+    try {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: 'POST', referrerPolicy: 'strict-origin-when-cross-origin',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
+        body: JSON.stringify({ contents: [{ role: 'user', parts }], safetySettings: safety, generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: aspect } } }),
+      });
+      if (!r.ok) { imageInfo.why = (prev ? prev + '；' : '') + `金鑰那條：${model} 回 ${r.status}${r.status === 429 ? '（額度用完或太頻繁）' : r.status === 400 ? '（金鑰或參數不對）' : r.status === 403 ? '（金鑰沒有權限，或限制了網站）' : ''}`; continue; }
+      const img = (await r.json())?.candidates?.[0]?.content?.parts?.find((x) => x.inlineData?.data)?.inlineData;
+      if (!img) { imageInfo.why = (prev ? prev + '；' : '') + '金鑰那條：這張被 Google 擋下來了（多半是太露骨）'; return ''; }
+      return await saveImage(img.data, (img.mimeType || 'image/png').split('/')[1] || 'png');
+    } catch (e) { imageInfo.why = (prev ? prev + '；' : '') + `金鑰那條：${model} 連不上（${e.message || e}）`; }
+  }
+  return '';
+}
 
 async function viaGemini(prompt, refs = [], aspect = '1:1') {
   const c = ctx(); const o = c?.chatCompletionSettings || {};
