@@ -5,6 +5,7 @@
 import * as store from './store.js';
 import { currentChar, generate } from './st.js';
 import { verify } from './music.js';
+import * as stage from './stage.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const pad = (n) => String(n).padStart(2, '0');
@@ -75,11 +76,14 @@ export function createHisPhone({ host, say, onExit }) {
 
   async function ask(task, format) {
     const bg = await background();
+    // 隨時都能偷看（不用等交往），所以手機裡的東西要照現在的關係寫：剛認識就不會把她存成「老婆」
+    const st = await stage.get(ch.key);
     return parseJSON(await generate([
       '[Brume Phone · 他的手機]',
       `現在不是在寫劇情正文。${ch.user} 趁 ${ch.name} 不注意，偷偷拿了他的手機在看。請照 ${ch.name} 的個性、生活、跟 ${ch.user} 的關係和最近發生的事，寫出他手機裡會有的東西。`,
       '- 要像真的手機：日常、瑣碎、有生活感，也藏著他不會當面說的事',
       `- 跟 ${ch.user} 有關的小地方要自然，不要每一樣都繞著她`,
+      `- 他們現在的關係是「${stage.name(st)}」（${stage.tone(st)}）：備註名、聊天、相簿裡跟她有關的東西都要符合這個階段，不要超前`,
       '- 出現的其他人物要符合角色卡和世界觀，年代、用語也一樣',
       bg ? `\n${bg}` : '',
       '',

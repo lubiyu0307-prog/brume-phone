@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.14.13';
+const VERSION = '0.15.0';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -173,7 +173,7 @@ function build() {
     <div class="bp-sheet">
       <h3>設定</h3>
       <div class="bp-setrow"><span>你們的關係</span><div class="bp-seg" data-seg="stage">${stage.STAGES.map((x) => `<b data-act="stage" data-v="${x.id}">${x.name}</b>`).join('')}</div></div>
-      <p class="bp-sheet-note">有些功能等關係到了才打開：曖昧開始他會主動找妳，交往之後可以偷看他的手機、有陪睡模式，同居之後有冰箱門。劇情裡關係往前一步時，手機會問妳要不要改。</p>
+      <p class="bp-sheet-note">有些功能等關係到了才打開：曖昧開始他會主動找妳，交往之後有陪睡模式，同居之後有冰箱門。他的手機隨時都可以偷看。劇情裡關係往前一步時，手機會問妳要不要改。</p>
       <div class="bp-setrow"><span>他主動的程度</span><div class="bp-seg" data-seg="level">${Object.entries(LEVELS).map(([k, v]) => `<b data-act="level" data-v="${k}">${v.name}</b>`).join('')}</div></div>
       <button data-act="bridge" class="bp-switchrow">劇情接手機<i></i></button>
       <p class="bp-sheet-note">開著：正文裡你們分開、約好下次的時候，他之後會自己傳 LINE 或發脆，過幾分鐘手機才響。</p>
@@ -486,7 +486,7 @@ function build() {
       overlay.querySelector('.bp-hintsheet')?.remove();
       phone.insertAdjacentHTML('beforeend', `<div class="bp-hintsheet" data-key="${key}" data-v="${v}"><div>
         <b>劇情裡，你們好像${v === 'married' ? '結婚了' : v === 'living' ? '住在一起了' : v === 'dating' ? '在一起了' : '有點曖昧了'}</b>
-        <span>要把關係改成「${stage.name(v)}」嗎？會打開${v === 'living' ? '冰箱門' : v === 'dating' ? '偷看他的手機、陪睡模式' : v === 'flirt' ? '他主動找妳' : '新的東西'}。</span>
+        <span>要把關係改成「${stage.name(v)}」嗎？會打開${v === 'living' ? '冰箱門' : v === 'dating' ? '陪睡模式' : v === 'flirt' ? '他主動找妳' : '新的東西'}。</span>
         <div><button data-act="hint-no">先不要</button><button data-act="hint-yes" class="ok">好</button></div></div></div>`);
       if (!overlay.classList.contains('bp-open')) showBanner({ who: '小手機', text: '你們的關係好像變了，打開手機看看' });
     },
