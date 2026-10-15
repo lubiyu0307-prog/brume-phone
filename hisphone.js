@@ -293,7 +293,8 @@ export function createHisPhone({ host, say, onExit }) {
     const all = hp.album.map((p, i) => ({ p, i })).sort((a, b) => b.p.ts - a.p.ts);
     const shown = all.filter((x) => !x.p.hidden); const hidden = all.filter((x) => x.p.hidden);
     return `<div class="bp-hp-pgrid">${shown.map((x) => photoTile(x.p, x.i)).join('')}</div>
-      ${hidden.length ? `<h4>已隱藏 <small>${hidden.length}</small></h4><div class="bp-hp-pgrid">${hidden.map((x) => photoTile(x.p, x.i)).join('')}</div>` : ''}`;
+      ${hidden.length ? `<h4>已隱藏 <small>${hidden.length}</small></h4><div class="bp-hp-pgrid">${hidden.map((x) => photoTile(x.p, x.i)).join('')}</div>` : ''}
+      ${hp.album.length ? `<div class="bp-hp-pacts"><button data-hp="realbum" ${rewriting ? 'disabled' : ''}>${rewriting ? '重寫中⋯' : '重寫全部照片描述'}</button></div>` : ''}`;
   }
   function albumOne(i) {
     const p = hp.album[i];
@@ -358,6 +359,24 @@ export function createHisPhone({ host, say, onExit }) {
           c.msgs = (r.msgs || []).map((m) => ({ me: /^他$|^我$/.test(String(m.from || '').trim()) || String(m.from || '').trim() === who.name, from: String(m.from || ''), text: String(m.text || ''), ts: now - Math.max(0, +m.hoursAgo || 0) * 3600e3 }));
           save(); sub = c.name;
         }
+      } catch (err) { say(`沒有重寫成功：${err.message || err}`); }
+      rewriting = false; paint();
+    }
+    // 舊照片只有一句話描述，生圖得靠猜誰入鏡：整本重寫成新的寫法（desc＋shot＋in），同一張照片同一個瞬間，已經生好的圖留著
+    if (a === 'realbum' && view === 'album' && !rewriting && hp.album.length) {
+      const who = ch; const list = hp.album;
+      rewriting = true; paint();
+      try {
+        const people = await loadCast(who.charKey).catch(() => ({ cast: {}, look: {} }));
+        const r = await ask(`他相簿裡有這些照片，請一張一張重寫描述，拍的還是同一個瞬間、同一個東西，順序和張數都不變：\n${list.map((p, i) => `${i + 1}. ${p.hidden ? '（已隱藏）' : ''}${p.desc}`).join('\n')}\n這些照片都是 ${who.name} 用自己的手機拍或存下來的，拍照的人就是他。\n${shotRules(people, who)}`,
+          '[{"n":1,"desc":"照片拍到什麼，一句話","shot":"","in":[]}]');
+        let n = 0;
+        for (const x of Array.isArray(r) ? r : []) {
+          const p = list[(+x.n || 0) - 1]; if (!p || !String(x.shot || '').trim()) continue;
+          p.desc = String(x.desc || p.desc); p.shot = String(x.shot).trim(); p.in = Array.isArray(x.in) ? x.in.map(String) : []; n++;
+        }
+        if (who.key === ch?.key) save();
+        say(n ? `重寫了 ${n} 張，已經生好的圖還在，想照新描述畫就點開按「重新生一張」` : '沒有重寫成功，再按一次試試');
       } catch (err) { say(`沒有重寫成功：${err.message || err}`); }
       rewriting = false; paint();
     }
