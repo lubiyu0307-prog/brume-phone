@@ -82,10 +82,11 @@ export function refsFor(data, ch, text, always = []) {
 const FACE_TAG = /hair|bang|fringe|undercut|eye|face|skin|freckle|beard|mustache|lips?\b|nose|eyebrow|\d+\s*(years?|yo)\b|\bage\b|\bmature\b|middle[- ]aged|elderly|\bold(er)?\b|\byoung\b|youthful|\bteen|\b1(boy|girl)\b|\bsolo\b|髮|瀏海|眼|臉|膚|歲|鬍|成熟|中年|年輕|少年/i;
 const stripFace = (text) => String(text).split(/[,，、]/).map((t) => t.trim()).filter((t) => t && !FACE_TAG.test(t)).join(/[\u4e00-\u9fff]/.test(text) ? '，' : ', ');
 // 長相裡的衣服當「衣櫃」：玩家常把他會穿的衣服全列上去，整串送去生圖會被混搭成一身（10/14 員工 Polo 衫配灰色運動褲）
-const CLOTHES = /shirt|polo|tee|t-shirt|top|jeans|pants|trousers|shorts|sweatpants|jogger|jacket|coat|hoodie|sweater|cardigan|knit|vest|dress|skirt|suit|uniform|lanyard|badge|apron|scarf|tie|socks|shoes|sneakers|boots|cap|hat|衣|衫|褲|裙|外套|帽|鞋|圍裙|制服|識別證/i;
+const CLOTHES = /shirt|polo|tee|t-shirt|top|jeans|pants|trousers|shorts|sweatpants|jogger|jacket|coat|hoodie|sweater|cardigan|knit|vest|dress|skirt|suit|uniform|lanyard|badge|apron|scarf|tie|socks|shoes|sneakers|boots|cap|hat|衣|衫|褲|裙|外套|帽|鞋|圍裙|制服|識別證|背心|洋裝|針織|毛衣|睡袍|浴袍|襪|圍巾|領帶/i;
 export const splitLook = (text) => {
-  const tags = stripFace(text).split(', ').filter(Boolean);
-  return { body: tags.filter((t) => !CLOTHES.test(t)).join(', '), wardrobe: tags.filter((t) => CLOTHES.test(t)).join(', ') };
+  const tags = stripFace(text).split(/\s*[,，、]\s*/).filter(Boolean);
+  const sep = /[\u4e00-\u9fff]/.test(text) ? '，' : ', ';
+  return { body: tags.filter((t) => !CLOTHES.test(t)).join(sep), wardrobe: tags.filter((t) => CLOTHES.test(t)).join(sep) };
 };
 const lookNote = (text) => {
   const { body, wardrobe } = splitLook(text);
@@ -93,7 +94,8 @@ const lookNote = (text) => {
 };
 const hasRef = (data, p) => !!(p.photo || (p.id === HIM && data.cardAvatar));
 
-export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
+// hand：false＝寫照片的模型講明手不入鏡，POV 就不提手（提了模型會硬塞一隻手進來）
+export function finalPrompt(data, ch, prompt, ids = [], { by, hand: handIn } = {}) {
   const inFrame = ids.map((id) => person(data, ch, id));
   const anyRef = inFrame.some((p) => hasRef(data, p));
   // 有照片的人：臉和頭髮照照片，文字只留身形、衣著；沒照片的人照舊整段長相
@@ -111,13 +113,13 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
   const sex = cam && (/\b(1boy|male|man|boy)\b/i.test(cam.look) || /男/.test(cam.look) ? P.HAND_MAN : /\b(1girl|female|woman|girl)\b/i.test(cam.look) || /女/.test(cam.look) ? P.HAND_WOMAN : '');
   return [
     String(prompt).trim(),
-    cam ? P.POV(cam.name, [sex, hand].filter(Boolean).join(P.COLON)) : '',
+    cam ? (handIn === false ? P.POV_NOHAND(cam.name) : P.POV(cam.name, [sex, hand].filter(Boolean).join(P.COLON))) : '',
     notes.length ? `${P.PEOPLE_TITLE}\n${notes.join('\n')}` : '',
     // 玩家寫的風格蓋過上面的「photo」「realistic」：動漫風的卡寫 anime style 就要畫成動漫，不是寫實照片。
     // 玩家沒寫就用看頭像判斷的；判斷是寫實照片就不用加
     style && !/^realistic photo\.?$/i.test(style) ? P.STYLE(style) : '',
     ...people(inFrame.length),
-    ...(realistic(style) ? photoLook(data.look.preset, inFrame.length > 0, anyRef) : []),
+    ...(realistic(style) ? photoLook(data.look.preset, inFrame.length > 0, anyRef, !!cam || /自拍|對鏡|selfie|mirror/i.test(prompt)) : []),
   ].filter(Boolean).join('\n');
 }
 
@@ -136,10 +138,10 @@ function people(n) {
  *   candid 生活感：露比給的長 prompt 濃縮的，像朋友用手機隨手拍、發在 SNS 上的照片
  * 文字都在 prompts.js
  */
-function photoLook(preset, hasPeople, anyRef) {
+function photoLook(preset, hasPeople, anyRef, phone = false) {
   const hair = hasPeople ? P.HAIR : '';
   if (preset === 'candid') return [hair, P.CANDID.colour(anyRef), hasPeople ? P.CANDID.skin : '', hasPeople ? P.CANDID.gaze : '', P.CANDID.camera];
-  return [hair, anyRef ? P.POLISHED.match : '', P.POLISHED.colour(anyRef), hasPeople ? P.POLISHED.people : P.POLISHED.things];
+  return [hair, anyRef ? P.POLISHED.match : '', P.POLISHED.colour(anyRef), hasPeople ? (phone ? P.POLISHED.phone : P.POLISHED.people) : P.POLISHED.things];
 }
 
 /**
@@ -163,6 +165,8 @@ export function shotRules(data, ch) {
  * 加了模型會畫一隻手拿著手機（10/15 購物車截圖被畫成手拿 iPhone）
  */
 export const isSavedImage = (shot) => /截圖[（(]?[^，。]{0,6}[)）]?本身|圖片本身|截圖本身|沒有手機外框|screenshot itself|the image itself|no phone frame/i.test(String(shot || ''));
+/** shot 裡有沒有寫拍照的人的手入鏡（「手不入鏡」不算） */
+export const shotHand = (shot) => /拍照的人的手(?!不入鏡|沒有?入鏡)|photographer'?s (own )?hand(?! is not| not)/i.test(String(shot || ''));
 export const savedImagePrompt = (shot) => `${String(shot).trim()}\n${P.SAVED_IMAGE}`;
 
 /** in 裡的名字換成證件照的 id（他、妳、配角） */

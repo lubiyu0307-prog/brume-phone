@@ -8,7 +8,7 @@ import { currentChar, generate, imagine, canSeeImages, imageInfo, canDraw, world
 import { imagineAndPick } from './pick.js';
 import { P } from './prompts.js';
 import { promptEditor } from './promptedit.js';
-import { HIM, ME, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit, isSavedImage, savedImagePrompt } from './cast.js';
+import { HIM, ME, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit, isSavedImage, savedImagePrompt, shotHand } from './cast.js';
 
 // 自動生圖：打開的話，他新發的貼文用 Gemini 畫成真的照片（一張要等一下）
 const AUTO_KEY = 'brume-phone:igauto';
@@ -221,7 +221,7 @@ export function createIG({ screen, say }) {
       const ids = shotIds(people, who, p.in);
       const author = p.author.kind === 'other' ? p.author.name : p.author.kind === 'him' ? HIM : null;
       const by = author && !ids.includes(author) ? author : undefined;
-      return { prompt: finalPrompt(people, who, `${p.shot}${story ? P.IG_STORY : P.IG_POST}`, ids, { by }), refs: refsFor(people, who, '', ids) };
+      return { prompt: finalPrompt(people, who, `${p.shot}${story ? P.IG_STORY : P.IG_POST}`, ids, { by, hand: shotHand(p.shot) }), refs: refsFor(people, who, '', ids) };
     }
     // 發文的人本人入鏡（自拍、對鏡、合照）才帶他的長相和照片；描述裡只有「他的手」不算，那是第一人稱視角
     // 倒影也算入鏡：隔著玻璃拍企鵝，玻璃上映出他拿手機的樣子（10/15 那張臉不是他）

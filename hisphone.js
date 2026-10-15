@@ -4,7 +4,7 @@
 
 import * as store from './store.js';
 import { currentChar, generate, imageInfo, canDraw, worldRoster } from './st.js';
-import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit, isSavedImage, savedImagePrompt } from './cast.js';
+import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit, isSavedImage, savedImagePrompt, shotHand } from './cast.js';
 import { imagineAndPick } from './pick.js';
 import { promptEditor } from './promptedit.js';
 import { verify } from './music.js';
@@ -400,7 +400,7 @@ export function createHisPhone({ host, say, onExit }) {
         }
         if (p.shot) {
           const ids = shotIds(people, who, p.in);
-          const prompt = finalPrompt(people, who, `${p.shot}, photo taken on his phone, candid, natural light`, ids, ids.includes(HIM) ? {} : { by: HIM });
+          const prompt = finalPrompt(people, who, p.shot, ids, ids.includes(HIM) ? {} : { by: HIM, hand: shotHand(p.shot) });
           const url = await imagineAndPick(host, prompt, { refs: refsFor(people, who, '', ids), aspect: '1:1' });
           if (url) { p.img = url; if (who.key === ch?.key) save(); } else say(imageInfo.why ? `沒有出圖：${imageInfo.why}` : '沒有出圖');
           drawing = false; if (view === 'album' && sub === i) paint();
@@ -427,7 +427,7 @@ export function createHisPhone({ host, say, onExit }) {
         const hand = /(?<!二)手(?![寫機工繪作冊帳錶套續術法邊])|手指|指尖|握著|托著|捧著|拿著/.test(p.desc);
         const prompt = shot
           ? `${p.desc}. Show only the saved image itself, flat, filling the whole frame edge to edge. No phone, no screen bezel, no people, no hands.`
-          : finalPrompt(people, who, `${p.desc}, photo taken on his phone, candid, natural light`, ids, hand ? { by: HIM } : {});
+          : finalPrompt(people, who, `${p.desc}, photo taken on his phone, candid`, ids, hand ? { by: HIM } : {});
         const url = await imagineAndPick(host, prompt, { refs: shot ? [] : refsFor(people, who, p.desc, always), aspect: '1:1' });
         if (url) { p.img = url; if (who.key === ch?.key) save(); }
         else say(imageInfo.why ? `沒有出圖：${imageInfo.why}` : '沒有出圖');
