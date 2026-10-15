@@ -1202,3 +1202,4 @@
 .bp-pick-acts button.ok { background: #fff; color: #000; border-color: #fff; font-weight: 600; }
 .bp-pick-grid i { position: relative; }
 .bp-pick-grid em { position: absolute; right: 6px; bottom: 6px; padding: 2px 7px; border-radius: 9px; background: rgba(0, 0, 0, .65); color: #fff; font-size: 10px; font-style: normal; }
+.bp-line-sys.bp-modehint { margin: 30px 24px; text-align: center; color: rgba(255, 255, 255, .9); font-size: 13px; line-height: 1.6; }

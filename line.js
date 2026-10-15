@@ -319,11 +319,16 @@ export function createLine({ screen, say, onUnread, onData }) {
     return `<div class="bp-line-bwrap" data-id="${m.id}">${body}${cards}${react ? `<span class="bp-line-react">${REACTS[react]}</span>` : ''}</div>`;
   }
 
+  const inView = (m) => (thread.mode === 'now' ? !!m.now : !m.now);
+
   function bubbles() {
     let out = ''; let lastDay = '';
     const readUpTo = thread.readTs || 0;
     let prevHim = false; let prevMe = false;
-    for (const m of thread.msgs) {
+    // 劇情和現實分開看：劇情模式只顯示劇情時間的（含舊紀錄），現實模式只顯示現實時間傳的
+    const shownMsgs = thread.msgs.filter(inView);
+    if (!shownMsgs.length && thread.msgs.length) out += `<div class="bp-line-sys bp-modehint">${thread.mode === 'now' ? '這裡是現實時間的聊天。劇情裡的訊息在上面「換回劇情」。' : '劇情時間還沒有訊息。現實時間聊的在上面「換成現實」。'}</div>`;
+    for (const m of shownMsgs) {
       const d = new Date(m.ts); const day = `${d.getMonth() + 1}/${d.getDate()}（${WEEK[d.getDay()]}）`;
       if (!m.story && day !== lastDay) { out += `<div class="bp-line-day"><span>${day}</span></div>`; lastDay = day; prevHim = false; prevMe = false; }
       const when = m.story ? (m.st || '') : hm(m.ts);
@@ -499,6 +504,9 @@ export function createLine({ screen, say, onUnread, onData }) {
 
   function jump(id) {
     unpop();
+    // 要跳去的訊息在另一邊（劇情／現實），先換過去
+    const target = find(id);
+    if (target && !inView(target)) { thread.mode = target.now ? 'now' : 'story'; save(); renderRoom(); }
     const el = screen.querySelector(`.bp-line-bwrap[data-id="${id}"]`);
     if (!el) return;
     el.scrollIntoView({ block: 'center', behavior: 'smooth' });
