@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.53';
+const VERSION = '0.18.54';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -30,6 +30,10 @@ function dbg(tag, extra) {
       t: new Date().toTimeString().slice(0, 8), ms: Date.now() - dbgT0, tag, ...(extra ? { x: extra } : {}),
       vv: vv ? [Math.round(vv.width), Math.round(vv.height), Math.round(vv.offsetTop), Math.round(vv.pageTop || 0)] : null,
       win: [innerWidth, innerHeight, Math.round(scrollY)], open: !!ov?.classList.contains('bp-open'), ov: r(ov), ph: r(ph),
+      // 最上面那條（時間、電池）蓋不住時查原因：安全區多高、最上面一排是誰、網頁有沒有延伸到狀態列底下
+      safe: (() => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;top:0;height:env(safe-area-inset-top);width:1px;visibility:hidden'; document.body.appendChild(d); const h = d.getBoundingClientRect().height; d.remove(); return Math.round(h); })(),
+      top: (() => { const e = document.elementFromPoint(innerWidth / 2, 2); return e ? `${e.tagName}.${String(e.className || '').slice(0, 24)}` : null; })(),
+      meta: document.querySelector('meta[name=viewport]')?.content?.replace(/\s+/g, '') || '', pwa: !!navigator.standalone,
       html: getComputedStyle(document.documentElement).position, act: document.activeElement?.className?.toString().slice(0, 30) || document.activeElement?.tagName,
     };
     const a = JSON.parse(localStorage.getItem(DBG_KEY) || '[]'); a.push(row);
