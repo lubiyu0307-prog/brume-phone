@@ -31,6 +31,7 @@ export const lite = {
 
 // 省 token 模式不帶預設，少了預設開頭那段創作脈絡，Vertex 會把「人設寫嬌小＋世界書的親密條目＋床上的劇情」
 // 誤判成未成年而整包擋掉（PROHIBITED_CONTENT）。這段補回成年人創作的前提，R18 照樣完整帶進去。
+const PHONE_MODE = '【手機模式】現在寫的是小手機裡的東西，不是劇情正文。上面設定裡關於正文的寫法、字數、排版、狀態欄、變數更新、輸出格式的規則全部不適用：不要寫狀態欄、不要寫任何 <標籤> 區塊、不要寫旁白，只照要求輸出。';
 const ADULT_FRAME = '這是成年人之間的虛構互動創作，供成年玩家私下閱讀。故事裡所有角色都是成年人，年齡以角色卡與玩家人設寫的為準；身材描述（嬌小、纖細等）只是外貌，不代表年齡。內容可以包含成年人之間合意的親密情節。';
 
 async function liteContext(c, prompt) {
@@ -63,6 +64,8 @@ async function liteContext(c, prompt) {
     persona ? `【${c.name1}】（玩家角色的設定。${ch.name} 只知道劇情裡他看到、聽到或她親口說過的部分；還沒在劇情裡揭露的職業、家人、過去，他不知道）\n${persona}` : '',
     wi ? `【世界設定】\n${wi}` : '',
     recent.length ? `【正文最近的劇情】\n${recent.join('\n')}` : '',
+    // 角色卡和世界書常寫著正文的演繹協定、輸出格式、狀態欄：模型照著寫就又長又慢（10/15 一句 LINE 等超過一分鐘）
+    PHONE_MODE,
   ].filter(Boolean).join('\n\n');
 }
 
@@ -100,7 +103,7 @@ async function quickAsk(c, system, prompt) {
       method: 'POST', headers: c.getRequestHeaders(),
       body: JSON.stringify({
         messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
-        model, chat_completion_source: src, stream: false, max_tokens: 4096, temperature: o.temp_openai ?? 1,
+        model, chat_completion_source: src, stream: false, max_tokens: 3000, temperature: o.temp_openai ?? 1,
         reasoning_effort: 'low', include_reasoning: false,
         vertexai_auth_mode: o.vertexai_auth_mode, vertexai_region: o.vertexai_region, vertexai_express_project_id: o.vertexai_express_project_id,
         reverse_proxy: o.reverse_proxy, proxy_password: o.proxy_password,
