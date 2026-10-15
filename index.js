@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.39';
+const VERSION = '0.18.40';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -470,7 +470,8 @@ function build() {
 
   // App 畫面：從右邊滑進來，蓋在主畫面上
   const appScreen = overlay.querySelector('.bp-appscreen');
-  const openApp = (app) => { music?.leave(); app.open(); appScreen.classList.add('bp-show'); phone.classList.add('bp-app-open'); };
+  // 先清掉上一個 App 的畫面：App 要等資料（有時候等伺服器）才畫得出來，不清的話會先看到上一個 App 停幾秒
+  const openApp = (app) => { music?.leave(); appScreen.innerHTML = '<div class="bp-app-wait"><i></i><i></i><i></i></div>'; app.open(); appScreen.classList.add('bp-show'); phone.classList.add('bp-app-open'); };
   const closeApp = () => { if (callApp?.inCall) callApp.hang(); appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); music?.leave(); refreshNotices?.(); };
   appScreen.addEventListener('bp-home', closeApp);
   const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => calDots() });
