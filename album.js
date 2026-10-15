@@ -208,8 +208,10 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         '只輸出 JSON：{"desc":"照片拍到什麼，中文一句話","in":["入鏡的人名"],"shot":"鏡頭","angle":"鏡頭從哪裡看","people":[{"name":"人名","doing":"動作和姿勢","face":"表情和視線","wearing":"穿著"}],"place":"地點和背景","props":"重要的物品","light":"時間和光線"}',
       ].filter(Boolean).join('\n')));
       r.prompt = r.prompt || snapFromFields(r);
-      const inFrame = Array.isArray(r.in) ? r.in.map(String) : null;
-      const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), ...(inFrame ? { in: inFrame } : {}), prompt: String(r.prompt || ''), scene: scenes.join('\n\n').slice(0, 1200) };
+      // 生圖前先給玩家看一眼：模型把劇情翻成畫面時猜錯（誰拍的、鏡頭多遠、誰在畫面裡），在花額度之前改掉
+      const ok = await confirmSnap(r, who);
+      if (!ok) { busy = false; if (mine()) renderSnap(); return; }
+      const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), in: ok.in, by: ok.by, prompt: ok.prompt, scene: scenes.join('\n\n').slice(0, 1200) };
       if (p.prompt) await ensureAutoStyle(people, who.charKey);
       // 快照用橫的 4:3，像真的相機拍的（跟 GPT 對照時比正方形自然）
       p.img = p.prompt ? await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' }) : '';
@@ -233,7 +235,64 @@ export function createAlbum({ screen, say, onShare, onIG }) {
   const snapRefs = (p) => refsFor(people, ch, p.desc || '', snapWho(p));
   // 快照是妳用手機拍的：畫面裡沒有妳，就講明是妳拍的第一人稱照片，不然「他把硬幣遞過來」這種畫面，
   // Gemini 會自己生一個收硬幣的人出來，有時是他的分身，有時硬塞一個妳（10/14）
-  const snapPrompt = (p) => { const ids = idsFor(people, p.desc || '', snapWho(p)); return finalPrompt(people, ch, p.prompt, ids, { by: ids.includes(ME) ? null : ME }); };
+  // p.by 是確認畫面選的「誰拍的」：me 妳拍、him 他拍、other 路人拍（沒有第一人稱）；舊快照沒有，照有沒有妳判斷
+  const snapPrompt = (p) => {
+    const ids = idsFor(people, p.desc || '', snapWho(p));
+    const by = p.by === 'him' ? HIM : p.by === 'me' ? ME : p.by === 'other' ? null : (ids.includes(ME) ? null : ME);
+    return finalPrompt(people, ch, p.prompt, ids, { by });
+  };
+
+  // 快照確認畫面：描述可以改，鏡頭、入鏡的人、誰拍的用點的。回傳 { prompt, in, by }，取消回傳 null
+  function confirmSnap(r, who) {
+    return new Promise((resolve) => {
+      const names = [who.name, who.user, ...sideNames(people)].filter((n, i, a) => n && a.indexOf(n) === i);
+      const inSet = new Set((Array.isArray(r.in) ? r.in.map(String) : [who.name]).filter((n) => names.includes(n)));
+      let shot = ''; let by = inSet.has(who.user) ? 'other' : 'me';
+      let composed = String(r.prompt || '');
+      const box = document.createElement('div');
+      box.className = 'bp-pe bp-cf';
+      const chip = (k, v, label, on) => `<button class="bp-cf-chip${on ? ' on' : ''}" data-cf="${k}" data-v="${esc(v)}">${esc(label)}</button>`;
+      const draw = () => {
+        box.querySelectorAll('[data-cf="shot"]').forEach((b) => b.classList.toggle('on', b.dataset.v === shot));
+        box.querySelectorAll('[data-cf="in"]').forEach((b) => b.classList.toggle('on', inSet.has(b.dataset.v)));
+        box.querySelectorAll('[data-cf="by"]').forEach((b) => b.classList.toggle('on', b.dataset.v === by));
+      };
+      box.innerHTML = `<div class="bp-pe-bg" data-cf="no"></div><div class="bp-pe-card">
+        <b>確認畫面</b>
+        ${r.desc ? `<p class="bp-cf-desc">${esc(r.desc)}</p>` : ''}
+        <textarea rows="6">${esc(composed)}</textarea>
+        <div class="bp-cf-row"><span>鏡頭</span>${chip('shot', '', '照描述', true)}${P.SHOTS.map((x) => chip('shot', x, x, false)).join('')}</div>
+        <div class="bp-cf-row"><span>入鏡</span>${names.map((n) => chip('in', n, n, inSet.has(n))).join('')}</div>
+        <div class="bp-cf-row"><span>誰拍的</span>${chip('by', 'me', `${who.user}拍`, by === 'me')}${chip('by', 'him', `${who.name}拍`, by === 'him')}${chip('by', 'other', '別人拍', by === 'other')}</div>
+        <p>不對就改上面那段或點選項，人物長相和照片風格會自動接上。</p>
+        <div class="bp-pe-btns"><button data-cf="no">取消</button><button data-cf="ok" class="ok">生成照片</button></div></div>`;
+      screen.appendChild(box);
+      const ta = box.querySelector('textarea');
+      const done = (v) => { box.remove(); resolve(v); };
+      box.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-cf]'); if (!b) return;
+        e.stopPropagation();
+        const k = b.dataset.cf; const v = b.dataset.v;
+        if (k === 'no') { done(null); return; }
+        if (k === 'shot') {
+          shot = v;
+          // 還沒手改過描述：直接換掉描述開頭的鏡頭；改過了就等送出時加在最前面
+          if (ta.value === composed) { r.shot = shot || r.shotOrig || r.shot; composed = snapFromFields(r); ta.value = composed; }
+        }
+        if (k === 'in') { if (inSet.has(v)) inSet.delete(v); else inSet.add(v); }
+        if (k === 'by') by = v;
+        if (k === 'ok') {
+          let text = ta.value.trim();
+          if (!text) { say('描述不能是空的'); return; }
+          if (shot && !text.includes(shot)) text = `${shot}${P.PERIOD}${text}`;
+          done({ prompt: text, in: names.filter((n) => inSet.has(n)), by });
+          return;
+        }
+        draw();
+      });
+      r.shotOrig = r.shot;
+    });
+  }
 
   async function lookAuto() {
     busy = true; renderPerson();

@@ -67,6 +67,8 @@ const ZH = {
   SNAP_PROMPT: '生圖用的中文描述，逗號分隔：鏡頭（全身、半身、近景）、誰在做什麼、動作、表情、穿著、場景、光線',
   SNAP_LANG: '- 欄位都用中文寫',
   SHOT_LANG: '中文',
+  // 快照確認畫面的鏡頭選項（選了會換掉描述開頭的鏡頭）
+  SHOTS: ['近照', '半身', '全身'],
   SAVED_IMAGE: '只畫這張圖片本身，平面、畫滿整個畫面。畫面裡沒有手機、沒有螢幕邊框、沒有手、沒有人在拿著它。',
   WEARING: (w) => `穿${w}`,
   COMMA: '，',
@@ -124,6 +126,7 @@ const EN = {
   SNAP_PROMPT: '英文生圖 prompt，逗號分隔：鏡頭（full body、half body、close-up）、誰在做什麼、動作、表情、穿著、場景、光線',
   SNAP_LANG: '- 欄位除了 desc 以外都用英文寫（desc 用中文）',
   SHOT_LANG: '英文',
+  SHOTS: ['close-up', 'half body', 'full body'],
   SAVED_IMAGE: 'Draw only the image itself, flat, filling the whole frame. No phone, no screen bezel, no hands, nobody holding it.',
   WEARING: (w) => `wearing ${w}`,
   COMMA: ', ',
