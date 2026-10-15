@@ -15,7 +15,7 @@ const ZH = {
   // 入鏡的人
   PEOPLE_TITLE: '入鏡的人：',
   PERSON_WITH_REF: (name) => `${name}：臉、髮色、髮型照${name}的參考照片（文字寫的不算）`,
-  PERSON_WITH_REF_HAIR: (name, hair) => `${name}：臉和髮型照${name}的參考照片；髮色是${hair}（照片光線讓頭髮看起來比較深，要畫成${hair}，不是黑髮）`,
+  PERSON_WITH_REF_HAIR: (name, feat) => `${name}：臉和髮型照${name}的參考照片；另外這些特色一定要畫出來，跟照片看起來不一樣時以這裡為準（被衣服遮住的地方就不用）：${feat}`,
   BODY: (body) => `身形：${body}`,
   WARDROBE: (list) => `衣櫃（只穿情境寫的；情境沒寫才從這裡挑一套搭得起來的，不要全部穿上身）：${list}`,
   SEP: '；',
@@ -78,7 +78,7 @@ const EN = {
 
   PEOPLE_TITLE: 'People in the picture:',
   PERSON_WITH_REF: (name) => `${name}: face, hair colour and hairstyle exactly as in ${name}'s reference photo (ignore any text that says otherwise)`,
-  PERSON_WITH_REF_HAIR: (name, hair) => `${name}: face and hairstyle exactly as in ${name}'s reference photo; hair colour is ${hair} (the photo's lighting makes it look darker; draw it clearly as ${hair}, not black)`,
+  PERSON_WITH_REF_HAIR: (name, feat) => `${name}: face and hairstyle exactly as in ${name}'s reference photo; these features must clearly show, and where the photo looks different, these win (skip anything covered by clothes): ${feat}`,
   BODY: (body) => `body: ${body}`,
   WARDROBE: (list) => `clothes they might own (wear only what the scene describes; if the scene says nothing, pick ONE coherent outfit from these, never mix them all): ${list}`,
   SEP: '; ',

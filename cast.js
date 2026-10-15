@@ -46,7 +46,7 @@ export function person({ cast, look }, ch, id) {
   return { id, name: id, photo: cast[id]?.photo || '', look: cast[id]?.look || '', hair: cast[id]?.hair || '' };
 }
 
-// hair：照片光線暗、灰髮銀髮看起來像黑髮時，玩家另外寫的髮色（10/15 格的深灰髮一直被畫成黑髮）
+// hair：玩家寫的「特色」，要加強的髮色、雀斑、刺青、痣⋯（10/15 格的深灰髮一直被畫成黑髮；比比說雀斑刺青也想加強）
 export function setPerson(data, id, { photo, look, hair }) {
   if (id === HIM || id === ME) {
     data.look[id === HIM ? 'him' : 'me'] = look || '';
