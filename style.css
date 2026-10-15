@@ -1251,3 +1251,4 @@
 .bp-cf-chip { padding: 6px 12px; border: 1px solid #e3ddd3; border-radius: 999px; background: #fff; color: #4b463f; font: inherit; font-size: 13px; cursor: pointer; }
 .bp-cf-chip.on { background: #2b2824; border-color: #2b2824; color: #fff; }
 .bp-hp-pacts button.bp-hp-danger { background: rgba(214, 69, 69, .16); color: #e06a6a; }
+.bp-app-soon .bp-icon { opacity: .45; }

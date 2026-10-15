@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.46';
+const VERSION = '0.18.47';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -136,8 +136,11 @@ function musicWidget() {
     <div class="bp-music-ctl"><i data-mw="prev">${ICON.prev}</i><i data-mw="toggle">${ICON.play}</i><i data-mw="next">${ICON.next}</i></div></div>`;
 }
 
+// 還沒準備好的 App：圖示變淡，點了只跳提示（10/15 露比說先鎖起來）
+const SOON = new Set(['phone', 'game']);
+
 function appTile(a) {
-  return `<div class="bp-app" data-open="${a.app}"><div class="bp-icon">${ICON[a.app]}</div><div class="bp-label">${a.name}</div></div>`;
+  return `<div class="bp-app${SOON.has(a.app) ? ' bp-app-soon' : ''}" data-open="${a.app}"><div class="bp-icon">${ICON[a.app]}</div><div class="bp-label">${a.name}</div></div>`;
 }
 
 function tile(t) {
@@ -444,6 +447,7 @@ function build() {
       if (open.dataset.open === 'threads') { openApp(threads); return; }
       if (open.dataset.open === 'album') { openApp(album); return; }
       if (open.dataset.open === 'ig') { openApp(ig); return; }
+      if (SOON.has(open.dataset.open)) { say('這個功能還在準備中，之後開放 ☁︎'); return; }
       if (open.dataset.open === 'game') { openApp(games); return; }
       if (open.dataset.open === 'phone') { openApp(callApp); return; }
       if (open.dataset.open === 'camera') { openApp(snap); return; }
