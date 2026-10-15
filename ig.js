@@ -209,11 +209,19 @@ export function createIG({ screen, say }) {
   // 照片的生圖 prompt：照片裡有誰入鏡，就帶誰的長相和證件照，最後套上玩家寫的照片風格
   function photoPrompt(p, who, story = false) {
     // 發文的人本人入鏡（自拍、對鏡、合照）才帶他的長相和照片；描述裡只有「他的手」不算，那是第一人稱視角
-    const self = /自拍|鏡子|鏡中|對鏡|合照|入鏡|露臉|全身照/.test(p.desc);
-    const always = !self ? [] : p.author.kind === 'other' ? [p.author.name] : p.author.kind === 'him' ? [HIM] : [];
+    // 倒影也算入鏡：隔著玻璃拍企鵝，玻璃上映出他拿手機的樣子（10/15 那張臉不是他）
+    const self = /自拍|鏡子|鏡中|對鏡|合照|入鏡|露臉|全身照|倒影|反射|映在|映出|鏡面|reflection/i.test(p.desc);
+    const author = p.author.kind === 'other' ? p.author.name : p.author.kind === 'him' ? HIM : null;
+    const always = self && author ? [author] : [];
     const ids = idsFor(people, p.desc, always);
-    const by = p.author.kind === 'him' ? HIM : p.author.kind === 'other' ? p.author.name : null;
-    return { prompt: finalPrompt(people, who, `${p.desc}${story ? P.IG_STORY : P.IG_POST}`, ids, { by }), refs: refsFor(people, who, p.desc, always) };
+    const by = author;
+    const refs = refsFor(people, who, p.desc, always);
+    // 沒寫入鏡，但 Gemini 常自己在玻璃、櫥窗畫出拍照的人：照片照樣帶上，註明「萬一出現才用」，出現了臉也會對
+    if (!self && author) {
+      const [r] = refsFor(people, who, '', [author]);
+      if (r && !refs.some((x) => x.url === r.url)) refs.push({ name: `${r.name} (the photographer; not in the picture, but if any reflection or glimpse of them shows, it must be this face)`, url: r.url });
+    }
+    return { prompt: finalPrompt(people, who, `${p.desc}${story ? P.IG_STORY : P.IG_POST}`, ids, { by }), refs };
   }
   // 限動是直的（9:16），貼文是方的
   // pick：玩家自己按的才讓她挑（一次生幾張照證件照頁的設定）；自動生圖在背景跑，只生一張
