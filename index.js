@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.54';
+const VERSION = '0.18.55';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -33,6 +33,7 @@ function dbg(tag, extra) {
       // 最上面那條（時間、電池）蓋不住時查原因：安全區多高、最上面一排是誰、網頁有沒有延伸到狀態列底下
       safe: (() => { const d = document.createElement('div'); d.style.cssText = 'position:fixed;top:0;height:env(safe-area-inset-top);width:1px;visibility:hidden'; document.body.appendChild(d); const h = d.getBoundingClientRect().height; d.remove(); return Math.round(h); })(),
       top: (() => { const e = document.elementFromPoint(innerWidth / 2, 2); return e ? `${e.tagName}.${String(e.className || '').slice(0, 24)}` : null; })(),
+      tc: [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => m.content).join('|'),
       meta: document.querySelector('meta[name=viewport]')?.content?.replace(/\s+/g, '') || '', pwa: !!navigator.standalone,
       html: getComputedStyle(document.documentElement).position, act: document.activeElement?.className?.toString().slice(0, 30) || document.activeElement?.tagName,
     };
@@ -628,17 +629,21 @@ function build() {
   function close(why = 'api') { dbg('close', why); overlay.classList.remove('bp-open'); tint(false); refreshNotices(); }
   // iPhone 最上面時間、電池那一條不是網頁的一部分，蓋不住；Safari 會照 theme-color 幫它上色。
   // 手機打開時換成黑色，跟手機外框融在一起，關掉再換回酒館原本的顏色（10/16 比比看到頂上一條酒館的藍灰色）
-  let tintMeta = null; let tintOld = null;
+  // 10/16 除錯紀錄：她是從主畫面開的 App（pwa:true）、安全區 0——網頁從那條下面才開始，蓋不到，只能靠 theme-color 上色。
+  // 只改 content 時主畫面 App 不會重畫那條，所以整個 meta 拿掉、換一個新的黑色進去；關掉再把原本的放回去
+  let tintSaved = null; let tintMine = null;
   function tint(on) {
     try {
       if (on) {
-        tintMeta = document.querySelector('meta[name="theme-color"]');
-        tintOld = tintMeta ? tintMeta.getAttribute('content') : null;
-        if (!tintMeta) { tintMeta = document.createElement('meta'); tintMeta.name = 'theme-color'; tintMeta.dataset.bp = '1'; document.head.appendChild(tintMeta); }
-        tintMeta.setAttribute('content', '#000000');
-      } else if (tintMeta) {
-        if (tintMeta.dataset.bp) tintMeta.remove(); else if (tintOld != null) tintMeta.setAttribute('content', tintOld);
-        tintMeta = null;
+        if (tintMine) return;
+        tintSaved = [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => [m, m.nextSibling, m.parentNode]);
+        tintSaved.forEach(([m]) => m.remove());
+        tintMine = document.createElement('meta'); tintMine.name = 'theme-color'; tintMine.content = '#000000';
+        document.head.appendChild(tintMine);
+      } else if (tintMine) {
+        tintMine.remove(); tintMine = null;
+        (tintSaved || []).forEach(([m, next, parent]) => { (parent || document.head).insertBefore(m, next && next.parentNode === parent ? next : null); });
+        tintSaved = null;
       }
     } catch { /* 改不了就算了 */ }
   }
