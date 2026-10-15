@@ -441,8 +441,8 @@ export function createIG({ screen, say }) {
     screen.insertAdjacentHTML('beforeend', `<div class="bp-ig-storyv">
       <div class="bp-ig-sbars">${story.list.map((_, i) => `<i class="${i < story.i ? 'done' : i === story.i ? 'now' : ''}"></i>`).join('')}</div>
       <header>${av(s.author, 'xs')}<b>${esc(s.author.handle)}</b><span>${ago(s.ts)}</span></header>
-      ${s.img ? `<img src="${esc(s.img)}" alt="">` : `<div class="card" style="--h:${hue(s.desc)}"><span>${esc(s.desc)}</span></div>`}
-      ${!s.img && s.author.kind !== 'me' ? '<button class="bp-ig-sgen" data-ig="sgen">生出這張照片</button>' : ''}
+      ${s.img ? `<img src="${esc(s.img)}" alt="" data-igstory="${s.id}">` : `<div class="card" style="--h:${hue(s.desc)}" data-igstory="${s.id}"><span>${esc(s.desc)}</span></div>`}
+      ${s.author.kind !== 'me' && s.desc ? `<button class="bp-ig-sgen" data-ig="sgen">${s.img ? '重新生一張' : '生出這張照片'}</button>` : ''}
       ${s.text ? `<p>${esc(s.text)}</p>` : ''}<small>點一下看下一則</small></div>`);
   }
 
@@ -494,9 +494,20 @@ export function createIG({ screen, say }) {
   // 長按貼文照片 → 改描述、重新出圖（妳自己發的、從相本來的是真照片，不能改）
   promptEditor(screen, {
     say,
-    match: (el) => (mine() ? el.closest('[data-igphoto]')?.dataset.igphoto ?? null : null),
-    get: (id) => { const p = find(id); return p && p.author.kind !== 'me' && !p.fromAlbum ? { text: p.desc } : null; },
+    match: (el) => { if (!mine()) return null; const st = el.closest('[data-igstory]'); if (st) return 's:' + st.dataset.igstory; return el.closest('[data-igphoto]')?.dataset.igphoto ?? null; },
+    get: (id) => {
+      if (id.startsWith('s:')) { const s = d.stories.find((x) => x.id === id.slice(2)); return s && s.author.kind !== 'me' && s.desc ? { text: s.desc } : null; }
+      const p = find(id); return p && p.author.kind !== 'me' && !p.fromAlbum ? { text: p.desc } : null;
+    },
     run: async (id, text, again) => {
+      // 限動：改描述、重新出直的（9:16）
+      if (id.startsWith('s:')) {
+        const s = d.stories.find((x) => x.id === id.slice(2)); if (!s) return;
+        s.desc = text; save();
+        if (again) { say('生圖中⋯'); const url = await draw(s, ch, '9:16', true); if (url) { s.img = url; save(); } }
+        if (screen.querySelector('.bp-ig-storyv') && story.list[story.i] === s) showStory();
+        return;
+      }
       const p = find(id); if (!p) return;
       p.desc = text; save();
       if (!again) { say('描述存好了'); view === 'post' ? renderPost() : view === 'profile' ? renderProfile() : renderFeed(); return; }
