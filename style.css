@@ -1054,7 +1054,9 @@
 
 /* ---------- 手機寬度（放最後，才蓋得過上面的規則） ---------- */
 @media (max-width: 500px) {
-  #bp-overlay { bottom: 0; right: 0; }
+  /* iOS 26 的 Safari 會拿貼在最上面的固定元素的底色去塗時間、電池那一條；半透明的底它不認，會跳過去拿酒館頭部的藍灰色。
+     手機版的小手機本來就鋪滿整個畫面，底色改成不透明的黑，那條就跟著變黑（10/16 比比：黑森林換得了顏色，小手機為什麼不行） */
+  #bp-overlay { bottom: 0; right: 0; background: #000; }
   /* 手機上不靠外框置中：外框高度在某些主題下會被算成 0，手機就只剩上半截 */
   .bp-phone {
     position: fixed; top: var(--bp-top, 0px); left: var(--bp-left, 0px);
