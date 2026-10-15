@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.38';
+const VERSION = '0.18.39';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -257,7 +257,8 @@ function build() {
   };
   applyWall();
 
-  // 桌面照角色卡分：每張卡可以有自己的桌布和照片（desk:角色），沒設過的卡用共用的那份（desk）。
+  // 桌面照角色卡分：每張卡有自己的桌布和照片（desk:角色），沒設過的卡是空白的。
+  // desk 是 0.18.37 搬上伺服器時的那份，只在沒開角色的時候用
   // 跟伺服器對一次桌面；伺服器上還沒有、這台有舊的就傳上去
   let deskSeen = JSON.stringify(desk);
   let shared = null; // 共用那份，換照片時用來判斷舊圖還有沒有別的卡在用
@@ -265,18 +266,18 @@ function build() {
   const loadDesk = async () => {
     const key = deskKey();
     shared = await store.get(DESK);
-    let d = key === DESK ? shared : ((await store.get(key)) || shared);
-    if (!d && (state.wall || Object.keys(state.photos || {}).length)) {
+    let d = key === DESK ? shared : await store.get(key);
+    if (!d && !shared && (state.wall || Object.keys(state.photos || {}).length)) {
       d = { wall: '', photos: {} };
       if (state.wall) d.wall = (await uploadImage(state.wall)) || '';
       for (const [k, v] of Object.entries(state.photos || {})) { const u = await uploadImage(v); if (u) d.photos[k] = u; }
       if (d.wall || Object.keys(d.photos).length) {
-        await store.set(DESK, d); shared = d;
+        await store.set(key, d); if (key === DESK) shared = d; // 這台還有 0.18.36 以前的舊桌面：搬給現在開的這張卡
         delete state.wall; delete state.photos; save(state);
       } else d = null;
     }
     d ||= { wall: '', photos: {} };
-    if (state.wall || state.photos) { delete state.wall; delete state.photos; save(state); } // 伺服器上已經有了，這台的舊副本不要了
+    if (shared && (state.wall || state.photos)) { delete state.wall; delete state.photos; save(state); } // 伺服器上已經有了，這台的舊副本不要了
     desk = { wall: d.wall || '', photos: { ...(d.photos || {}) } };
     const now = JSON.stringify(desk);
     if (now === deskSeen) return;
