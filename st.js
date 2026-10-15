@@ -203,7 +203,7 @@ async function viaKey(prompt, refs = [], aspect = '1:1') {
       const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: 'POST', referrerPolicy: 'strict-origin-when-cross-origin',
         headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({ contents: [{ role: 'user', parts }], safetySettings: safety, generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: aspect, ...(/gemini-3/.test(model) ? { imageSize: RESOLUTION } : {}) } } }),
+        body: JSON.stringify({ contents: [{ role: 'user', parts }], safetySettings: safety, generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: aspect, ...(/gemini-3/.test(model) ? { imageSize: imageResPref.get() } : {}) } } }),
       });
       if (!r.ok) { imageInfo.why = (prev ? prev + '；' : '') + `金鑰那條：${model} 回 ${r.status}${r.status === 429 ? '（額度用完或太頻繁）' : r.status === 400 ? '（金鑰或參數不對）' : r.status === 403 ? '（金鑰沒有權限，或限制了網站）' : ''}`; continue; }
       const img = (await r.json())?.candidates?.[0]?.content?.parts?.find((x) => x.inlineData?.data)?.inlineData;
@@ -231,7 +231,7 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
         method: 'POST', headers: c.getRequestHeaders(),
         body: JSON.stringify({
           messages: [{ role: 'user', content }], model, chat_completion_source: src, stream: false,
-          request_images: true, request_image_aspect_ratio: aspect, request_image_resolution: RESOLUTION, max_tokens: 4096, temperature: 1,
+          request_images: true, request_image_aspect_ratio: aspect, request_image_resolution: imageResPref.get(), max_tokens: 4096, temperature: 1,
           vertexai_auth_mode: o.vertexai_auth_mode, vertexai_region: o.vertexai_region, vertexai_express_project_id: o.vertexai_express_project_id,
           reverse_proxy: o.reverse_proxy, proxy_password: o.proxy_password,
         }),
@@ -286,8 +286,13 @@ export async function asDataUrl(url) {
 }
 
 // 圖存到酒館伺服器的使用者圖片資料夾，手機只記網址。直接存 base64 會把瀏覽器的空間（約 5MB）一張就吃掉三分之一
-// 2K：全身照、遠景的臉才分得到夠多像素，五官不會糊掉（1K 時全身照的臉只有幾十個像素，10/14 測的）
-const RESOLUTION = '2K';
+// 預設 2K：全身照、遠景的臉才分得到夠多像素，五官不會糊掉（1K 時全身照的臉只有幾十個像素，10/14 測的）
+// 1K 讓玩家自己選：Flash 一張便宜三分之一，近景、自拍差別不大（10/15 比比要的）
+const RES = 'brume-phone:imgres';
+export const imageResPref = {
+  get() { try { return localStorage.getItem(RES) === '1K' ? '1K' : '2K'; } catch { return '2K'; } },
+  set(v) { try { localStorage.setItem(RES, v === '1K' ? '1K' : '2K'); } catch { /* 存不了就照預設 */ } },
+};
 
 // 存檔前轉成 JPG：2K 的 PNG 一張好幾 MB，相本整本會同步到伺服器
 async function toJpeg(base64, ext) {

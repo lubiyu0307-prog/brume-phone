@@ -2,7 +2,7 @@
 // 「證件照」分頁放他、妳、配角的參考照片和長相，每張快照都帶著，同一個人才不會每張長得不一樣。
 
 import * as store from './store.js';
-import { currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref, saveToPhone } from './st.js';
+import { currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref, imageResPref, saveToPhone } from './st.js';
 import { imagineAndPick } from './pick.js';
 import { P, promptLang } from './prompts.js';
 import { promptEditor } from './promptedit.js';
@@ -140,6 +140,9 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <label>生圖模型</label>
         <div class="bp-al-seg">${[['flash', 'Flash・快'], ['pro', 'Pro・細']].map(([v, n]) => `<b data-al="imgmodel" data-v="${v}" class="${imageModelPref.get() === v ? 'on' : ''}">${n}</b>`).join('')}</div>
         <p class="bp-al-hint">Flash 一張十幾秒；Pro 二十秒上下，光影和細節比較細，費用也比較高。選的那個叫不到時，會自動換另一個。</p>
+        <label>解析度</label>
+        <div class="bp-al-seg">${[['1K', '1K・省錢'], ['2K', '2K・清楚']].map(([v, n]) => `<b data-al="imgres" data-v="${v}" class="${imageResPref.get() === v ? 'on' : ''}">${n}</b>`).join('')}</div>
+        <p class="bp-al-hint">1K 比較便宜，近景、自拍、限動在手機上看差不多；2K 全身照、遠景的臉比較不會糊。</p>
         <label>一次生幾張</label>
         <div class="bp-al-seg three">${[1, 2, 4].map((v) => `<b data-al="imgcount" data-v="${v}" class="${imageCountPref.get() === v ? 'on' : ''}">${v} 張</b>`).join('')}</div>
         <p class="bp-al-hint">生好排成格子讓妳挑最像的那張，沒選的會自動刪掉。張數越多越好挑，費用也是幾倍。</p>
@@ -261,6 +264,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (a === 'preset') { people.look.preset = e.target.closest('[data-v]').dataset.v; saveCast(ch.charKey, people); say(people.look.preset === 'candid' ? '之後拍成生活感' : '之後拍成精修'); renderIds(); return; }
     if (a === 'lang') { promptLang.set(e.target.closest('[data-v]').dataset.v); say(promptLang.get() === 'en' ? '生圖指令改用英文' : '生圖指令改用中文'); renderIds(); return; }
     if (a === 'imgcount') { imageCountPref.set(e.target.closest('[data-v]').dataset.v); say(`之後一次生 ${imageCountPref.get()} 張`); renderIds(); return; }
+    if (a === 'imgres') { imageResPref.set(e.target.closest('[data-v]').dataset.v); say(`之後用 ${imageResPref.get()} 生圖`); renderIds(); return; }
     if (a === 'imgmodel') { imageModelPref.set(e.target.closest('[data-v]').dataset.v); say(imageModelPref.get() === 'pro' ? '之後用 Pro 生圖' : '之後用 Flash 生圖'); renderIds(); return; }
     if (a === 'idpic') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'idpic'; f.click(); }
     if (a === 'idok' && editing) {
