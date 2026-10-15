@@ -347,15 +347,26 @@ export function createHisPhone({ host, say, onExit }) {
       try {
         const people = await loadCast(who.charKey);
         await ensureAutoStyle(people, who.charKey);
-        // 他手機裡的照片是他拍的；寫到自拍、鏡子、倒影他才入鏡，寫到她就帶她的證件照
+        // 截圖、插畫、存下來的圖片不是他拍的照片：照那張圖本身畫，不放人、不放手、不帶證件照
+        // （10/15「安羽傳過來的 LINE 大頭貼截圖」被畫成她本人＋一隻男生的手）
+        const shot = /截圖|螢幕|截下|插畫|插圖|貼圖|梗圖|海報|圖片|手繪|畫作|頭貼|桌布/.test(p.desc);
         const always = [];
-        if (/自拍|鏡子|鏡中|對鏡|合照|倒影|反射|映在/.test(p.desc)) always.push(HIM);
-        // 「已隱藏」的多半是他偷拍她的：寫到側影、背影、頭髮這些人的樣子，也當成她（10/15 那張「綁著橘紅色長捲髮鬆辮」沒寫到她，其實就是她）
-        const herWords = new RegExp(`她|妳|${who.user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
-        if (herWords.test(p.desc) || (p.hidden && /側影|背影|身影|側臉|睡臉|長髮|捲髮|髮辮|鬆辮|馬尾|髮尾|頭髮/.test(p.desc))) always.push(ME);
-        const ids = idsFor(people, p.desc, always);
-        const prompt = finalPrompt(people, who, `${p.desc}, photo taken on his phone, candid, natural light`, ids, { by: HIM });
-        const url = await imagineAndPick(host, prompt, { refs: refsFor(people, who, p.desc, always), aspect: '1:1' });
+        if (!shot) {
+          // 他手機裡的照片是他拍的；寫到自拍、鏡子、倒影他才入鏡
+          if (/自拍|鏡子|鏡中|對鏡|合照|倒影|反射|映在/.test(p.desc)) always.push(HIM);
+          // 寫到她（她、妳、名字），或「已隱藏」裡寫到側影、背影、頭髮這些人的樣子，當成她入鏡
+          // 名字後面接「傳、給、寄、說」是在講她做的事，不代表她在照片裡
+          const nm = who.user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const herIn = new RegExp(`她|妳|${nm}(?![傳給寄說送])`).test(p.desc);
+          if (herIn || (p.hidden && /側影|背影|身影|側臉|睡臉|長髮|捲髮|髮辮|鬆辮|馬尾|髮尾|頭髮/.test(p.desc))) always.push(ME);
+        }
+        const ids = shot ? [] : idsFor(people, p.desc, always);
+        // 有寫到手才講是他的手；沒寫就不提，不然模型會硬塞一隻手進來
+        const hand = /手|指|握|托|捧|拿著/.test(p.desc);
+        const prompt = shot
+          ? `${p.desc}. Show only the saved image itself as it appears on a phone screen, full frame, flat. No people, no hands, no phone body.`
+          : finalPrompt(people, who, `${p.desc}, photo taken on his phone, candid, natural light`, ids, hand ? { by: HIM } : {});
+        const url = await imagineAndPick(host, prompt, { refs: shot ? [] : refsFor(people, who, p.desc, always), aspect: '1:1' });
         if (url) { p.img = url; if (who.key === ch?.key) save(); }
         else say(imageInfo.why ? `沒有出圖：${imageInfo.why}` : '沒有出圖');
       } catch (err) { say(`沒有出圖：${err.message || err}`); }
