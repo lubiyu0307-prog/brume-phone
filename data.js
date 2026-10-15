@@ -54,7 +54,9 @@ export const cards = {
 // 貼圖庫（所有角色共用）：{ id, tag, img }
 export const stickers = {
   all: () => list('stickers', 'all'),
-  async add(s) { const a = await list('stickers', 'all'); a.push({ id: uid(), ...s }); await save('stickers', 'all', a); },
+  async add(s) { const a = await list('stickers', 'all'); const x = { id: uid(), ...s }; a.push(x); await save('stickers', 'all', a); return x; },
+  // desc：看過圖寫下的一句描述，他收到貼圖、自己挑貼圖時都看這句
+  async update(id, patch) { const a = await list('stickers', 'all'); const x = a.find((y) => y.id === id); if (!x) return; Object.assign(x, patch); await save('stickers', 'all', a); },
   async remove(id) { await save('stickers', 'all', (await list('stickers', 'all')).filter((x) => x.id !== id)); },
   // only：只給這張角色卡用（存角色卡的 charKey）；沒有 only 的是所有角色共用
   async setOnly(id, charKey) { const a = await list('stickers', 'all'); const x = a.find((y) => y.id === id); if (!x) return; if (charKey) x.only = charKey; else delete x.only; await save('stickers', 'all', a); },

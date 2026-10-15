@@ -2,7 +2,7 @@
 // 回覆走酒館自己的 generateQuietPrompt，所以模型看得到角色卡、世界書與正文。
 
 import * as store from './store.js';
-import { currentChar, generate, ctx, writeLore, canSeeImages, imagine, canDraw } from './st.js';
+import { currentChar, generate, ctx, writeLore, canSeeImages, imagine, canDraw, lookAt } from './st.js';
 import * as data from './data.js';
 import * as stage from './stage.js';
 import { findUrls, readLink, linkForPrompt } from './link.js';
@@ -106,7 +106,7 @@ function msgText(m) {
   if (m.gift) return `［送了禮物：${m.gift.item}${m.gift.note ? `，附一句「${m.gift.note}」` : ''}${m.me ? '' : m.gift.opened ? '（她拆開了）' : '（她還沒拆）'}］`;
   if (m.couple) return m.couple === 'off' ? '［她把你們的情侶頭貼換回來了］' : '［她把你們兩個的 LINE 頭貼換成情侶頭貼了］';
   if (m.loc) return `［傳了位置：${m.loc.place}${m.loc.note ? `「${m.loc.note}」` : ''}］`;
-  if (m.sticker) return `［貼圖：${m.sticker.tag}］`;
+  if (m.sticker) return `［貼圖：${m.sticker.tag}${m.sticker.desc ? `｜${m.sticker.desc}` : ''}］`;
   if (m.alarm) return `［鬧鐘卡 ${m.alarm.time}「${m.alarm.label}」］`;
   if (m.moment) return `（動態：${m.moment}）`;
   const links = (m.links || []).filter((l) => !l.fail && l.title).map((l) => `［連結：${l.title}］`).join('');
@@ -185,7 +185,7 @@ function buildPrompt(ch, msgs, x = {}) {
     '想做的話可以加這些小動作（不用每次都做）：',
     '- 引用她的某一句來回：在回覆最前面獨立一行寫 [[QUOTE|位置]]',
     '- 對她的某則訊息回貼表符：在回覆最後獨立一行寫 [[REACT|位置|表符]]，表符只能是 heart、lol、tear、wow、hug、huh 其中一個，一次最多一個',
-    x.stickerTags?.length ? `- 傳貼圖：在回覆最後獨立一行寫 [[STICKER|tag]]，tag 只能是：${x.stickerTags.join('、')}。一次最多一張` : '',
+    x.stickerTags?.length ? `- 傳貼圖：在回覆最後獨立一行寫 [[STICKER|標籤]]，只寫標籤（括號裡是那張圖畫什麼，幫你挑，不用寫進去）。可以用的有：${x.stickerTags.join('、')}。一次最多一張` : '',
     '- 她明確請你設鬧鐘或提醒時（例如「明天六點叫我」），先答應，再在最後獨立一行寫 [[ALARM|HH:MM|鬧鐘名稱]]，24 小時制，名稱是你留給她的一句話，10 字內、不用 emoji。她沒要求就不要寫',
     x.notesOn ? '- 在她冰箱上貼便條：最後獨立一行寫 [[NOTE|內容]] 或 [[NOTE|內容|YYYY-MM-DD]]，20 字內。她提到身體、作息、天氣、要吃的藥或補品、要帶的東西，你放不下心就貼一張，貼了在訊息裡順口提一下' : '',
     '- 記上你們共用的行事曆：最後獨立一行寫 [[CAL|YYYY-MM-DD|標題]]，標題 12 字內。約好的事、紀念日、回診檢查、兩人之間的「第一次」都記；行事曆上已經有的不要再記',
@@ -598,10 +598,10 @@ export function createLine({ screen, say, onUnread, onData }) {
   async function renderStickers() {
     const all = await data.stickers.all();
     const shared = all.filter((x) => !x.only); const own = all.filter((x) => ch && x.only === ch.charKey);
-    const item = (x) => `<div class="bp-line-stkitem" data-stkmove="${x.id}"><img src="${x.img}" alt=""><span>${esc(x.tag)}</span><i data-stkdel="${x.id}">✕</i></div>`;
+    const item = (x) => `<div class="bp-line-stkitem" data-stkmove="${x.id}"><img src="${x.img}" alt=""><span>${esc(x.tag)}</span><i data-stkdel="${x.id}">✕</i><em data-stkedit="${x.id}" title="${esc(x.desc || '還沒有描述')}">${x.desc ? '✎' : '…'}</em></div>`;
     screen.innerHTML = `<div class="bp-line bp-line-sub">${subHead('管理貼圖')}
       <div class="bp-line-subbody">
-        <p class="bp-line-subhint">每張要取一個標籤（例如「抱抱」「生氣」），他會照標籤挑來貼。點一下貼圖可以在「共用」和「只有他用」之間搬。</p>
+        <p class="bp-line-subhint">每張要取一個標籤（例如「抱抱」「生氣」）。新增時他會看一次圖、寫一句描述，收到貼圖和自己挑貼圖都看這句；左上角的 ✎ 可以看和改描述。點一下貼圖可以在「共用」和「只有他用」之間搬。</p>
         <h4 class="bp-line-stkh">只有${esc(ch?.name || '他')}用</h4>
         <div class="bp-line-stkgrid">
           ${own.map(item).join('')}
@@ -615,6 +615,18 @@ export function createLine({ screen, say, onUnread, onData }) {
       </div>
       <input class="bp-line-file" type="file" accept="image/*" hidden>
       <div class="bp-line-pop"></div></div>`;
+  }
+
+  // 新增貼圖時看一次圖、寫一句描述存起來（每張只看一次，不是每次傳都送圖）
+  async function describeSticker(x) {
+    if (!x?.img) return;
+    say('他在看這張貼圖⋯');
+    const d = await lookAt(`這是一張聊天用的貼圖，標籤是「${x.tag}」。用一句繁體中文描述它：畫了什麼角色或東西、表情和動作、傳達什麼情緒。25 字內，只輸出那一句。`, x.img);
+    const desc = d.split('\n')[0].replace(/^[「"]|[」"]$/g, '').trim().slice(0, 40);
+    if (!desc) { say('他沒看懂這張，可以按 ✎ 自己寫描述'); return; }
+    await data.stickers.update(x.id, { desc });
+    if (view === 'stickers') renderStickers();
+    say(`他看懂了：${desc}`);
   }
 
   async function toggleStickers() {
@@ -735,9 +747,12 @@ export function createLine({ screen, say, onUnread, onData }) {
       const today = data.today();
       const [notes, cal, memory, stks] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key), data.stickers.for(who.charKey)]);
       const cur = await stage.get(who.key);
-      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => x.tag))], photos: roundPhotos.length, photosSeen: !!image, couple: couple ? `${new Date(couple.ts).getMonth() + 1}/${new Date(couple.ts).getDate()} 換的` : '', pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
+      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => (x.desc ? `${x.tag}（${x.desc}）` : x.tag)))], photos: roundPhotos.length, photosSeen: !!image, couple: couple ? `${new Date(couple.ts).getMonth() + 1}/${new Date(couple.ts).getDate()} 換的` : '', pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
       out = parseReply(await generate(buildPrompt(who, t.msgs, extra), image), who);
-      out.stickerObj = out.sticker ? stks.find((x) => x.tag === out.sticker) : null;
+      // 他偶爾會連括號裡的描述一起抄，只取標籤；同一個標籤有好幾張就隨機挑一張
+      const stkTag = out.sticker ? String(out.sticker).replace(/[（(].*$/, '').trim() : '';
+      const stkHits = stkTag ? stks.filter((x) => x.tag === stkTag) : [];
+      out.stickerObj = stkHits.length ? stkHits[Math.floor(Math.random() * stkHits.length)] : null;
       if (!out.lines.length && !out.stickerObj && !out.alarm && !out.moments.length && !out.gifts.length && !out.locs.length) throw new Error('他沒有回出字來');
     } catch (e) {
       busy = false;
@@ -762,7 +777,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     }
     // 文字之後：貼圖、鬧鐘卡、動態、便條與行事曆
     const extras = [];
-    if (out.stickerObj) extras.push({ sticker: { tag: out.stickerObj.tag, img: out.stickerObj.img } });
+    if (out.stickerObj) extras.push({ sticker: { tag: out.stickerObj.tag, img: out.stickerObj.img, ...(out.stickerObj.desc ? { desc: out.stickerObj.desc } : {}) } });
     if (out.alarm) extras.push({ alarm: out.alarm });
     for (const g of out.gifts.slice(0, 1)) extras.push({ gift: g });
     for (const l of out.locs.slice(0, 1)) extras.push({ loc: l });
@@ -847,7 +862,9 @@ export function createLine({ screen, say, onUnread, onData }) {
       return;
     }
     const stk = e.target.closest('[data-stksend]');
-    if (stk) { const x = (await data.stickers.all()).find((y) => y.id === stk.dataset.stksend); if (x) send({ text: '', sticker: { tag: x.tag, img: x.img } }); return; }
+    if (stk) { const x = (await data.stickers.all()).find((y) => y.id === stk.dataset.stksend); if (x) send({ text: '', sticker: { tag: x.tag, img: x.img, ...(x.desc ? { desc: x.desc } : {}) } }); return; }
+    const stkEdit = e.target.closest('[data-stkedit]');
+    if (stkEdit) { const x = (await data.stickers.all()).find((y) => y.id === stkEdit.dataset.stkedit); if (x) askSheet(`「${esc(x.tag)}」這張畫什麼`, x.desc || '', 'dostkdesc', x.id, '他收到這張貼圖、自己挑貼圖時看的是這句。看錯了就改。', 3); return; }
     const stkDel = e.target.closest('[data-stkdel]');
     if (stkDel) { await data.stickers.remove(stkDel.dataset.stkdel); renderStickers(); return; }
     const stkMove = e.target.closest('[data-stkmove]');
@@ -990,7 +1007,14 @@ export function createLine({ screen, say, onUnread, onData }) {
     if (a === 'dostktag') {
       const tag = screen.querySelector('.bp-line-edit textarea').value.trim();
       if (!tag) return;
-      await data.stickers.add({ tag, img: pendingSticker, ...(stickerOnly && ch ? { only: ch.charKey } : {}) }); pendingSticker = null; renderStickers();
+      const img = pendingSticker;
+      const x = await data.stickers.add({ tag, img, ...(stickerOnly && ch ? { only: ch.charKey } : {}) }); pendingSticker = null; renderStickers();
+      describeSticker(x);
+    }
+    if (a === 'dostkdesc') {
+      const desc = screen.querySelector('.bp-line-edit textarea').value.trim();
+      const id = e.target.closest('[data-id]').dataset.id;
+      await data.stickers.update(id, { desc }); unpop(); renderStickers(); say(desc ? '描述改好了' : '描述清掉了');
     }
     if (a === 'doalarmset') {
       const v = screen.querySelector('.bp-line-edit textarea').value.trim();
