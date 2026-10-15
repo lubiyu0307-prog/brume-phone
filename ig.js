@@ -217,7 +217,12 @@ export function createIG({ screen, say }) {
     const author = p.author.kind === 'other' ? p.author.name : p.author.kind === 'him' ? HIM : null;
     const always = self && author ? [author] : [];
     // 別人拍到他或妳：描述裡寫到名字（或名字裡的字，像「阿愷」）也帶證件照（10/15 動物園粉專拍到飼育員侯愷，沒帶到他的照片）
-    const nameHit = (n) => n && (p.desc.includes(n) || (n.length >= 2 && new RegExp(`阿${n.slice(-1)}|小${n.slice(-1)}`).test(p.desc)));
+    // 名字後面接的是手、手掌、手指（「格骨節分明的男生手掌拿著⋯」）只是他的手入鏡，不算整個人入鏡：
+    // 帶證件照會把整張臉畫進去（10/15 霧靈晨那張，第一人稱拍晨，卻冒出他的大臉）
+    const esc2 = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // 單字的名字（像「格」）會撞到「風格」「格子」，不自動判斷，靠自拍、合照這些字
+    const nameHit = (n) => n && n.length >= 2 && [n, ...(n.length >= 2 ? [`阿${n.slice(-1)}`, `小${n.slice(-1)}`] : [])]
+      .some((x) => new RegExp(`${esc2(x)}(?![^，。,、]{0,10}(手|指|臂|掌))`).test(p.desc));
     if (nameHit(who.name) && !always.includes(HIM)) always.push(HIM);
     if (nameHit(who.user) && !always.includes(ME)) always.push(ME);
     const ids = idsFor(people, p.desc, always);
