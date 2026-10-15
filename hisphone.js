@@ -346,7 +346,9 @@ export function createHisPhone({ host, say, onExit }) {
         // 他手機裡的照片是他拍的；寫到自拍、鏡子、倒影他才入鏡，寫到她就帶她的證件照
         const always = [];
         if (/自拍|鏡子|鏡中|對鏡|合照|倒影|反射|映在/.test(p.desc)) always.push(HIM);
-        if (new RegExp(`她|妳|${who.user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(p.desc)) always.push(ME);
+        // 「已隱藏」的多半是他偷拍她的：寫到側影、背影、頭髮這些人的樣子，也當成她（10/15 那張「綁著橘紅色長捲髮鬆辮」沒寫到她，其實就是她）
+        const herWords = new RegExp(`她|妳|${who.user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`);
+        if (herWords.test(p.desc) || (p.hidden && /側影|背影|身影|側臉|睡臉|長髮|捲髮|髮辮|鬆辮|馬尾|髮尾|頭髮/.test(p.desc))) always.push(ME);
         const ids = idsFor(people, p.desc, always);
         const prompt = finalPrompt(people, who, `${p.desc}, photo taken on his phone, candid, natural light`, ids, { by: HIM });
         const url = await imagineAndPick(host, prompt, { refs: refsFor(people, who, p.desc, always), aspect: '1:1' });
