@@ -376,3 +376,39 @@ export async function writeLore(text, keys = []) {
 
 // 以前（0.9.2 以前）手機資料是照角色存的。這裡列出每一種資料的前綴，搬家時一起搬
 export const DATA_PREFIXES = ['line', 'linebg', 'music', 'ig', 'threads', 'his', 'album', 'calls', 'rps', 'stage', 'notes', 'cal', 'memory', 'cards', 'couple'];
+
+/**
+ * 把照片存到手機：iPhone、Android 走分享選單（裡面有「儲存影像」），電腦直接下載。
+ * Safari 要分享得在按下去的當下，先抓圖再分享常被擋（NotAllowedError）：抓好的圖留著，叫她再按一次就是當下
+ */
+let shareCache = { key: '', files: [] };
+export async function saveToPhone(urls, say) {
+  urls = [...new Set(urls.filter(Boolean))];
+  if (!urls.length) { say?.('這裡還沒有生好的照片'); return; }
+  const key = urls.join('|');
+  if (shareCache.key !== key) {
+    say?.(urls.length > 1 ? `準備 ${urls.length} 張照片⋯` : '準備照片⋯');
+    const files = [];
+    for (const [i, u] of urls.entries()) {
+      try {
+        const b = await (await fetch(u)).blob();
+        const ext = (b.type.split('/')[1] || 'png').replace('jpeg', 'jpg');
+        files.push(new File([b], `brume-${new Date().toISOString().slice(0, 10)}-${i + 1}.${ext}`, { type: b.type || 'image/png' }));
+      } catch { /* 抓不到的那張跳過 */ }
+    }
+    if (!files.length) { say?.('照片讀不到，可能被刪掉了'); return; }
+    shareCache = { key, files };
+  }
+  const { files } = shareCache;
+  if (navigator.canShare?.({ files })) {
+    try { await navigator.share({ files }); return; } catch (e) {
+      if (e?.name === 'AbortError') return; // 她自己關掉分享選單
+      if (e?.name === 'NotAllowedError') { say?.('照片準備好了，再按一次就能存'); return; }
+    }
+  }
+  for (const f of files) {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(f); a.download = f.name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  say?.(files.length > 1 ? `下載了 ${files.length} 張` : '下載了');
+}

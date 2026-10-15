@@ -2,7 +2,7 @@
 // 「證件照」分頁放他、妳、配角的參考照片和長相，每張快照都帶著，同一個人才不會每張長得不一樣。
 
 import * as store from './store.js';
-import { currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref } from './st.js';
+import { currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref, saveToPhone } from './st.js';
 import { imagineAndPick } from './pick.js';
 import { P, promptLang } from './prompts.js';
 import { promptEditor } from './promptedit.js';
@@ -27,7 +27,7 @@ const IC = {
 
 export function createAlbum({ screen, say, onShare, onIG }) {
   let ch = null; let items = []; let people = { cast: {}, look: { him: '', me: '' } }; let editing = null; // editing：證件照正在改的那個人
-  let view = 'grid'; let tab = 'all'; let openId = null; let picked = new Set(); let busy = false; let note = '';
+  let view = 'grid'; let tab = 'all'; let openId = null; let picked = new Set(); let busy = false; let note = ''; let shownImgs = [];
   const mine = () => !!screen.querySelector('.bp-al');
   const save = () => ch && store.set('album:' + ch.key, items).catch(() => {});
 
@@ -66,10 +66,13 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (view === 'one') return renderOne();
     const line = await chatPhotos();
     const all = [...items, ...line].sort((a, b) => b.ts - a.ts);
+    shownImgs = [];
     const shown = tab === 'snap' ? all.filter((p) => p.source === 'snap') : tab === 'line' ? line : tab === 'mine' ? all.filter((p) => p.source === 'upload') : all;
+    shownImgs = shown.map((p) => p.img).filter(Boolean);
     screen.innerHTML = `<div class="bp-al">${head('相本', 'home', `<i data-al="upload" class="bp-al-up" title="放照片">${IC.up}<small>放照片</small></i>`)}
       ${tabBar()}
       <div class="bp-al-scroll">
+        ${shown.some((p) => p.img) ? `<button class="bp-al-saveall" data-al="saveall">把這頁 ${shown.filter((p) => p.img).length} 張存到手機</button>` : ''}
         ${shown.length ? `<div class="bp-al-grid">${shown.map(tile).join('')}</div>` : `<p class="bp-al-empty">${tab === 'snap' || tab === 'all' ? '還沒有快照。<br>按右下角的相機，挑一段劇情拍下來。' : tab === 'mine' ? '還沒有放照片。<br>按右上角的「放照片」，一次可以選好幾張。' : '這裡還沒有照片。'}</p>`}
       </div>
       <button class="bp-al-fab" data-al="snap">${IC.cam}</button>
@@ -88,6 +91,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         ${own && p.source === 'upload' ? `<input class="bp-al-cap" value="${esc(p.desc === '妳放的照片' ? '' : p.desc)}" placeholder="寫一句話（例如：第一次一起去海邊）" maxlength="60">` : `<p class="bp-al-desc">${esc(p.desc)}</p>`}
         ${p.scene ? `<details class="bp-al-scene"><summary>這一幕</summary><p>${esc(p.scene)}</p></details>` : ''}
         ${p.prompt ? `<div class="bp-al-prompt"><small>生圖 prompt</small><p>${esc(p.prompt)}</p><button data-al="copy">複製</button></div>` : ''}
+        ${p.img ? '<button class="bp-al-saveall" data-al="phone">存到手機</button>' : ''}
         ${own ? `<div class="bp-al-acts">
           ${p.prompt && !p.img ? '<button data-al="gen">生成這張照片</button>' : ''}
           ${p.prompt ? '<button data-al="regen">重新生一張</button>' : ''}
@@ -272,6 +276,8 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (a === 'upload') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'new'; f.click(); }
     if (a === 'attach') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'attach'; f.click(); }
     // 複製的是完整的 prompt（帶長相和照片風格），拿去外面生也一樣像
+    if (a === 'saveall') { await saveToPhone(shownImgs, say); return; }
+    if (a === 'phone') { await saveToPhone([screen.querySelector('.bp-al-big')?.getAttribute('src')], say); return; } // 聊天裡的照片不在 items，直接拿畫面上那張
     if (a === 'copy' && p) { try { await navigator.clipboard.writeText(snapPrompt(p)); say('複製了'); } catch { say('這裡不能複製，長按文字自己選'); } }
     if ((a === 'gen' || a === 'regen') && p) await redraw(p);
     if (a === 'ig' && p?.img && !busy) {
@@ -334,7 +340,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
   promptEditor(screen, {
     say,
     match: (el) => { if (!mine()) return null; const t = el.closest('.bp-al-tile[data-photo]'); if (t) return t.dataset.photo; return el.closest('.bp-al-big, .bp-al-bigcard') && view === 'one' ? openId : null; },
-    get: (id) => { const p = items.find((x) => x.id === id); return p?.prompt ? { text: p.prompt, hasImg: !!p.img } : null; },
+    get: (id) => { const p = items.find((x) => x.id === id); return p?.prompt ? { text: p.prompt, hasImg: !!p.img, img: p.img } : null; },
     run: async (id, text, again) => {
       const p = items.find((x) => x.id === id); if (!p) return;
       p.prompt = text; save();

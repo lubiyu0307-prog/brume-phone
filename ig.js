@@ -495,8 +495,8 @@ export function createIG({ screen, say }) {
     say,
     match: (el) => { if (!mine()) return null; const st = el.closest('[data-igstory]'); if (st) return 's:' + st.dataset.igstory; return el.closest('[data-igphoto]')?.dataset.igphoto ?? null; },
     get: (id) => {
-      if (id.startsWith('s:')) { const s = d.stories.find((x) => x.id === id.slice(2)); return s && s.author.kind !== 'me' && s.desc ? { text: s.desc, hasImg: !!s.img } : null; }
-      const p = find(id); return p && p.author.kind !== 'me' && !p.fromAlbum ? { text: p.desc, hasImg: !!p.img } : null;
+      if (id.startsWith('s:')) { const s = d.stories.find((x) => x.id === id.slice(2)); return s && s.author.kind !== 'me' && s.desc ? { text: s.desc, hasImg: !!s.img, img: s.img } : null; }
+      const p = find(id); return p && p.author.kind !== 'me' && !p.fromAlbum ? { text: p.desc, hasImg: !!p.img, img: p.img } : null;
     },
     run: async (id, text, again) => {
       // 限動：改描述、重新出直的（9:16）

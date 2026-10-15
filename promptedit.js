@@ -1,12 +1,14 @@
 // 長按生圖的照片（或還是文字的照片卡）→ 跳出這張照片的中文描述，可以改，改完存下來或直接用新的描述重新出圖。
 // 相本、IG、他的手機共用。長相和照片風格不在這裡，出圖時會自動接上去。
 
+import { saveToPhone } from './st.js';
+
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 /**
  * root：要聽長按的容器
  * match(el)：按到的地方是哪張照片，回傳鍵，不是照片回 null
- * get(key)：回傳 { text } 或 null（這張沒有描述可以改）
+ * get(key)：回傳 { text, hasImg, img } 或 null（這張沒有描述可以改）；有 img 就多一顆「存到手機」
  * run(key, text, redraw)：存下改過的描述；redraw 為 true 時用新描述重新出圖
  */
 export function promptEditor(root, { match, get, run, say }) {
@@ -38,6 +40,7 @@ export function promptEditor(root, { match, get, run, say }) {
       <b>這張照片的描述</b>
       <textarea rows="7">${esc(cur.text)}</textarea>
       <p>改這段就能改照片內容。人物的長相和照片風格會自動接上，不用寫在這裡。</p>
+      ${cur.img ? '<button class="bp-pe-save" data-pe="phone">存到手機</button>' : ''}
       <div class="bp-pe-btns"><button data-pe="close">取消</button><button data-pe="save">存下來</button><button data-pe="redraw" class="ok">${cur.hasImg === false ? '生成照片' : '重新出圖'}</button></div></div>`;
     root.appendChild(box);
     const ta = box.querySelector('textarea');
@@ -45,6 +48,7 @@ export function promptEditor(root, { match, get, run, say }) {
       const a = e.target.closest('[data-pe]')?.dataset.pe; if (!a) return;
       e.stopPropagation();
       if (a === 'close') { box.remove(); return; }
+      if (a === 'phone') { await saveToPhone([cur.img], say); return; }
       const text = ta.value.trim();
       if (!text) { say?.('描述不能是空的'); return; }
       box.remove();
