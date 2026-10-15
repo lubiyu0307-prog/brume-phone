@@ -184,9 +184,12 @@ async function imageModels(key) {
 async function refRequest(prompt, refs) {
   const ask = `${P.ASK}\n${String(prompt).trim()}`;
   const got = [];
-  for (const r of refs) { const url = await asDataUrl(r.url); if (url) got.push({ name: r.name, url }); }
+  for (const r of refs) { const url = await asDataUrl(r.url); if (url) got.push({ name: r.name, url, ghost: !!r.ghost }); }
   if (!got.length) return { images: [], text: ask };
-  return { images: got.map((r) => r.url), text: `${got.map((r, i) => P.REF_INTRO(r.name, i)).join('\n')}\n${P.REF_RULE}\n\n${ask}` };
+  // ghost 是拍照的人：不能算進「裡面就是這些人」，不然 flash 會把他整個人畫進畫面（10/15 浴室門口多一個人）
+  const intro = got.map((r, i) => (r.ghost ? P.GHOST_INTRO(r.name, i) : P.REF_INTRO(r.name, i))).join('\n');
+  const rule = got.some((r) => !r.ghost) ? P.REF_RULE : P.GHOST_ONLY;
+  return { images: got.map((r) => r.url), text: `${intro}\n${rule}\n\n${ask}` };
 }
 
 async function viaKey(prompt, refs = [], aspect = '1:1') {

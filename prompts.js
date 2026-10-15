@@ -8,6 +8,9 @@ const ZH = {
   REF_INTRO: (name, i) => `圖${i + 1}是${name}的參考照片（並排的是同一個人的不同角度，仍然是同一個人）。`,
   REF_RULE: '請畫一張新的照片，裡面就是這些人：每個人的臉型、眼睛、鼻子、下巴、髮色、髮型都要跟各自的參考照片一模一樣。參考照片優先於下面的文字。鏡頭照情境描述的方式拍（全身、半身、近景都可以）；只要看得到臉，就要認得出是誰。沒有特別指定畫風的話，照參考照片的畫風畫（動漫就畫動漫，照片就畫照片）。',
   ASK: '畫一張圖，圖上不要有任何文字、字幕或浮水印。',
+  // 拍照的人：不入鏡，照片只是以防玻璃、櫥窗映出他時臉要對
+  GHOST_INTRO: (name, i) => `圖${i + 1}是拍這張照片的${name}，${name}不在畫面裡，不要把${name}畫進去；只有玻璃或水面映出拍照的人時，那張臉才照這張畫。`,
+  GHOST_ONLY: '請畫一張新的照片。',
 
   // 入鏡的人
   PEOPLE_TITLE: '入鏡的人：',
@@ -66,6 +69,8 @@ const EN = {
   REF_INTRO: (name, i) => `Image ${i + 1} is a reference photo of ${name} (it may show the same person from several angles side by side; it is still one person).`,
   REF_RULE: "Create a new picture with exactly these people: keep each person's face, eyes, nose, jawline, hair colour and hairstyle identical to their reference image. The reference images win over any text below. Use the framing the scene describes (full body, half body or close-up); whenever a face is visible it must be recognisable as that person. Unless a visual style is given below, draw in the same art style as the references (anime stays anime, photo stays photo).",
   ASK: 'Generate one image. No text, captions or watermarks in the image.',
+  GHOST_INTRO: (name, i) => `Image ${i + 1} is ${name}, who is taking this photo. ${name} is NOT in the picture; do not draw ${name}. Only if glass or water reflects the photographer, that face must match this image.`,
+  GHOST_ONLY: 'Create a new picture.',
 
   PEOPLE_TITLE: 'People in the picture:',
   PERSON_WITH_REF: (name) => `${name}: face, hair colour and hairstyle exactly as in ${name}'s reference photo (ignore any text that says otherwise)`,

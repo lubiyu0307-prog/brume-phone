@@ -229,9 +229,10 @@ export function createIG({ screen, say }) {
     const by = author;
     const refs = refsFor(people, who, p.desc, always);
     // 沒寫入鏡，但 Gemini 常自己在玻璃、櫥窗畫出拍照的人：照片照樣帶上，註明「萬一出現才用」，出現了臉也會對
-    if (!self && author) {
+    // 只有場景裡有玻璃、櫥窗、水面這種會映出人的東西才帶（flash 看到照片就想把人畫進去）
+    if (!self && author && /玻璃|櫥窗|窗|水面|水族|螢幕|反光|glass|window/i.test(p.desc)) {
       const [r] = refsFor(people, who, '', [author]);
-      if (r && !refs.some((x) => x.url === r.url)) refs.push({ name: `${r.name} (the photographer; not in the picture, but if any reflection or glimpse of them shows, it must be this face)`, url: r.url });
+      if (r && !refs.some((x) => x.url === r.url)) refs.push({ name: r.name, url: r.url, ghost: true });
     }
     return { prompt: finalPrompt(people, who, `${p.desc}${story ? P.IG_STORY : P.IG_POST}`, ids, { by }), refs };
   }
