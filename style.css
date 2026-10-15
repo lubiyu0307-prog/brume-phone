@@ -1203,3 +1203,12 @@
 .bp-pick-grid i { position: relative; }
 .bp-pick-grid em { position: absolute; right: 6px; bottom: 6px; padding: 2px 7px; border-radius: 9px; background: rgba(0, 0, 0, .65); color: #fff; font-size: 10px; font-style: normal; }
 .bp-line-sys.bp-modehint { margin: 30px 24px; text-align: center; color: rgba(255, 255, 255, .9); font-size: 13px; line-height: 1.6; }
+
+/* 他的手機・照片：生成過的顯示真的圖，點進去可以一張一張生成 */
+.bp-hp-photo.bp-has { padding: 0; overflow: hidden; }
+.bp-hp-photo.bp-has img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.bp-hp-pimg { display: block; width: 100%; border-radius: 12px; }
+.bp-hp-pdesc { margin: 10px 2px 0; font-size: 13px; line-height: 1.5; opacity: .85; }
+.bp-hp-pacts { display: flex; gap: 8px; margin-top: 12px; }
+.bp-hp-pacts button { flex: 1; padding: 11px; border: 0; border-radius: 12px; background: rgba(127, 127, 127, .18); color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
+.bp-hp-pacts button[disabled] { opacity: .5; }

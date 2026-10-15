@@ -3,7 +3,9 @@
 // 他的小動作藏在各處：妳的備註名、有沒有被釘選、打了沒傳的草稿、跟朋友聊到妳、藏起來的照片⋯
 
 import * as store from './store.js';
-import { currentChar, generate } from './st.js';
+import { currentChar, generate, imageInfo, canDraw } from './st.js';
+import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
+import { imagineAndPick } from './pick.js';
 import { verify } from './music.js';
 import * as stage from './stage.js';
 
@@ -57,6 +59,7 @@ const APPS = [
 ];
 
 export function createHisPhone({ host, say, onExit }) {
+  let drawing = false;
   let ch = null; let hp = null; let view = 'lock'; let sub = null; let typed = ''; let fails = 0;
   const busy = new Set();
 
@@ -273,7 +276,9 @@ export function createHisPhone({ host, say, onExit }) {
   }
 
   function photoTile(p, i) {
-    return `<div class="bp-hp-photo" data-photo="${i}" style="--h:${hue(p.desc)}"><span>${esc(p.desc)}</span></div>`;
+    return p.img
+      ? `<div class="bp-hp-photo bp-has" data-photo="${i}"><img src="${esc(p.img)}" alt="" loading="lazy"></div>`
+      : `<div class="bp-hp-photo" data-photo="${i}" style="--h:${hue(p.desc)}"><span>${esc(p.desc)}</span></div>`;
   }
   function albumGrid() {
     const all = hp.album.map((p, i) => ({ p, i })).sort((a, b) => b.p.ts - a.p.ts);
@@ -283,7 +288,10 @@ export function createHisPhone({ host, say, onExit }) {
   }
   function albumOne(i) {
     const p = hp.album[i];
-    return `<div class="bp-hp-pone" style="--h:${hue(p.desc)}"><span>${esc(p.desc)}</span></div><p class="bp-hp-meta">${new Date(p.ts).getMonth() + 1}月${new Date(p.ts).getDate()}日 ${when(p.ts)}${p.hidden ? '・已隱藏' : ''}</p>`;
+    // 一張一張自己決定要不要生成：點進去才有按鈕，不會整本一起畫
+    return `${p.img ? `<img class="bp-hp-pimg" src="${esc(p.img)}" alt=""><p class="bp-hp-pdesc">${esc(p.desc)}</p>` : `<div class="bp-hp-pone" style="--h:${hue(p.desc)}"><span>${esc(p.desc)}</span></div>`}
+      <p class="bp-hp-meta">${new Date(p.ts).getMonth() + 1}月${new Date(p.ts).getDate()}日 ${when(p.ts)}${p.hidden ? '・已隱藏' : ''}</p>
+      ${canDraw() ? `<div class="bp-hp-pacts"><button data-hp="gen" ${drawing ? 'disabled' : ''}>${drawing ? '生成中⋯' : p.img ? '重新生一張' : '生成這張照片'}</button>${p.img ? '<button data-hp="ungen">換回文字</button>' : ''}</div>` : ''}`;
   }
   function memoList() {
     return hp.memos.map((m, i) => ({ m, i })).sort((a, b) => b.m.ts - a.m.ts).map(({ m, i }) => `<div class="bp-hp-memo" data-memo="${i}"><b>${esc(m.title)}</b><span>${when(m.ts)}　${esc(m.body.split('\n')[0]).slice(0, 30)}</span></div>`).join('');
@@ -306,7 +314,7 @@ export function createHisPhone({ host, say, onExit }) {
   }
 
   // ---------- 操作 ----------
-  host.addEventListener('click', (e) => {
+  host.addEventListener('click', async (e) => {
     const k = e.target.closest('[data-key]');
     if (k) {
       const v = k.dataset.key;
@@ -328,6 +336,25 @@ export function createHisPhone({ host, say, onExit }) {
     if (a === 'home') { view = 'home'; sub = null; paint(); }
     if (a === 'sub') { sub = null; paint(); }
     if (a === 'peek') { say(`他輸的是 ${hp.code}`); }
+    if (a === 'ungen' && hp.album[sub]) { delete hp.album[sub].img; save(); paint(); }
+    if (a === 'gen' && hp.album[sub] && !drawing) {
+      const i = sub; const p = hp.album[i]; const who = ch;
+      drawing = true; paint();
+      try {
+        const people = await loadCast(who.charKey);
+        await ensureAutoStyle(people, who.charKey);
+        // 他手機裡的照片是他拍的；寫到自拍、鏡子、倒影他才入鏡，寫到她就帶她的證件照
+        const always = [];
+        if (/自拍|鏡子|鏡中|對鏡|合照|倒影|反射|映在/.test(p.desc)) always.push(HIM);
+        if (new RegExp(`她|妳|${who.user.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`).test(p.desc)) always.push(ME);
+        const ids = idsFor(people, p.desc, always);
+        const prompt = finalPrompt(people, who, `${p.desc}, photo taken on his phone, candid, natural light`, ids, { by: HIM });
+        const url = await imagineAndPick(host, prompt, { refs: refsFor(people, who, p.desc, always), aspect: '1:1' });
+        if (url) { p.img = url; if (who.key === ch?.key) save(); }
+        else say(imageInfo.why ? `沒有出圖：${imageInfo.why}` : '沒有出圖');
+      } catch (err) { say(`沒有出圖：${err.message || err}`); }
+      drawing = false; if (view === 'album' && sub === i) paint();
+    }
   });
 
   function close() { host.classList.remove('bp-show'); host.innerHTML = ''; }
