@@ -231,7 +231,7 @@ export function createLine({ screen, say, onUnread, onData }) {
   let timer = null;
   let quoting = null;
   let renderToken = 0;
-  let stickerOpen = false;
+  let stickerOpen = false; let stickerOnly = false; // stickerOnly：正在新增的貼圖是不是只給這個角色
   let curStage = 'meet';
   let pendingSticker = null;
   let msQueue = [];
@@ -596,12 +596,20 @@ export function createLine({ screen, say, onUnread, onData }) {
   }
 
   async function renderStickers() {
-    const ss = await data.stickers.all();
+    const all = await data.stickers.all();
+    const shared = all.filter((x) => !x.only); const own = all.filter((x) => ch && x.only === ch.charKey);
+    const item = (x) => `<div class="bp-line-stkitem" data-stkmove="${x.id}"><img src="${x.img}" alt=""><span>${esc(x.tag)}</span><i data-stkdel="${x.id}">✕</i></div>`;
     screen.innerHTML = `<div class="bp-line bp-line-sub">${subHead('管理貼圖')}
       <div class="bp-line-subbody">
-        <p class="bp-line-subhint">貼圖所有角色共用。每張要取一個標籤（例如「抱抱」「生氣」），他會照標籤挑來貼。</p>
+        <p class="bp-line-subhint">每張要取一個標籤（例如「抱抱」「生氣」），他會照標籤挑來貼。點一下貼圖可以在「共用」和「只有他用」之間搬。</p>
+        <h4 class="bp-line-stkh">只有${esc(ch?.name || '他')}用</h4>
         <div class="bp-line-stkgrid">
-          ${ss.map((x) => `<div class="bp-line-stkitem"><img src="${x.img}" alt=""><span>${esc(x.tag)}</span><i data-stkdel="${x.id}">✕</i></div>`).join('')}
+          ${own.map(item).join('')}
+          <div class="bp-line-stkitem bp-add" data-line="stkadd" data-only="1">${IC.plus}<span>新增</span></div>
+        </div>
+        <h4 class="bp-line-stkh">所有角色共用</h4>
+        <div class="bp-line-stkgrid">
+          ${shared.map(item).join('')}
           <div class="bp-line-stkitem bp-add" data-line="stkadd">${IC.plus}<span>新增</span></div>
         </div>
       </div>
@@ -615,7 +623,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     stickerOpen = !stickerOpen;
     panel.hidden = !stickerOpen;
     if (!stickerOpen) return;
-    const ss = await data.stickers.all();
+    const ss = await data.stickers.for(ch?.charKey);
     panel.innerHTML = ss.length
       ? `<div class="bp-line-stkgrid">${ss.map((x) => `<div class="bp-line-stkitem" data-stksend="${x.id}"><img src="${x.img}" alt=""></div>`).join('')}</div>`
       : '<p class="bp-line-subhint">還沒有貼圖。<u data-line="stickermgr">去新增</u></p>';
@@ -725,7 +733,7 @@ export function createLine({ screen, say, onUnread, onData }) {
       if (roundPhotos.length && !seeing && !warnedImages) { warnedImages = true; say('酒館沒開「Send inline images」，他看不到照片'); }
       const image = seeing ? await collage(roundPhotos.map((m) => m.img)) : null;
       const today = data.today();
-      const [notes, cal, memory, stks] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key), data.stickers.all()]);
+      const [notes, cal, memory, stks] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key), data.stickers.for(who.charKey)]);
       const cur = await stage.get(who.key);
       const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => x.tag))], photos: roundPhotos.length, photosSeen: !!image, couple: couple ? `${new Date(couple.ts).getMonth() + 1}/${new Date(couple.ts).getDate()} 換的` : '', pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
       out = parseReply(await generate(buildPrompt(who, t.msgs, extra), image), who);
@@ -842,6 +850,13 @@ export function createLine({ screen, say, onUnread, onData }) {
     if (stk) { const x = (await data.stickers.all()).find((y) => y.id === stk.dataset.stksend); if (x) send({ text: '', sticker: { tag: x.tag, img: x.img } }); return; }
     const stkDel = e.target.closest('[data-stkdel]');
     if (stkDel) { await data.stickers.remove(stkDel.dataset.stkdel); renderStickers(); return; }
+    const stkMove = e.target.closest('[data-stkmove]');
+    if (stkMove && ch) {
+      const x = (await data.stickers.all()).find((y) => y.id === stkMove.dataset.stkmove); if (!x) return;
+      await data.stickers.setOnly(x.id, x.only ? '' : ch.charKey); renderStickers();
+      say(x.only ? '改成所有角色共用' : `改成只有${ch.name}用`);
+      return;
+    }
     const memEdit = e.target.closest('[data-memedit]');
     if (memEdit) { const m = (await data.memory.all(ch.key)).find((x) => x.id === memEdit.dataset.memedit); if (m) askSheet('改這條記憶', m.text, 'domemedit', m.id); return; }
     const memDel = e.target.closest('[data-memdel]');
@@ -958,7 +973,7 @@ export function createLine({ screen, say, onUnread, onData }) {
       say(why ? `沒寫進去：${why}` : `寫了 ${n} 條進世界書`);
     }
     if (a === 'msclose') e.target.closest('.bp-line-ms')?.remove();
-    if (a === 'stkadd') { const f = screen.querySelector('.bp-line-file'); f.dataset.for = 'sticker'; f.click(); }
+    if (a === 'stkadd') { const f = screen.querySelector('.bp-line-file'); f.dataset.for = 'sticker'; stickerOnly = !!e.target.closest('[data-only]'); f.click(); }
     if (a === 'alarmset') askSheet('鬧鐘捷徑的名字', alarmShortcut(), 'doalarmset', '', '點鬧鐘卡時，會叫 iPhone 的「捷徑」App 跑這個名字的捷徑。<br>做法：捷徑 App → 新增捷徑 → 加「分割文字」（自訂：|）→「從清單取得項目」第一項當時間、最後一項當名稱 →「製作鬧鐘」。捷徑的名字要跟這裡一樣。', 1);
     if (a === 'dokeep') {
       const text = screen.querySelector('.bp-line-edit textarea').value.trim();
@@ -975,7 +990,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     if (a === 'dostktag') {
       const tag = screen.querySelector('.bp-line-edit textarea').value.trim();
       if (!tag) return;
-      await data.stickers.add({ tag, img: pendingSticker }); pendingSticker = null; renderStickers();
+      await data.stickers.add({ tag, img: pendingSticker, ...(stickerOnly && ch ? { only: ch.charKey } : {}) }); pendingSticker = null; renderStickers();
     }
     if (a === 'doalarmset') {
       const v = screen.querySelector('.bp-line-edit textarea').value.trim();

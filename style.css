@@ -1252,3 +1252,5 @@
 .bp-cf-chip.on { background: #2b2824; border-color: #2b2824; color: #fff; }
 .bp-hp-pacts button.bp-hp-danger { background: rgba(214, 69, 69, .16); color: #e06a6a; }
 .bp-app-soon .bp-icon { opacity: .45; }
+
+.bp-line-stkh { margin: 14px 2px 8px; font-size: 13px; font-weight: 600; color: #666; }

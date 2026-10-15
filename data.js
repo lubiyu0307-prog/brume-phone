@@ -56,6 +56,10 @@ export const stickers = {
   all: () => list('stickers', 'all'),
   async add(s) { const a = await list('stickers', 'all'); a.push({ id: uid(), ...s }); await save('stickers', 'all', a); },
   async remove(id) { await save('stickers', 'all', (await list('stickers', 'all')).filter((x) => x.id !== id)); },
+  // only：只給這張角色卡用（存角色卡的 charKey）；沒有 only 的是所有角色共用
+  async setOnly(id, charKey) { const a = await list('stickers', 'all'); const x = a.find((y) => y.id === id); if (!x) return; if (charKey) x.only = charKey; else delete x.only; await save('stickers', 'all', a); },
+  /** 這張角色卡用得到的：共用的＋只給他的 */
+  async for(charKey) { return (await list('stickers', 'all')).filter((x) => !x.only || x.only === charKey); },
 };
 
 export const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
