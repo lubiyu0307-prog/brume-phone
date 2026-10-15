@@ -5,6 +5,7 @@ import * as store from './store.js';
 import { currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref } from './st.js';
 import { imagineAndPick } from './pick.js';
 import { P, promptLang } from './prompts.js';
+import { promptEditor } from './promptedit.js';
 import { HIM, ME, loadCast, saveCast, person, setPerson, sideNames, refsFor, idsFor, finalPrompt, ensureAutoStyle, splitLook } from './cast.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -272,15 +273,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (a === 'attach') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'attach'; f.click(); }
     // 複製的是完整的 prompt（帶長相和照片風格），拿去外面生也一樣像
     if (a === 'copy' && p) { try { await navigator.clipboard.writeText(snapPrompt(p)); say('複製了'); } catch { say('這裡不能複製，長按文字自己選'); } }
-    if ((a === 'gen' || a === 'regen') && p) {
-      // 先等畫面重畫完再叫挑圖：renderOne 是非同步的，晚一步寫 innerHTML 會把挑圖的格子蓋掉（10/14 卡在「生圖中⋯」）
-      note = '生圖中⋯'; await renderOne();
-      await ensureAutoStyle(people, ch.charKey);
-      const url = await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' });
-      if (url) { p.img = url; save(); }
-      note = drawnNote(url) || (url ? '' : '沒有出圖：要聊天接 Google，或在證件照頁貼 AI Studio 金鑰。');
-      if (mine()) renderOne();
-    }
+    if ((a === 'gen' || a === 'regen') && p) await redraw(p);
     if (a === 'ig' && p?.img && !busy) {
       busy = 'ig'; renderOne();
       try {
@@ -324,6 +317,29 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (!ch || e.detail !== 'album:' + ch.key) return;
     items = (await store.get('album:' + ch.key).catch(() => null)) || [];
     if (mine() && view === 'grid') render();
+  });
+
+  async function redraw(p) {
+    openId = p.id; view = 'one';
+    // 先等畫面重畫完再叫挑圖：renderOne 是非同步的，晚一步寫 innerHTML 會把挑圖的格子蓋掉（10/14 卡在「生圖中⋯」）
+    note = '生圖中⋯'; await renderOne();
+    await ensureAutoStyle(people, ch.charKey);
+    const url = await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' });
+    if (url) { p.img = url; save(); }
+    note = drawnNote(url) || (url ? '' : '沒有出圖：要聊天接 Google，或在證件照頁貼 AI Studio 金鑰。');
+    if (mine()) renderOne();
+  }
+
+  // 長按快照（格子或大圖）→ 改描述、重新出圖。妳放的照片沒有描述，不能改
+  promptEditor(screen, {
+    say,
+    match: (el) => { if (!mine()) return null; const t = el.closest('.bp-al-tile[data-photo]'); if (t) return t.dataset.photo; return el.closest('.bp-al-big, .bp-al-bigcard') && view === 'one' ? openId : null; },
+    get: (id) => { const p = items.find((x) => x.id === id); return p?.prompt ? { text: p.prompt } : null; },
+    run: async (id, text, again) => {
+      const p = items.find((x) => x.id === id); if (!p) return;
+      p.prompt = text; save();
+      if (again) await redraw(p); else { say('描述存好了'); if (view === 'one') renderOne(); }
+    },
   });
 
   return {

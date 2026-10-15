@@ -1212,3 +1212,15 @@
 .bp-hp-pacts { display: flex; gap: 8px; margin-top: 12px; }
 .bp-hp-pacts button { flex: 1; padding: 11px; border: 0; border-radius: 12px; background: rgba(127, 127, 127, .18); color: inherit; font: inherit; font-size: 14px; cursor: pointer; }
 .bp-hp-pacts button[disabled] { opacity: .5; }
+
+/* 長按照片改描述 */
+.bp-al-tile, .bp-al-big, .bp-ig-img, .bp-hp-photo, .bp-hp-pimg, .bp-hp-pone { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
+.bp-pe { position: absolute; inset: 0; z-index: 60; display: flex; align-items: flex-end; }
+.bp-pe-bg { position: absolute; inset: 0; background: rgba(0, 0, 0, .4); }
+.bp-pe-card { position: relative; width: 100%; padding: 18px 16px calc(16px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: #f7f4ef; color: #2b2824; }
+.bp-pe-card b { display: block; text-align: center; margin-bottom: 10px; }
+.bp-pe-card textarea { width: 100%; box-sizing: border-box; border: 1px solid #e3ddd3; border-radius: 12px; padding: 10px; font: inherit; font-size: 16px; line-height: 1.55; background: #fff; color: #2b2824; resize: none; outline: none; }
+.bp-pe-card p { margin: 8px 2px 12px; font-size: 12px; color: #8a8378; line-height: 1.5; }
+.bp-pe-btns { display: flex; gap: 8px; }
+.bp-pe-btns button { flex: 1; padding: 11px 6px; border: 0; border-radius: 12px; background: #ebe6de; color: #4b463f; font: inherit; font-size: 14px; cursor: pointer; }
+.bp-pe-btns button.ok { background: #2b2824; color: #fff; }

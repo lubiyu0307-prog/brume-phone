@@ -6,6 +6,7 @@ import * as store from './store.js';
 import { currentChar, generate, imageInfo, canDraw } from './st.js';
 import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
 import { imagineAndPick } from './pick.js';
+import { promptEditor } from './promptedit.js';
 import { verify } from './music.js';
 import * as stage from './stage.js';
 
@@ -337,8 +338,11 @@ export function createHisPhone({ host, say, onExit }) {
     if (a === 'sub') { sub = null; paint(); }
     if (a === 'peek') { say(`他輸的是 ${hp.code}`); }
     if (a === 'ungen' && hp.album[sub]) { delete hp.album[sub].img; save(); paint(); }
-    if (a === 'gen' && hp.album[sub] && !drawing) {
-      const i = sub; const p = hp.album[i]; const who = ch;
+    if (a === 'gen' && hp.album[sub] && !drawing) await genPhoto(sub);
+  });
+
+  async function genPhoto(i) {
+      const p = hp.album[i]; const who = ch; if (!p || drawing) return;
       drawing = true; paint();
       try {
         const people = await loadCast(who.charKey);
@@ -357,6 +361,17 @@ export function createHisPhone({ host, say, onExit }) {
       } catch (err) { say(`沒有出圖：${err.message || err}`); }
       drawing = false; if (view === 'album' && sub === i) paint();
     }
+
+  // 長按照片（格子或點開的大圖）→ 改描述、重新出圖
+  promptEditor(host, {
+    say,
+    match: (el) => { const t = el.closest('[data-photo]'); if (t) return +t.dataset.photo; return view === 'album' && sub !== null && sub !== undefined && el.closest('.bp-hp-pimg, .bp-hp-pone') ? sub : null; },
+    get: (i) => (hp?.album?.[i] ? { text: hp.album[i].desc } : null),
+    run: async (i, text, again) => {
+      const p = hp.album[i]; if (!p) return;
+      p.desc = text; save();
+      if (again) { view = 'album'; sub = i; await genPhoto(i); } else { say('描述存好了'); paint(); }
+    },
   });
 
   function close() { host.classList.remove('bp-show'); host.innerHTML = ''; }

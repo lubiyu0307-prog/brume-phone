@@ -7,6 +7,7 @@ import * as store from './store.js';
 import { currentChar, generate, imagine, canSeeImages, imageInfo, canDraw } from './st.js';
 import { imagineAndPick } from './pick.js';
 import { P } from './prompts.js';
+import { promptEditor } from './promptedit.js';
 import { HIM, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
 
 // 自動生圖：打開的話，他新發的貼文用 Gemini 畫成真的照片（一張要等一下）
@@ -66,8 +67,8 @@ export function createIG({ screen, say }) {
     return `<span class="bp-ig-av ${cls}"${tap} style="--h:${hue(a.handle)}">${esc((a.name || '?').slice(0, 1))}</span>`;
   }
   const photo = (p, cls = '') => (p.img
-    ? `<img class="bp-ig-img ${cls}" src="${esc(p.img)}" alt="">`
-    : `<div class="bp-ig-img card ${cls}" style="--h:${hue(p.desc)}"><span>${esc(p.desc)}</span></div>`);
+    ? `<img class="bp-ig-img ${cls}" src="${esc(p.img)}" alt="" data-igphoto="${p.id}">`
+    : `<div class="bp-ig-img card ${cls}" style="--h:${hue(p.desc)}" data-igphoto="${p.id}"><span>${esc(p.desc)}</span></div>`);
 
   function post(p, detail) {
     const n = p.comments?.length || 0;
@@ -424,6 +425,22 @@ export function createIG({ screen, say }) {
     if (ch?.key === who.key) d = dd;
     return String(r.caption || '');
   }
+
+  // 長按貼文照片 → 改描述、重新出圖（妳自己發的、從相本來的是真照片，不能改）
+  promptEditor(screen, {
+    say,
+    match: (el) => (mine() ? el.closest('[data-igphoto]')?.dataset.igphoto ?? null : null),
+    get: (id) => { const p = find(id); return p && p.author.kind !== 'me' && !p.fromAlbum ? { text: p.desc } : null; },
+    run: async (id, text, again) => {
+      const p = find(id); if (!p) return;
+      p.desc = text; save();
+      if (!again) { say('描述存好了'); view === 'post' ? renderPost() : view === 'profile' ? renderProfile() : renderFeed(); return; }
+      say('生圖中⋯');
+      const url = await draw(p, ch, '1:1', true);
+      if (url) { p.img = url; save(); }
+      if (mine()) view === 'post' ? renderPost() : view === 'profile' ? renderProfile() : renderFeed();
+    },
+  });
 
   return { open() { view = 'feed'; render(); }, postPhoto };
 }
