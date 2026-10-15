@@ -334,7 +334,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
   promptEditor(screen, {
     say,
     match: (el) => { if (!mine()) return null; const t = el.closest('.bp-al-tile[data-photo]'); if (t) return t.dataset.photo; return el.closest('.bp-al-big, .bp-al-bigcard') && view === 'one' ? openId : null; },
-    get: (id) => { const p = items.find((x) => x.id === id); return p?.prompt ? { text: p.prompt } : null; },
+    get: (id) => { const p = items.find((x) => x.id === id); return p?.prompt ? { text: p.prompt, hasImg: !!p.img } : null; },
     run: async (id, text, again) => {
       const p = items.find((x) => x.id === id); if (!p) return;
       p.prompt = text; save();

@@ -38,7 +38,7 @@ export function promptEditor(root, { match, get, run, say }) {
       <b>這張照片的描述</b>
       <textarea rows="7">${esc(cur.text)}</textarea>
       <p>改這段就能改照片內容。人物的長相和照片風格會自動接上，不用寫在這裡。</p>
-      <div class="bp-pe-btns"><button data-pe="close">取消</button><button data-pe="save">存下來</button><button data-pe="redraw" class="ok">重新出圖</button></div></div>`;
+      <div class="bp-pe-btns"><button data-pe="close">取消</button><button data-pe="save">存下來</button><button data-pe="redraw" class="ok">${cur.hasImg === false ? '生成照片' : '重新出圖'}</button></div></div>`;
     root.appendChild(box);
     const ta = box.querySelector('textarea');
     box.addEventListener('click', async (e) => {

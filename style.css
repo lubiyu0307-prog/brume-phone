@@ -1232,3 +1232,5 @@
 .bp-ig-menu-card button { padding: 13px; border: 0; border-radius: 12px; background: #f2f2f2; color: #111; font: inherit; font-size: 15px; cursor: pointer; }
 .bp-ig-menu-card button.danger { color: #ed4956; }
 .bp-ig-post header i[data-igmore] { cursor: pointer; }
+.bp-ig-lphint { position: absolute; left: 0; right: 0; bottom: 12px; text-align: center; font-size: 11px; color: rgba(255, 255, 255, .7); }
+.bp-ig-img.card, .bp-ig-storyv .card { position: relative; }

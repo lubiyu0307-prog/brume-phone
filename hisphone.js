@@ -401,7 +401,7 @@ export function createHisPhone({ host, say, onExit }) {
   promptEditor(host, {
     say,
     match: (el) => { const t = el.closest('[data-photo]'); if (t) return +t.dataset.photo; return view === 'album' && sub !== null && sub !== undefined && el.closest('.bp-hp-pimg, .bp-hp-pone') ? sub : null; },
-    get: (i) => (hp?.album?.[i] ? { text: hp.album[i].desc } : null),
+    get: (i) => (hp?.album?.[i] ? { text: hp.album[i].desc, hasImg: !!hp.album[i].img } : null),
     run: async (i, text, again) => {
       const p = hp.album[i]; if (!p) return;
       p.desc = text; save();

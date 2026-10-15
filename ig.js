@@ -68,7 +68,7 @@ export function createIG({ screen, say }) {
   }
   const photo = (p, cls = '') => (p.img
     ? `<img class="bp-ig-img ${cls}" src="${esc(p.img)}" alt="" data-igphoto="${p.id}">`
-    : `<div class="bp-ig-img card ${cls}" style="--h:${hue(p.desc)}" data-igphoto="${p.id}"><span>${esc(p.desc)}</span></div>`);
+    : `<div class="bp-ig-img card ${cls}" style="--h:${hue(p.desc)}" data-igphoto="${p.id}"><span>${esc(p.desc)}</span>${p.author.kind !== 'me' ? '<small class="bp-ig-lphint">長按生成照片</small>' : ''}</div>`);
 
   function post(p, detail) {
     const n = p.comments?.length || 0;
@@ -139,7 +139,6 @@ export function createIG({ screen, say }) {
       <div class="bp-ig-head"><span class="bp-back" data-ig="back">‹</span><b>貼文</b><span></span></div>
       <div class="bp-ig-scroll">
         ${post(p, true)}
-        ${p.author.kind !== 'me' && !p.fromAlbum ? `<button class="bp-ig-gen" data-ig="gen">${p.img ? '重新生一張' : '用酒館生出這張照片'}</button>` : ''}
         <div class="bp-ig-comments">
           ${p.loading ? '<p class="bp-ig-empty">留言載入中⋯</p>' : ''}
           ${(p.comments || []).map((c) => `<div class="bp-ig-c">${av(c.author, 'xs')}<p><b>${esc(c.author.handle)}</b> ${esc(c.text)}<small>${ago(c.ts)}</small></p></div>`).join('')}
@@ -441,8 +440,7 @@ export function createIG({ screen, say }) {
     screen.insertAdjacentHTML('beforeend', `<div class="bp-ig-storyv">
       <div class="bp-ig-sbars">${story.list.map((_, i) => `<i class="${i < story.i ? 'done' : i === story.i ? 'now' : ''}"></i>`).join('')}</div>
       <header>${av(s.author, 'xs')}<b>${esc(s.author.handle)}</b><span>${ago(s.ts)}</span></header>
-      ${s.img ? `<img src="${esc(s.img)}" alt="" data-igstory="${s.id}">` : `<div class="card" style="--h:${hue(s.desc)}" data-igstory="${s.id}"><span>${esc(s.desc)}</span></div>`}
-      ${s.author.kind !== 'me' && s.desc ? `<button class="bp-ig-sgen" data-ig="sgen">${s.img ? '重新生一張' : '生出這張照片'}</button>` : ''}
+      ${s.img ? `<img src="${esc(s.img)}" alt="" data-igstory="${s.id}">` : `<div class="card" style="--h:${hue(s.desc)}" data-igstory="${s.id}"><span>${esc(s.desc)}</span>${s.author.kind !== 'me' ? '<small class="bp-ig-lphint">長按生成照片</small>' : ''}</div>`}
       ${s.text ? `<p>${esc(s.text)}</p>` : ''}<small>點一下看下一則</small></div>`);
   }
 
@@ -496,8 +494,8 @@ export function createIG({ screen, say }) {
     say,
     match: (el) => { if (!mine()) return null; const st = el.closest('[data-igstory]'); if (st) return 's:' + st.dataset.igstory; return el.closest('[data-igphoto]')?.dataset.igphoto ?? null; },
     get: (id) => {
-      if (id.startsWith('s:')) { const s = d.stories.find((x) => x.id === id.slice(2)); return s && s.author.kind !== 'me' && s.desc ? { text: s.desc } : null; }
-      const p = find(id); return p && p.author.kind !== 'me' && !p.fromAlbum ? { text: p.desc } : null;
+      if (id.startsWith('s:')) { const s = d.stories.find((x) => x.id === id.slice(2)); return s && s.author.kind !== 'me' && s.desc ? { text: s.desc, hasImg: !!s.img } : null; }
+      const p = find(id); return p && p.author.kind !== 'me' && !p.fromAlbum ? { text: p.desc, hasImg: !!p.img } : null;
     },
     run: async (id, text, again) => {
       // 限動：改描述、重新出直的（9:16）
