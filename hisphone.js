@@ -3,7 +3,7 @@
 // 他的小動作藏在各處：妳的備註名、有沒有被釘選、打了沒傳的草稿、跟朋友聊到妳、藏起來的照片⋯
 
 import * as store from './store.js';
-import { currentChar, generate, imageInfo, canDraw, worldRoster } from './st.js';
+import { currentChar, generate, imageInfo, canDraw, worldRoster, dropImage } from './st.js';
 import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit, isSavedImage, savedImagePrompt, shotHand } from './cast.js';
 import { imagineAndPick } from './pick.js';
 import { promptEditor } from './promptedit.js';
@@ -61,7 +61,7 @@ const APPS = [
 
 export function createHisPhone({ host, say, onExit }) {
   let drawing = false; let rewriting = false;
-  let ch = null; let hp = null; let view = 'lock'; let sub = null; let typed = ''; let fails = 0;
+  let ch = null; let hp = null; let view = 'lock'; let sub = null; let delArmed = null; // delArmed：刪照片要按兩次，第一次按的是哪一張 let typed = ''; let fails = 0;
   const busy = new Set();
 
   const key = () => 'his:' + ch.key;
@@ -304,7 +304,8 @@ export function createHisPhone({ host, say, onExit }) {
     // 一張一張自己決定要不要生成：點進去才有按鈕，不會整本一起畫
     return `${p.img ? `<img class="bp-hp-pimg" src="${esc(p.img)}" alt=""><p class="bp-hp-pdesc">${esc(p.desc)}</p>` : `<div class="bp-hp-pone" style="--h:${hue(p.desc)}"><span>${esc(p.desc)}</span></div>`}
       <p class="bp-hp-meta">${new Date(p.ts).getMonth() + 1}月${new Date(p.ts).getDate()}日 ${when(p.ts)}${p.hidden ? '・已隱藏' : ''}</p>
-      ${canDraw() ? `<div class="bp-hp-pacts"><button data-hp="gen" ${drawing ? 'disabled' : ''}>${drawing ? '生成中⋯' : p.img ? '重新生一張' : '生成這張照片'}</button>${p.img ? '<button data-hp="ungen">換回文字</button>' : ''}</div>` : ''}`;
+      ${canDraw() ? `<div class="bp-hp-pacts"><button data-hp="gen" ${drawing ? 'disabled' : ''}>${drawing ? '生成中⋯' : p.img ? '重新生一張' : '生成這張照片'}</button>${p.img ? '<button data-hp="ungen">換回文字</button>' : ''}</div>` : ''}
+      <div class="bp-hp-pacts"><button data-hp="pdel" class="bp-hp-danger">${delArmed === i ? '再按一次就刪掉' : '刪掉這張'}</button></div>`;
   }
   function memoList() {
     return hp.memos.map((m, i) => ({ m, i })).sort((a, b) => b.m.ts - a.m.ts).map(({ m, i }) => `<div class="bp-hp-memo" data-memo="${i}"><b>${esc(m.title)}</b><span>${when(m.ts)}　${esc(m.body.split('\n')[0]).slice(0, 30)}</span></div>`).join('');
@@ -342,7 +343,7 @@ export function createHisPhone({ host, say, onExit }) {
     const app = e.target.closest('[data-app]');
     if (app) { view = app.dataset.app; sub = null; paint(); ensure(view); return; }
     const chat = e.target.closest('[data-chat]'); if (chat) { sub = chat.dataset.chat; paint(); return; }
-    const ph = e.target.closest('[data-photo]'); if (ph) { sub = +ph.dataset.photo; paint(); return; }
+    const ph = e.target.closest('[data-photo]'); if (ph) { sub = +ph.dataset.photo; delArmed = null; paint(); return; }
     const mo = e.target.closest('[data-memo]'); if (mo) { sub = +mo.dataset.memo; paint(); return; }
     const a = e.target.closest('[data-hp]')?.dataset.hp;
     if (a === 'exit') { close(); onExit?.(); }
@@ -384,6 +385,15 @@ export function createHisPhone({ host, say, onExit }) {
       rewriting = false; paint();
     }
     if (a === 'peek') { say(`他輸的是 ${hp.code}`); }
+    // 刪照片：按一次變「再按一次就刪掉」，再按才刪（酒館裡不能跳確認視窗）
+    if (a === 'pdel' && hp.album[sub]) {
+      if (delArmed !== sub) { delArmed = sub; paint(); return; }
+      const [gone] = hp.album.splice(sub, 1); delArmed = null; sub = null; save(); paint();
+      if (gone?.img) dropImage(gone.img);
+      say('刪掉了');
+      return;
+    }
+    if (a !== 'pdel') delArmed = null;
     if (a === 'ungen' && hp.album[sub]) { delete hp.album[sub].img; save(); paint(); }
     if (a === 'gen' && hp.album[sub] && !drawing) await genPhoto(sub);
   });
