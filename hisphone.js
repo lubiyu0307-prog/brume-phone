@@ -368,12 +368,12 @@ export function createHisPhone({ host, say, onExit }) {
       rewriting = true; paint();
       try {
         const people = await loadCast(who.charKey).catch(() => ({ cast: {}, look: {} }));
-        const r = await ask(`他相簿裡有這些照片，請一張一張重寫描述，拍的還是同一個瞬間、同一個東西，順序和張數都不變：\n${list.map((p, i) => `${i + 1}. ${p.hidden ? '（已隱藏）' : ''}${p.desc}`).join('\n')}\n這些照片都是 ${who.name} 用自己的手機拍或存下來的，拍照的人就是他。\n${shotRules(people, who)}`,
+        const r = await ask(`他相簿裡有這些照片，請一張一張重寫描述，拍的還是同一個瞬間、同一個東西，順序和張數都不變：\n${list.map((p, i) => `${i + 1}. ${p.desc}${p.hidden ? ' [這張在已隱藏]' : ''}`).join('\n')}\ndesc 只寫照片內容，不要寫「已隱藏」這類標記。\n這些照片都是 ${who.name} 用自己的手機拍或存下來的，拍照的人就是他。\n${shotRules(people, who)}`,
           '[{"n":1,"desc":"照片拍到什麼，一句話","shot":"","in":[]}]');
         let n = 0;
         for (const x of Array.isArray(r) ? r : []) {
           const p = list[(+x.n || 0) - 1]; if (!p || !String(x.shot || '').trim()) continue;
-          p.desc = String(x.desc || p.desc); p.shot = String(x.shot).trim(); p.in = Array.isArray(x.in) ? x.in.map(String) : []; n++;
+          p.desc = String(x.desc || p.desc).replace(/^[（(]已隱藏[）)]\s*|\s*\[這張在已隱藏\]/g, ''); p.shot = String(x.shot).trim(); p.in = Array.isArray(x.in) ? x.in.map(String) : []; n++;
         }
         if (who.key === ch?.key) save();
         say(n ? `重寫了 ${n} 張，已經生好的圖還在，想照新描述畫就點開按「重新生一張」` : '沒有重寫成功，再按一次試試');

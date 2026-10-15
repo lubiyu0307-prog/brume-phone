@@ -30,6 +30,8 @@ const ZH = {
 
   // 有人入鏡就一定要的（精修、生活感、動漫都套用）
   NO_SELFIE: '除非情境寫到自拍或拍照，畫面裡的人不要拿著手機對著自己拍。',
+  // 參考照片多半是正面看鏡頭的證件照，模型會連姿勢表情一起抄（10/15 趴著睡的她被畫成坐直看鏡頭微笑）
+  POSE_FROM_SCENE: '參考照片只決定長相；姿勢、表情、眼睛睜開或閉上、視線方向都照情境寫的畫。情境沒寫看鏡頭，就不要看鏡頭。',
   ONLY_LISTED: '每個人在畫面裡只出現一次，不要有同一個人的分身；除了背景路人，不要多出上面沒列到的人。',
   ANATOMY: '人體結構要真實：手和手指數量正確、關節自然、重量和接觸合理；身體碰在一起的地方，衣服會有壓痕和皺褶。',
   CLOTHES: '衣服是一般日常穿搭，有自然皺褶和布料重量；除非情境有寫，不要穿成一樣的情侶裝。',
@@ -87,6 +89,7 @@ const EN = {
   STYLE: (style) => `Visual style (this overrides any "photo" or "realistic" wording above): ${style}`,
 
   NO_SELFIE: 'Unless the scene says someone is taking a selfie or a photo, nobody in the picture is holding up a phone to photograph themselves.',
+  POSE_FROM_SCENE: 'The reference photos only decide what people look like; pose, expression, whether the eyes are open or closed, and gaze direction follow the scene. Unless the scene says so, nobody looks at the camera.',
   ONLY_LISTED: 'Each person appears only once in the picture, never a duplicate or clone of the same person; apart from background passers-by, no one who is not listed above.',
   ANATOMY: 'Anatomy must be real: correct hands and finger count, natural joints, believable weight and contact; clothes wrinkle and compress where bodies touch or overlap.',
   CLOTHES: 'Clothes are ordinary everyday outfits with natural folds and fabric weight; people do not wear matching outfits unless the scene says so.',
