@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.51';
+const VERSION = '0.18.52';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -617,11 +617,27 @@ function build() {
   });
 
   const api = {
-    open() { store.refresh(); loadDesk(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); dbg('open'); },
+    open() { store.refresh(); loadDesk(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); tint(true); fit(); dbg('open'); },
     close,
   };
   return api;
-  function close(why = 'api') { dbg('close', why); overlay.classList.remove('bp-open'); refreshNotices(); }
+  function close(why = 'api') { dbg('close', why); overlay.classList.remove('bp-open'); tint(false); refreshNotices(); }
+  // iPhone 最上面時間、電池那一條不是網頁的一部分，蓋不住；Safari 會照 theme-color 幫它上色。
+  // 手機打開時換成黑色，跟手機外框融在一起，關掉再換回酒館原本的顏色（10/16 比比看到頂上一條酒館的藍灰色）
+  let tintMeta = null; let tintOld = null;
+  function tint(on) {
+    try {
+      if (on) {
+        tintMeta = document.querySelector('meta[name="theme-color"]');
+        tintOld = tintMeta ? tintMeta.getAttribute('content') : null;
+        if (!tintMeta) { tintMeta = document.createElement('meta'); tintMeta.name = 'theme-color'; tintMeta.dataset.bp = '1'; document.head.appendChild(tintMeta); }
+        tintMeta.setAttribute('content', '#000000');
+      } else if (tintMeta) {
+        if (tintMeta.dataset.bp) tintMeta.remove(); else if (tintOld != null) tintMeta.setAttribute('content', tintOld);
+        tintMeta = null;
+      }
+    } catch { /* 改不了就算了 */ }
+  }
 }
 
 function shrink(fileObj, max) {
