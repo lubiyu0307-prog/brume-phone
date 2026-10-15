@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.45';
+const VERSION = '0.18.46';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -164,7 +164,7 @@ function build() {
       <div class="bp-lock-bottom">
         <div class="bp-lock-row">
           <div class="bp-weather"><b>☁︎ 24°</b><br>多雲<br>高 27° 低 21°</div>
-          <div class="bp-lock-chips"><div class="bp-round">${ICON.music}</div></div>
+          <div class="bp-lock-chips"><div class="bp-round" data-act="music" title="音樂">${ICON.music}</div></div>
         </div>
         <div class="bp-lock-tools"><div class="bp-round bp-swap" data-act="his" title="偷看他的手機">${ICON.swap}</div><div class="bp-round" data-act="snap" title="快照">${ICON.camera}</div></div>
         <div class="bp-hint">往上滑或點一下解鎖</div>
@@ -406,6 +406,7 @@ function build() {
       if (a === 'level') { lifeSet.set({ level: act.dataset.v }); showSettings(); }
       if (a === 'bridge') { lifeSet.set({ bridge: !lifeSet.get().bridge }); showSettings(); life.refreshPrompt(); }
       if (a === 'snap') { lock.classList.add('bp-gone'); phone.classList.remove('bp-locked'); openApp(snap); }
+      if (a === 'music') { lock.classList.add('bp-gone'); phone.classList.remove('bp-locked'); openApp(music); }
       if (a === 'notif') { lock.classList.add('bp-gone'); phone.classList.remove('bp-locked'); openLineRoom(); }
       if (a === 'hint-yes') { const h = overlay.querySelector('.bp-hintsheet'); await stage.set(h.dataset.key, h.dataset.v); h.remove(); life.refreshPrompt(); syncMain(); say(`關係改成「${stage.name(h.dataset.v)}」了`); }
       if (a === 'hint-no') overlay.querySelector('.bp-hintsheet')?.remove();
