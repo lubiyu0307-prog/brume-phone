@@ -373,9 +373,9 @@
 .bp-line-plus { color: #3d4249; width: 34px; }
 .bp-line-plus svg { width: 25px; height: 25px; }
 .bp-line-bar.bp-typing-now .bp-hide-typing { display: none; }
-.bp-line-field { flex: 1; display: flex; align-items: center; background: #f2f3f5; border-radius: 19px; padding-right: 8px; min-width: 0; }
+.bp-line-field { flex: 1; display: flex; align-items: center; background: #f2f3f5; border-radius: 19px; padding-right: 2px; min-width: 0; }
 .bp-line-field .bp-line-input { background: none; height: 36px; border-radius: 19px; padding: 0 12px; }
-.bp-line-field i { color: #5d636b; display: grid; place-items: center; }
+.bp-line-field i { color: #5d636b; display: grid; place-items: center; width: 40px; height: 36px; flex: none; cursor: pointer; -webkit-tap-highlight-color: transparent; touch-action: manipulation; } /* 貼圖鈕：圖示 22px，可以按的範圍放大到 40×36 */
 .bp-line-field i svg { width: 22px; height: 22px; }
 .bp-line-bar button { width: 34px; height: 34px; background: none; color: var(--line-green); display: none; padding: 0; }
 .bp-line-bar.bp-typing-now button { display: grid; place-items: center; }

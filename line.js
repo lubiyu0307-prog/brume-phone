@@ -823,6 +823,9 @@ export function createLine({ screen, say, onUnread, onData }) {
   // 這個畫面幾個 App 共用，不是 LINE 的畫面就不要動
   const mine = () => !!screen.querySelector('.bp-line');
 
+  // 打字時按貼圖鈕：手機會先收鍵盤、畫面跳一下，那一下的點擊常常落空（10/16 比比說難按）。
+  // 按下去就先擋住失焦，鍵盤不收、畫面不跳，點擊才會落在按鈕上
+  screen.addEventListener('pointerdown', (e) => { if (e.target.closest('.bp-line-field i[data-line]')) e.preventDefault(); });
   screen.addEventListener('click', async (e) => {
     if (!mine()) return;
     if (pressed) { pressed = false; return; }
