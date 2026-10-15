@@ -247,15 +247,21 @@ async function viaKey(prompt, refs = [], aspect = '1:1') {
 
 async function viaGemini(prompt, refs = [], aspect = '1:1') {
   const c = ctx(); const o = c?.chatCompletionSettings || {};
-  const src = o.chat_completion_source;
-  if (src !== 'vertexai' && src !== 'makersuite') { imageInfo.why = '酒館聊天沒有接 Google（Vertex 或 AI Studio）'; return ''; }
+  const cur = o.chat_completion_source;
+  // 正文換成別家（Claude、OpenRouter⋯）時，酒館裡存的 Google 金鑰、Vertex 設定其實都還在：直接指定 Google 來生圖。
+  // 以前看到正文不是 Google 就放棄（10/16 比比換了正文的 API，生圖就斷了）
+  const onGoogle = cur === 'vertexai' || cur === 'makersuite';
+  const sources = onGoogle ? [cur] : ['vertexai', 'makersuite'];
   const req = await refRequest(prompt, refs);
   const content = req.images.length ? [...req.images.map((url) => ({ type: 'image_url', image_url: { url } })), { type: 'text', text: req.text }] : req.text;
   const order = byPref(GEMINI_IMAGE_MODELS);
   // 第一順位（玩家選的）失敗先等六秒再試一次：Pro 常常是短暫被擋速度，馬上退回 Flash 質感就掉了（10/14 五張有兩張這樣）。
   // 酒館把 Google 的錯誤一律回 500，分不出是不是被擋，所以只要失敗就重試
+  const whys = [];
+  for (const src of sources) {
+  imageInfo.why = '';
   for (const model of [order[0], ...order]) {
-    if (model === order[0] && imageInfo.why) await new Promise((res) => setTimeout(res, 6000));
+    if (model === order[0] && imageInfo.why) await new Promise((res) => setTimeout(res, onGoogle ? 6000 : 0));
     try {
       const r = await fetch('/api/backends/chat-completions/generate', {
         method: 'POST', headers: c.getRequestHeaders(),
@@ -263,7 +269,7 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
           messages: [{ role: 'user', content }], model, chat_completion_source: src, stream: false,
           request_images: true, request_image_aspect_ratio: aspect, request_image_resolution: imageResPref.get(), max_tokens: 4096, temperature: 1,
           vertexai_auth_mode: o.vertexai_auth_mode, vertexai_region: o.vertexai_region, vertexai_express_project_id: o.vertexai_express_project_id,
-          reverse_proxy: o.reverse_proxy, proxy_password: o.proxy_password,
+          ...(onGoogle ? { reverse_proxy: o.reverse_proxy, proxy_password: o.proxy_password } : {}), // 別家的反代不能拿來接 Google
         }),
       });
       if (!r.ok) { imageInfo.why = `${model} 回 ${r.status}${r.status === 404 ? '（這個地區沒有這個模型）' : r.status === 429 ? '（額度用完或太頻繁）' : ''}`; continue; }
@@ -276,6 +282,9 @@ async function viaGemini(prompt, refs = [], aspect = '1:1') {
       return await saveImage(img.data, (img.mimeType || 'image/png').split('/')[1] || 'png');
     } catch (e) { imageInfo.why = `${model} 連不上（${e.message || e}）`; /* 換下一個模型 */ }
   }
+  whys.push(`${src === 'vertexai' ? 'Vertex' : 'AI Studio'}：${imageInfo.why}`);
+  }
+  imageInfo.why = onGoogle ? whys[0].replace(/^[^：]+：/, '') : `正文沒接 Google，改用酒館存的 Google 設定也沒成功（${whys.join('；')}）`;
   return '';
 }
 
