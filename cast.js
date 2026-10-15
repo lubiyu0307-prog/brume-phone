@@ -140,3 +140,35 @@ function photoLook(preset, hasPeople, anyRef) {
   if (preset === 'candid') return [hair, P.CANDID.colour(anyRef), hasPeople ? P.CANDID.skin : '', hasPeople ? P.CANDID.gaze : '', P.CANDID.camera];
   return [hair, anyRef ? P.POLISHED.match : '', P.POLISHED.colour(anyRef), hasPeople ? P.POLISHED.people : P.POLISHED.things];
 }
+
+/**
+ * 照片的「shot」：寫照片的模型同時寫一段給生圖用的畫面描述，入鏡的人列在 in。
+ * 生圖照這兩個走，不再從一句話描述裡猜誰入鏡、是不是截圖、有沒有手（10/15 比比：一直補字眼補不完）
+ */
+export function shotRules(data, ch) {
+  const names = [ch.name, ch.user, ...sideNames(data)].filter(Boolean);
+  return [
+    `- 每張照片另外寫 "shot"：給生圖模型看的畫面描述，用${P.SHOT_LANG}，逗號分隔，只寫看得到的東西，不寫心情、比喻、回憶：`,
+    '  1. 先寫照片種類和鏡頭：誰用手機拍的（拍照的人自己拍的第一人稱／自拍／對鏡自拍／別人幫拍／偷拍），全身、半身、近景還是特寫，角度',
+    '  2. 入鏡的每個人寫名字（照下面 in 的名單寫法，不用暱稱），加動作、表情、穿著；不寫臉、髮色、雀斑、年紀、身材（證件照會處理）；沒有人入鏡就明寫「畫面裡沒有人」',
+    '  3. 拍照的人沒入鏡時，不要寫拍照的人的名字；只有手或手臂伸進畫面時，寫「拍照的人的手（男生的手／女生的手）」做什麼',
+    '  4. 截圖、海報、插畫、存下來的圖片：寫「這是一張截圖（或圖片）本身，畫滿整張，沒有手機外框」，再寫圖上畫了什麼',
+    '  5. 再寫地點、物件、光線、時間；不要寫畫面上要出現的字',
+    `- 每張照片另外寫 "in"：入鏡的人（看得到臉或身體）的名字陣列，只能用這幾個名字：${names.join('、')}；路人不用列，只有手入鏡不算，沒有人就 []`,
+  ].join('\n');
+}
+/** in 裡的名字換成證件照的 id（他、妳、配角） */
+export function shotIds(data, ch, names) {
+  const ids = [];
+  for (const n of (Array.isArray(names) ? names : []).map((x) => String(x).trim()).filter(Boolean)) {
+    const id = n === ch.name ? HIM : n === ch.user ? ME : sideNames(data).find((k) => k === n || (n.length >= 2 && k.includes(n)) || (k.length >= 2 && n.includes(k)));
+    if (id && !ids.includes(id)) ids.push(id);
+  }
+  return ids;
+}
+/** 玩家改過 shot：原本的 in 留著，新寫進去的名字（兩個字以上，避免「格」撞「風格」）加上 */
+export function shotInAfterEdit(data, ch, text, old = []) {
+  const names = [...(old || [])];
+  for (const n of [ch.name, ch.user, ...sideNames(data)]) if (n && n.length >= 2 && text.includes(n) && !names.includes(n)) names.push(n);
+  return names;
+}

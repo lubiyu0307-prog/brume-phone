@@ -4,7 +4,7 @@
 
 import * as store from './store.js';
 import { currentChar, generate, imageInfo, canDraw, worldRoster } from './st.js';
-import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
+import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit } from './cast.js';
 import { imagineAndPick } from './pick.js';
 import { promptEditor } from './promptedit.js';
 import { verify } from './music.js';
@@ -136,12 +136,14 @@ export function createHisPhone({ host, say, onExit }) {
       }
     },
     async album(grow) {
-      const r = await ask(grow
+      const people = await loadCast(ch.charKey).catch(() => ({ cast: {}, look: {} }));
+      const rules = `\n這些照片都是 ${ch.name} 用自己的手機拍或存下來的，拍照的人就是他。\n${shotRules(people, ch)}`;
+      const r = await ask((grow
         ? `他的相簿過了一段時間，多了 2～4 張新照片。之前的照片有：${hp.album.slice(-6).map((p) => p.desc).join('／')}`
-        : `他相簿裡最近的 12 張照片（用一句話描述照片拍到什麼）。其中 2～4 張是他放進「已隱藏」的，多半是他偷拍或捨不得刪的 ${ch.user}`,
-        '[{"desc":"照片拍到什麼，一句話","hidden":false,"daysAgo":1}]');
+        : `他相簿裡最近的 12 張照片（用一句話描述照片拍到什麼）。其中 2～4 張是他放進「已隱藏」的，多半是他偷拍或捨不得刪的 ${ch.user}`) + rules,
+        '[{"desc":"照片拍到什麼，一句話","shot":"","in":[],"hidden":false,"daysAgo":1}]');
       const now = Date.now();
-      const add = (Array.isArray(r) ? r : []).map((p) => ({ desc: String(p.desc || ''), hidden: !!p.hidden, ts: now - Math.max(0, +p.daysAgo || 0) * 864e5 - Math.random() * 36e5 }));
+      const add = (Array.isArray(r) ? r : []).map((p) => ({ desc: String(p.desc || ''), ...(String(p.shot || '').trim() ? { shot: String(p.shot).trim(), in: Array.isArray(p.in) ? p.in.map(String) : [] } : {}), hidden: !!p.hidden, ts: now - Math.max(0, +p.daysAgo || 0) * 864e5 - Math.random() * 36e5 }));
       hp.album = grow ? [...hp.album, ...add] : add;
     },
     async memos(grow) {
@@ -370,6 +372,16 @@ export function createHisPhone({ host, say, onExit }) {
       try {
         const people = await loadCast(who.charKey);
         await ensureAutoStyle(people, who.charKey);
+        // 寫照片時一起寫好的畫面描述：照 shot 和 in 畫，不用猜
+        if (p.shot) {
+          const ids = shotIds(people, who, p.in);
+          const prompt = finalPrompt(people, who, `${p.shot}, photo taken on his phone, candid, natural light`, ids, ids.includes(HIM) ? {} : { by: HIM });
+          const url = await imagineAndPick(host, prompt, { refs: refsFor(people, who, '', ids), aspect: '1:1' });
+          if (url) { p.img = url; if (who.key === ch?.key) save(); } else say(imageInfo.why ? `沒有出圖：${imageInfo.why}` : '沒有出圖');
+          drawing = false; if (view === 'album' && sub === i) paint();
+          return;
+        }
+        // 下面是舊照片（沒有 shot）的猜法
         // 截圖、插畫、存下來的圖片不是他拍的照片：照那張圖本身畫，不放人、不放手、不帶證件照
         // （10/15「安羽傳過來的 LINE 大頭貼截圖」被畫成她本人＋一隻男生的手）
         // 「螢幕光映在臉上」是在講光，不是截圖（10/15 她的睡臉被當成截圖，畫成一支手機框、臉也沒帶證件照）
@@ -402,10 +414,11 @@ export function createHisPhone({ host, say, onExit }) {
   promptEditor(host, {
     say,
     match: (el) => { const t = el.closest('[data-photo]'); if (t) return +t.dataset.photo; return view === 'album' && sub !== null && sub !== undefined && el.closest('.bp-hp-pimg, .bp-hp-pone') ? sub : null; },
-    get: (i) => (hp?.album?.[i] ? { text: hp.album[i].desc, hasImg: !!hp.album[i].img, img: hp.album[i].img } : null),
+    get: (i) => (hp?.album?.[i] ? { text: hp.album[i].shot || hp.album[i].desc, hasImg: !!hp.album[i].img, img: hp.album[i].img } : null),
     run: async (i, text, again) => {
       const p = hp.album[i]; if (!p) return;
-      p.desc = text; save();
+      if (p.shot) { p.shot = text; p.in = shotInAfterEdit(await loadCast(ch.charKey), ch, text, p.in); } else p.desc = text;
+      save();
       if (again) { view = 'album'; sub = i; await genPhoto(i); } else { say('描述存好了'); paint(); }
     },
   });

@@ -8,7 +8,7 @@ import { currentChar, generate, imagine, canSeeImages, imageInfo, canDraw, world
 import { imagineAndPick } from './pick.js';
 import { P } from './prompts.js';
 import { promptEditor } from './promptedit.js';
-import { HIM, ME, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
+import { HIM, ME, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit } from './cast.js';
 
 // 自動生圖：打開的話，他新發的貼文用 Gemini 畫成真的照片（一張要等一下）
 const AUTO_KEY = 'brume-phone:igauto';
@@ -177,10 +177,11 @@ export function createIG({ screen, say }) {
         `- photo 裡如果拍到 ${who.name} 或 ${who.user}（就算是別人偷拍、路人拍到、只當配角），一定要寫出名字（例如「${who.name}坐在窗邊看書」），不要只用職業或「那個男生」「一個女生」帶過`,
         '- 真實存在的名人（歌手、演員）入鏡時，photo 寫成台下遠遠拍的、背影、剪影或舞台燈光下看不清臉的樣子，不要臉部特寫（生圖畫不出真人的臉，也不該畫）',
         '- photo 會拿去生圖，要寫清楚畫面裡有誰；發文的人的手、手臂、腳或身體入鏡時，寫明是誰的、男生還是女生的（例如「他骨節分明的男生手掌托著⋯」），不要只寫「手」',
+        shotRules(people, who),
         `- ${who.name} 的帳號用：${dd.him.handle === who.name ? '幫他取一個英文小寫帳號' : dd.him.handle}`,
         have ? `已經有的（不要重複）：\n${have}` : '',
         album.length ? `${who.name} 和 ${who.user} 相本裡的合照（${who.name} 想曬的話，可以拿其中一張發，在那篇加 "album":編號；不想就不用）：\n${album.map((p, i) => `${i + 1}. ${p.desc}`).join('\n')}` : '',
-        '', '只輸出 JSON：{"posts":[{"type":"本人/配角/路人","name":"","handle":"英文小寫帳號","photo":"照片拍到什麼，一句話","caption":"說明文字","likes":120,"album":0}],"stories":[{"type":"","name":"","handle":"","photo":"畫面","text":"限動上的字"}]}',
+        '', '只輸出 JSON：{"posts":[{"type":"本人/配角/路人","name":"","handle":"英文小寫帳號","photo":"照片拍到什麼，一句話","shot":"","in":[],"caption":"說明文字","likes":120,"album":0}],"stories":[{"type":"","name":"","handle":"","photo":"畫面","shot":"","in":[],"text":"限動上的字"}]}',
       ].filter(Boolean).join('\n')));
       const now = Date.now();
       const author = (x) => {
@@ -198,9 +199,9 @@ export function createIG({ screen, say }) {
         const a = author(x);
         const pic = a.kind === 'him' && +x.album > 0 ? album[+x.album - 1] : null;
         if (pic) dd.usedAlbum.push(pic.id);
-        dd.posts.push({ id: uid(), author: a, desc: pic ? pic.desc : String(x.photo || ''), ...(pic ? { img: pic.img, fromAlbum: true } : {}), caption: String(x.caption || ''), likes: +x.likes || Math.floor(Math.random() * 200), ts: now - (i + Math.random()) * 3 * 36e5, comments: null });
+        dd.posts.push({ id: uid(), author: a, desc: pic ? pic.desc : String(x.photo || ''), ...(pic ? { img: pic.img, fromAlbum: true } : shotOf(x)), caption: String(x.caption || ''), likes: +x.likes || Math.floor(Math.random() * 200), ts: now - (i + Math.random()) * 3 * 36e5, comments: null });
       });
-      (r.stories || []).forEach((x, i) => dd.stories.push({ id: uid(), author: author(x), desc: String(x.photo || ''), text: String(x.text || ''), ts: now - i * 2 * 36e5, seen: false }));
+      (r.stories || []).forEach((x, i) => dd.stories.push({ id: uid(), author: author(x), desc: String(x.photo || ''), ...shotOf(x), text: String(x.text || ''), ts: now - i * 2 * 36e5, seen: false }));
       dd.posts = dd.posts.slice(-80); dd.stories = dd.stories.filter((s) => now - s.ts < 864e5);
       if (who.key === ch?.key) save();
     } catch (e) { say(`動態更新失敗：${e.message || e}`); }
@@ -209,8 +210,18 @@ export function createIG({ screen, say }) {
     autoDraw(who, dd);
   }
 
+  // 模型寫的 shot、in 收進貼文或限動；沒寫就照舊從 desc 猜
+  const shotOf = (x) => (x && String(x.shot || '').trim() ? { shot: String(x.shot).trim(), in: Array.isArray(x.in) ? x.in.map(String) : [] } : {});
+
   // 照片的生圖 prompt：照片裡有誰入鏡，就帶誰的長相和證件照，最後套上玩家寫的照片風格
   function photoPrompt(p, who, story = false) {
+    // 寫照片時一起寫好的畫面描述：入鏡的人照 in，不再從描述裡猜
+    if (p.shot) {
+      const ids = shotIds(people, who, p.in);
+      const author = p.author.kind === 'other' ? p.author.name : p.author.kind === 'him' ? HIM : null;
+      const by = author && !ids.includes(author) ? author : undefined;
+      return { prompt: finalPrompt(people, who, `${p.shot}${story ? P.IG_STORY : P.IG_POST}`, ids, { by }), refs: refsFor(people, who, '', ids) };
+    }
     // 發文的人本人入鏡（自拍、對鏡、合照）才帶他的長相和照片；描述裡只有「他的手」不算，那是第一人稱視角
     // 倒影也算入鏡：隔著玻璃拍企鵝，玻璃上映出他拿手機的樣子（10/15 那張臉不是他）
     const self = /自拍|鏡子|鏡中|對鏡|合照|入鏡|露臉|全身照|倒影|反射|映在|映出|鏡面|reflection/i.test(p.desc);
@@ -417,7 +428,8 @@ export function createIG({ screen, say }) {
         p.author.kind === 'him' ? `這篇是 ${who.name} 本人發的，照他的個性和最近發生的事重寫內容。` : `發文的人是誰、做什麼的、帳號叫什麼，照角色卡、世界書和正文；原本的身分或帳號跟資料不合就改掉。不要寫成 ${who.user} 發的。`,
         WORLD,
         `- photo 裡如果拍到 ${who.name} 或 ${who.user}，一定要寫出名字`,
-        '', '只輸出 JSON：{"type":"本人/配角/路人","name":"","handle":"英文小寫帳號","photo":"照片拍到什麼，一句話","caption":"說明文字"}',
+        shotRules(people, who),
+        '', '只輸出 JSON：{"type":"本人/配角/路人","name":"","handle":"英文小寫帳號","photo":"照片拍到什麼，一句話","shot":"","in":[],"caption":"說明文字"}',
       ].filter(Boolean).join('\n')));
       const old = p.author.handle;
       if (p.author.kind !== 'him') {
@@ -427,6 +439,7 @@ export function createIG({ screen, say }) {
         dd.stories.forEach((x) => fix(x.author));
       }
       p.desc = String(r.photo || p.desc); p.caption = String(r.caption || p.caption);
+      delete p.shot; delete p.in; Object.assign(p, shotOf(r));
       delete p.img; p.drawn = false; p.comments = null; // 照片描述換了，舊圖不對；留言也重來
       if (who.key === ch?.key) save();
       say('重寫好了');
@@ -490,25 +503,28 @@ export function createIG({ screen, say }) {
     return String(r.caption || '');
   }
 
+  // 有 shot 的照片長按改的是 shot（真正送去生圖的那段）；舊照片改 desc
+  const setText = (x, text) => { if (x.shot) { x.shot = text; x.in = shotInAfterEdit(people, ch, text, x.in); } else x.desc = text; };
+
   // 長按貼文照片 → 改描述、重新出圖（妳自己發的、從相本來的是真照片，不能改）
   promptEditor(screen, {
     say,
     match: (el) => { if (!mine()) return null; const st = el.closest('[data-igstory]'); if (st) return 's:' + st.dataset.igstory; return el.closest('[data-igphoto]')?.dataset.igphoto ?? null; },
     get: (id) => {
-      if (id.startsWith('s:')) { const s = d.stories.find((x) => x.id === id.slice(2)); return s && s.author.kind !== 'me' && s.desc ? { text: s.desc, hasImg: !!s.img, img: s.img } : null; }
-      const p = find(id); return p && p.author.kind !== 'me' && !p.fromAlbum ? { text: p.desc, hasImg: !!p.img, img: p.img } : null;
+      if (id.startsWith('s:')) { const s = d.stories.find((x) => x.id === id.slice(2)); return s && s.author.kind !== 'me' && s.desc ? { text: s.shot || s.desc, hasImg: !!s.img, img: s.img } : null; }
+      const p = find(id); return p && p.author.kind !== 'me' && !p.fromAlbum ? { text: p.shot || p.desc, hasImg: !!p.img, img: p.img } : null;
     },
     run: async (id, text, again) => {
       // 限動：改描述、重新出直的（9:16）
       if (id.startsWith('s:')) {
         const s = d.stories.find((x) => x.id === id.slice(2)); if (!s) return;
-        s.desc = text; save();
+        setText(s, text); save();
         if (again) { say('生圖中⋯'); const url = await draw(s, ch, '9:16', true); if (url) { s.img = url; save(); } }
         if (screen.querySelector('.bp-ig-storyv') && story.list[story.i] === s) showStory();
         return;
       }
       const p = find(id); if (!p) return;
-      p.desc = text; save();
+      setText(p, text); save();
       if (!again) { say('描述存好了'); view === 'post' ? renderPost() : view === 'profile' ? renderProfile() : renderFeed(); return; }
       say('生圖中⋯');
       const url = await draw(p, ch, '1:1', true);
