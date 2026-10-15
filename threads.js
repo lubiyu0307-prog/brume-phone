@@ -2,7 +2,7 @@
 // 可以按愛心、看留言、留言（發文的人會回）、自己發文（大家會來留言，他也可能出現）。
 
 import * as store from './store.js';
-import { currentChar, generate } from './st.js';
+import { currentChar, generate, worldRoster } from './st.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -176,6 +176,7 @@ export function createThreads({ screen, say }) {
     try {
       const have = f.posts.slice(-12).map((p) => `${p.author.handle}：${p.text.slice(0, 30)}`).join('\n');
       const raw = await generate([
+        await worldRoster(),
         '[Brume Phone · 脆（Threads）]',
         `現在不是在寫劇情正文。${who.user} 正在滑脆（Threads）的首頁河道。請寫 6 則河道上的新貼文：`,
         `- 1～2 則是 ${who.name} 本人發的：照他的個性、生活和最近發生的事`,
@@ -203,6 +204,7 @@ export function createThreads({ screen, say }) {
     const who = ch;
     try {
       const raw = await generate([
+        await worldRoster(),
         '[Brume Phone · 脆（Threads）]',
         `現在不是在寫劇情正文。這是脆上的一則貼文，請寫底下的 3～5 則回覆。`,
         `貼文（${p.author.kind === 'char' ? `${who.name} 本人` : p.author.kind === 'me' ? `${who.user} 本人` : p.author.name}，@${p.author.handle}）：${p.text}`,
@@ -229,6 +231,7 @@ export function createThreads({ screen, say }) {
       const ctxLines = p.replies.slice(-12).map((r) => `@${r.author.handle}：${r.text}`).join('\n');
       const target = p.author.kind === 'me' ? `${who.name}` : `發文的 @${p.author.handle}`;
       const raw = await generate([
+        await worldRoster(),
         '[Brume Phone · 脆（Threads）]',
         `現在不是在寫劇情正文。${who.user}（@${me().handle}）在脆上留言了，請寫接下來的 1～2 則回覆：`,
         `- 優先是${target}回她；${p.author.kind === 'char' || p.author.kind === 'me' ? '' : `${who.name} 看到也可以插一句，`}語氣照各自的個性`,

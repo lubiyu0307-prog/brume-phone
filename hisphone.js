@@ -3,7 +3,7 @@
 // 他的小動作藏在各處：妳的備註名、有沒有被釘選、打了沒傳的草稿、跟朋友聊到妳、藏起來的照片⋯
 
 import * as store from './store.js';
-import { currentChar, generate, imageInfo, canDraw } from './st.js';
+import { currentChar, generate, imageInfo, canDraw, worldRoster } from './st.js';
 import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
 import { imagineAndPick } from './pick.js';
 import { promptEditor } from './promptedit.js';
@@ -93,6 +93,7 @@ export function createHisPhone({ host, say, onExit }) {
       '- 配角的身分、職業、跟他的關係，照角色卡、世界書和正文裡寫的；資料裡沒寫的不要自己給他們新的職業或頭銜（例如不要把同事寫成醫生）',
       `- 他只知道劇情裡發生過、他親眼看到或 ${ch.user} 親口告訴他的事。${ch.user} 的設定裡還沒在劇情中讓他知道的（職業、家人、過去），他不知道，不能寫進手機；真的寫到也只能是他的猜測，可以猜錯`,
       bg ? `\n${bg}` : '',
+      await worldRoster(),
       '',
       task,
       '',

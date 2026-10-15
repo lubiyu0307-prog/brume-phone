@@ -309,6 +309,34 @@ async function saveImage(base64, ext) {
   return String((await r.json())?.path || '');
 }
 
+/**
+ * 世界書人物表：這張卡綁的世界書（角色卡的、這個聊天的）每個條目的標題＋開頭一小段。
+ * 手機寫 IG、脆、他的手機時常會自己帶出配角，可是世界書照關鍵字觸發，配角還沒被提到就叫不出來，
+ * 模型只好自己幫他編身分（10/15 B Side 黑膠酒吧的老闆老吳變成獸醫）。先給一份簡表，誰是誰就對得上
+ */
+let rosterCache = { at: 0, key: '', text: '' };
+export async function worldRoster() {
+  const c = ctx(); const ch = c?.characters?.[c?.characterId];
+  if (!c?.loadWorldInfo || !ch) return '';
+  const books = [...new Set([ch.data?.extensions?.world, c.chatMetadata?.world_info].filter(Boolean))];
+  const key = books.join('|');
+  if (rosterCache.key === key && Date.now() - rosterCache.at < 60000) return rosterCache.text;
+  const lines = [];
+  for (const b of books) {
+    const data = await c.loadWorldInfo(b).catch(() => null);
+    for (const e of Object.values(data?.entries || {})) {
+      if (e.disable || !e.content) continue;
+      const name = String(e.comment || (e.key || [])[0] || '').trim();
+      if (!name) continue;
+      lines.push(`- ${name}：${String(e.content).replace(/\s+/g, ' ').slice(0, 70)}`);
+      if (lines.length >= 40) break;
+    }
+  }
+  const text = lines.length ? `【世界書條目簡表】（配角的身分、職業、地點照這裡；要寫到哪一條就照那條，不要另外編）\n${lines.join('\n')}` : '';
+  rosterCache = { at: Date.now(), key, text };
+  return text;
+}
+
 /** 正文最近幾則（給快照挑劇情用） */
 export function recentChat(n = 12) {
   const c = ctx();

@@ -4,7 +4,7 @@
 // 配角的大頭貼由玩家自己放（點配角的頭像，或相本的證件照區）：卡片作者不一定會做，玩家可以拿作者宣傳時附的配角照片來用。
 
 import * as store from './store.js';
-import { currentChar, generate, imagine, canSeeImages, imageInfo, canDraw } from './st.js';
+import { currentChar, generate, imagine, canSeeImages, imageInfo, canDraw, worldRoster } from './st.js';
 import { imagineAndPick } from './pick.js';
 import { P } from './prompts.js';
 import { promptEditor } from './promptedit.js';
@@ -169,6 +169,7 @@ export function createIG({ screen, say }) {
         .filter((p) => p.img && !dd.usedAlbum.includes(p.id) && p.desc && p.desc !== '妳放的照片').slice(-6);
       const have = dd.posts.slice(-10).map((p) => `${p.author.handle}：${p.caption.slice(0, 20)}`).join('\n');
       const r = parseJSON(await generate([
+        await worldRoster(),
         '[Brume Phone · Instagram]',
         `現在不是在寫劇情正文。${who.user} 在滑 Instagram。請寫動態上新的 4 篇貼文和 2 則限時動態：`,
         `- 貼文 1～2 篇是 ${who.name} 本人發的，照他的個性、生活和最近發生的事；其他是角色卡、世界書裡的配角或路人`,
@@ -272,6 +273,7 @@ export function createIG({ screen, say }) {
     const who = ch;
     try {
       const r = parseJSON(await generate([
+        await worldRoster(),
         '[Brume Phone · Instagram]',
         `現在不是在寫劇情正文。這是 Instagram 上一篇貼文，請寫底下的 3～5 則留言。`,
         `發文的人：${p.author.kind === 'him' ? `${who.name} 本人` : p.author.kind === 'me' ? `${who.user} 本人` : p.author.name}（@${p.author.handle}）`,
@@ -294,6 +296,7 @@ export function createIG({ screen, say }) {
     save(); renderPost();
     try {
       const r = parseJSON(await generate([
+        await worldRoster(),
         '[Brume Phone · Instagram]',
         `現在不是在寫劇情正文。${who.user}（@${d.me.handle}）在一篇貼文底下留言了，請寫接下來的 1～2 則回覆。`,
         `- 優先是發文的 @${p.author.handle} 回她；${p.author.kind === 'him' ? '' : `${who.name} 也可以插一句`}`, WORLD,
@@ -416,6 +419,7 @@ export function createIG({ screen, say }) {
     dd.me.handle ||= who.user; dd.him.handle ||= who.name;
     const see = canSeeImages();
     const raw = await generate([
+        await worldRoster(),
       '[Brume Phone · Instagram]',
       `現在不是在寫劇情正文。${who.user} 把你們相本裡的一張照片給 ${who.name}，問他要不要發 IG。`,
       see ? '照片附在這則訊息裡，照實際看到的寫。' : (hint ? `照片內容：${hint}` : '（照片你看不到，寫得含蓄一點）'),
