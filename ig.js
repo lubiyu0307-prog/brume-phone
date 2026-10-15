@@ -73,7 +73,7 @@ export function createIG({ screen, say }) {
   function post(p, detail) {
     const n = p.comments?.length || 0;
     return `<article class="bp-ig-post">
-      <header data-prof="${p.author.kind}"${p.author.kind === 'other' ? ` data-cast="${esc(p.author.name)}"` : ''}>${av(p.author, 'sm')}<b>${esc(p.author.handle)}</b><i>${IC.more}</i></header>
+      <header data-prof="${p.author.kind}"${p.author.kind === 'other' ? ` data-cast="${esc(p.author.name)}"` : ''}>${av(p.author, 'sm')}<b>${esc(p.author.handle)}</b><i data-igmore="${p.id}">${IC.more}</i></header>
       <div ${detail ? '' : `data-post="${p.id}"`}>${photo(p)}</div>
       <div class="bp-ig-acts"><span data-like="${p.id}">${p.liked ? IC.heartOn : IC.heart}</span><span data-post="${p.id}">${IC.comment}</span><span>${IC.send}</span><span class="r">${IC.save}</span></div>
       <p class="bp-ig-likes">${fmt(p.likes + (p.liked ? 1 : 0))} 個讚</p>
@@ -316,6 +316,17 @@ export function createIG({ screen, say }) {
   let pendingImg = null;
   screen.addEventListener('click', async (e) => {
     if (!mine()) return;
+    // 貼文右上角 ⋯：重寫這篇、刪除這篇
+    const more = e.target.closest('[data-igmore]');
+    if (more) { postMenu(more.dataset.igmore); return; }
+    const mm = e.target.closest('[data-igm]');
+    if (mm) {
+      const p = find(mm.dataset.id); const a = mm.dataset.igm;
+      screen.querySelector('.bp-ig-menu')?.remove();
+      if (a === 'del' && p) { d.posts = d.posts.filter((x) => x !== p); save(); if (view === 'post') view = back; view === 'profile' ? renderProfile() : renderFeed(); say('刪掉了'); }
+      if (a === 'redo' && p) await rewritePost(p);
+      return;
+    }
     const cs = e.target.closest('[data-cast]');
     if (cs && !e.target.closest('.bp-ig-storyv')) { castSheet(cs.dataset.cast); return; }
     const lk = e.target.closest('[data-like]');
@@ -378,6 +389,45 @@ export function createIG({ screen, say }) {
       if (mine() && view === 'post') renderPost();
     }
   });
+
+  function postMenu(id) {
+    const p = find(id); if (!p) return;
+    screen.querySelector('.bp-ig-menu')?.remove();
+    screen.insertAdjacentHTML('beforeend', `<div class="bp-ig-menu"><div class="bp-ig-menu-bg" data-igm="close"></div><div class="bp-ig-menu-card">
+      ${p.author.kind !== 'me' ? `<button data-igm="redo" data-id="${p.id}">重寫這篇</button>` : ''}
+      <button data-igm="del" data-id="${p.id}" class="danger">刪除這篇</button>
+      <button data-igm="close">取消</button></div></div>`);
+  }
+
+  // 寫歪的貼文重寫一次：發文的人是誰、做什麼的照角色卡和世界書，帳號不對就換掉（同一個帳號的其他貼文、限動、留言一起換）
+  async function rewritePost(p) {
+    const who = ch; const dd = d;
+    say('重寫中⋯');
+    try {
+      const r = parseJSON(await generate([
+        await worldRoster(),
+        '[Brume Phone · Instagram]',
+        `現在不是在寫劇情正文。重寫 Instagram 上的一篇貼文，原本是 @${p.author.handle}（${p.author.name}）發的：「${p.caption}」，照片：${p.desc}`,
+        p.author.kind === 'him' ? `這篇是 ${who.name} 本人發的，照他的個性和最近發生的事重寫內容。` : `發文的人是誰、做什麼的、帳號叫什麼，照角色卡、世界書和正文；原本的身分或帳號跟資料不合就改掉。不要寫成 ${who.user} 發的。`,
+        WORLD,
+        `- photo 裡如果拍到 ${who.name} 或 ${who.user}，一定要寫出名字`,
+        '', '只輸出 JSON：{"type":"本人/配角/路人","name":"","handle":"英文小寫帳號","photo":"照片拍到什麼，一句話","caption":"說明文字"}',
+      ].filter(Boolean).join('\n')));
+      const old = p.author.handle;
+      if (p.author.kind !== 'him') {
+        const name = String(r.name || p.author.name); const handle = String(r.handle || old).replace(/^@/, '').slice(0, 24);
+        const fix = (a) => { if (a && a.kind !== 'me' && a.kind !== 'him' && a.handle === old) { a.handle = handle; a.name = name; } };
+        dd.posts.forEach((x) => { fix(x.author); (x.comments || []).forEach((c) => fix(c.author)); });
+        dd.stories.forEach((x) => fix(x.author));
+      }
+      p.desc = String(r.photo || p.desc); p.caption = String(r.caption || p.caption);
+      delete p.img; p.drawn = false; p.comments = null; // 照片描述換了，舊圖不對；留言也重來
+      if (who.key === ch?.key) save();
+      say('重寫好了');
+      if (mine()) view === 'post' ? renderPost() : view === 'profile' ? renderProfile() : renderFeed();
+      if (autoOn() && p.author.kind === 'him') autoDraw(who, dd);
+    } catch (err) { say(`沒有重寫成功：${err.message || err}`); }
+  }
 
   function showStory() {
     const s = story.list[story.i];

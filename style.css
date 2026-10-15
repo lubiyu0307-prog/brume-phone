@@ -1224,3 +1224,11 @@
 .bp-pe-btns { display: flex; gap: 8px; }
 .bp-pe-btns button { flex: 1; padding: 11px 6px; border: 0; border-radius: 12px; background: #ebe6de; color: #4b463f; font: inherit; font-size: 14px; cursor: pointer; }
 .bp-pe-btns button.ok { background: #2b2824; color: #fff; }
+
+/* IG 貼文 ⋯ 選單 */
+.bp-ig-menu { position: absolute; inset: 0; z-index: 50; display: flex; align-items: flex-end; }
+.bp-ig-menu-bg { position: absolute; inset: 0; background: rgba(0, 0, 0, .35); }
+.bp-ig-menu-card { position: relative; width: 100%; padding: 10px 12px calc(12px + env(safe-area-inset-bottom)); border-radius: 18px 18px 0 0; background: #fff; display: flex; flex-direction: column; gap: 6px; }
+.bp-ig-menu-card button { padding: 13px; border: 0; border-radius: 12px; background: #f2f2f2; color: #111; font: inherit; font-size: 15px; cursor: pointer; }
+.bp-ig-menu-card button.danger { color: #ed4956; }
+.bp-ig-post header i[data-igmore] { cursor: pointer; }
