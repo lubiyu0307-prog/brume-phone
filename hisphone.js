@@ -90,6 +90,7 @@ export function createHisPhone({ host, say, onExit }) {
       `- 跟 ${ch.user} 有關的小地方要自然，不要每一樣都繞著她`,
       `- 他們現在的關係是「${stage.name(st)}」（${stage.tone(st)}）：備註名、聊天、相簿裡跟她有關的東西都要符合這個階段，不要超前`,
       '- 出現的其他人物要符合角色卡和世界觀，年代、用語也一樣',
+      '- 配角的身分、職業、跟他的關係，照角色卡、世界書和正文裡寫的；資料裡沒寫的不要自己給他們新的職業或頭銜（例如不要把同事寫成醫生）',
       `- 他只知道劇情裡發生過、他親眼看到或 ${ch.user} 親口告訴他的事。${ch.user} 的設定裡還沒在劇情中讓他知道的（職業、家人、過去），他不知道，不能寫進手機；真的寫到也只能是他的猜測，可以猜錯`,
       bg ? `\n${bg}` : '',
       '',
@@ -266,7 +267,8 @@ export function createHisPhone({ host, say, onExit }) {
     if (id === 'her') {
       // 跟她的那串就是她手機上真的聊過的，只是從他這邊看
       const t = (await store.get('line:' + ch.key).catch(() => null)) || { msgs: [] };
-      const msgs = t.msgs.filter((m) => !m.err && (m.text || m.img || m.sticker));
+      // 他的手機是劇情裡的東西：現實時間聊的不在這裡（除非她打開了讓劇情知道）
+      const msgs = t.msgs.filter((m) => !m.err && (m.text || m.img || m.sticker) && (!m.now || t.nowSync));
       return `<div class="bp-hp-chat">${msgs.slice(-60).map((m) => bubble(!m.me, m.img ? '［照片］' : m.sticker ? `［貼圖］${m.sticker.tag}` : m.text, m.ts)).join('') || '<p class="bp-hp-loading">還沒聊過。</p>'}</div>
         ${hp.line.draft ? `<div class="bp-hp-draft"><small>他打了沒傳出去的：</small>${esc(hp.line.draft)}</div>` : ''}`;
     }

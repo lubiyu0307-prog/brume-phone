@@ -42,12 +42,15 @@ async function liteContext(c, prompt) {
   const personality = f.personality ?? sub(ch.personality);
   const scenario = f.scenario ?? sub(ch.scenario);
   const persona = f.persona || '';
-  const recent = (c.chat || []).filter((m) => !m.is_system && m.mes).slice(-6)
+  const lines = (c.chat || []).filter((m) => !m.is_system && m.mes)
     .map((m) => `${m.is_user ? c.name1 : m.name}：${String(m.mes).replace(/<[^>]+>/g, '').slice(0, 400)}`);
+  const recent = lines.slice(-6);
+  // 世界書用比較多則來掃：配角最近幾則沒出場，他的條目還是要叫得到，不然模型會自己幫他編職業（10/15 老吳變成獸醫）
+  const scan = lines.slice(-20);
   let wi = '';
   try {
     // 世界書照平常的關鍵字規則掃：掃這次的請求和正文最後幾則（只看不觸發事件）
-    const r = await c.getWorldInfoPrompt?.([prompt, ...recent].reverse(), 8192, true);
+    const r = await c.getWorldInfoPrompt?.([prompt, ...scan].reverse(), 8192, true);
     wi = r?.worldInfoString || '';
   } catch { /* 掃不到就不帶 */ }
   return [
