@@ -11,13 +11,13 @@ import { createGames } from './games.js';
 import { createCall } from './call.js';
 import { createLife, settings as lifeSet, LEVELS } from './life.js';
 import * as stage from './stage.js';
-import { currentChar, ctx, lite, DATA_PREFIXES } from './st.js';
+import { currentChar, ctx, lite, DATA_PREFIXES, uploadImage, dropImage } from './st.js';
 import * as store from './store.js';
 import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.36';
+const VERSION = '0.18.37';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -99,6 +99,11 @@ function save(state) {
 }
 let state = load();
 
+// 桌布和桌面照片：存在酒館伺服器上（store 的 desk），手機和電腦開同一個酒館看到同一個桌面。
+// 0.18.36 以前存在各自瀏覽器的 state.wall／state.photos，第一次打開時搬上去
+const DESK = 'desk';
+let desk = { wall: state.wall || '', photos: { ...(state.photos || {}) } };
+
 const $ = (html) => { const t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstElementChild; };
 const pad = (n) => String(n).padStart(2, '0');
 const WEEK = ['日', '一', '二', '三', '四', '五', '六'];
@@ -118,7 +123,7 @@ function calendarWidget() {
 }
 
 function photoWidget(w, slot) {
-  const src = state.photos?.[slot];
+  const src = desk.photos?.[slot];
   const inner = src ? '' : `<div class="bp-photo-empty"><div>${ICON.add}點一下放照片</div></div>`;
   const bg = src ? ` style="background-image:url('${src}')"` : '';
   return `<div class="bp-widget bp-${w} bp-photo" data-slot="${slot}"${bg}>${inner}</div>`;
@@ -248,9 +253,32 @@ function build() {
   let pickTarget = null;
 
   const applyWall = () => {
-    overlay.querySelector('.bp-wall').style.backgroundImage = state.wall ? `url('${state.wall}')` : '';
+    overlay.querySelector('.bp-wall').style.backgroundImage = desk.wall ? `url('${desk.wall}')` : '';
   };
   applyWall();
+
+  // 跟伺服器對一次桌面；伺服器上還沒有、這台有舊的就傳上去
+  let deskSeen = JSON.stringify(desk);
+  const loadDesk = async () => {
+    let d = await store.get(DESK);
+    if (!d && (state.wall || Object.keys(state.photos || {}).length)) {
+      d = { wall: '', photos: {} };
+      if (state.wall) d.wall = (await uploadImage(state.wall)) || '';
+      for (const [k, v] of Object.entries(state.photos || {})) { const u = await uploadImage(v); if (u) d.photos[k] = u; }
+      if (d.wall || Object.keys(d.photos).length) {
+        await store.set(DESK, d);
+        delete state.wall; delete state.photos; save(state);
+      } else d = null;
+    }
+    if (!d) return;
+    if (state.wall || state.photos) { delete state.wall; delete state.photos; save(state); } // 伺服器上已經有了，這台的舊副本不要了
+    desk = { wall: d.wall || '', photos: { ...(d.photos || {}) } };
+    const now = JSON.stringify(desk);
+    if (now === deskSeen) return;
+    deskSeen = now; applyWall(); rebuild();
+  };
+  const saveDesk = async () => { deskSeen = JSON.stringify(desk); await store.set(DESK, desk); };
+  window.addEventListener('bp-store-late', (e) => { if (e.detail === DESK) loadDesk(); });
 
   const tick = () => {
     const n = new Date();
@@ -349,8 +377,8 @@ function build() {
     if (act) {
       const a = act.dataset.act;
       if (a === 'wall') { pickTarget = 'wall'; file.click(); }
-      if (a === 'wall-reset') { delete state.wall; save(state); applyWall(); say('用回預設桌布了'); }
-      if (a === 'photos-reset') { state.photos = {}; save(state); rebuild(); say('照片清掉了'); }
+      if (a === 'wall-reset') { const old = desk.wall; desk.wall = ''; saveDesk(); if (old) dropImage(old); applyWall(); say('用回預設桌布了'); }
+      if (a === 'photos-reset') { const old = Object.values(desk.photos); desk.photos = {}; saveDesk(); old.forEach(dropImage); rebuild(); say('照片清掉了'); }
       if (a === 'close') sheet.classList.remove('bp-show');
       if (a === 'dbg') {
         let txt = ''; try { txt = localStorage.getItem(DBG_KEY) || '[]'; } catch { /* 讀不到 */ }
@@ -420,11 +448,15 @@ function build() {
   file.addEventListener('change', async () => {
     const f = file.files[0]; file.value = '';
     if (!f || !pickTarget) return;
-    const url = await shrink(f, pickTarget === 'wall' ? 1290 : 900);
-    if (pickTarget === 'wall') state.wall = url;
-    else (state.photos ||= {})[pickTarget] = url;
-    if (!save(state)) { say('照片太大，存不下'); return; }
-    if (pickTarget === 'wall') { applyWall(); say('桌布換好了'); } else rebuild();
+    const target = pickTarget;
+    say('照片放上去中⋯');
+    const url = await uploadImage(await shrink(f, target === 'wall' ? 1290 : 900));
+    if (!url) { say('照片存不上去，等一下再試試'); return; }
+    const old = target === 'wall' ? desk.wall : desk.photos[target];
+    if (target === 'wall') desk.wall = url; else desk.photos[target] = url;
+    await saveDesk();
+    if (old && old !== url) dropImage(old);
+    if (target === 'wall') { applyWall(); say('桌布換好了'); } else { rebuild(); say('放好了'); }
   });
 
   // App 畫面：從右邊滑進來，蓋在主畫面上
@@ -496,6 +528,7 @@ function build() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     store.refresh();
+    loadDesk();
     if (!appScreen.querySelector('.bp-line-roomv')) line.forget();
     refreshNotices();
   });
@@ -569,7 +602,7 @@ function build() {
   });
 
   const api = {
-    open() { store.refresh(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); dbg('open'); },
+    open() { store.refresh(); loadDesk(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); fit(); dbg('open'); },
     close,
   };
   return api;

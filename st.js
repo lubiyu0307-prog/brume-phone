@@ -306,12 +306,12 @@ async function toJpeg(base64, ext) {
   } catch { return { data: base64, ext }; }
 }
 
-async function saveImage(base64, ext) {
+async function saveImage(base64, ext, folder) {
   ({ data: base64, ext } = await toJpeg(base64, ext));
   const c = ctx(); const ch = c.characters?.[c.characterId];
   const r = await fetch('/api/images/upload', {
     method: 'POST', headers: c.getRequestHeaders(),
-    body: JSON.stringify({ image: base64, format: ext === 'jpeg' ? 'jpg' : ext, ch_name: ch?.name || 'Brume Phone', filename: `brume-phone_${Date.now()}` }),
+    body: JSON.stringify({ image: base64, format: ext === 'jpeg' ? 'jpg' : ext, ch_name: folder || ch?.name || 'Brume Phone', filename: `brume-phone_${Date.now()}` }),
   });
   if (!r.ok) return '';
   return String((await r.json())?.path || '');
@@ -343,6 +343,13 @@ export async function worldRoster() {
   const text = lines.length ? `【世界書條目簡表】（配角的身分、職業、地點照這裡；要寫到哪一條就照那條，不要另外編）\n${lines.join('\n')}` : '';
   rosterCache = { at: Date.now(), key, text };
   return text;
+}
+
+/** 把 dataURL 存到酒館伺服器的 Brume Phone 資料夾，回傳網址（存不了回傳空字串）。桌布、桌面照片用，手機和電腦才看得到同一張 */
+export async function uploadImage(dataUrl) {
+  const m = /^data:image\/(\w+);base64,(.+)$/.exec(String(dataUrl));
+  if (!m) return '';
+  try { return await saveImage(m[2], m[1], 'Brume Phone'); } catch { return ''; }
 }
 
 /** 正文最近幾則（給快照挑劇情用） */
