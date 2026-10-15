@@ -139,12 +139,15 @@ export function createHisPhone({ host, say, onExit }) {
       const people = await loadCast(ch.charKey).catch(() => ({ cast: {}, look: {} }));
       const rules = `\n這些照片都是 ${ch.name} 用自己的手機拍或存下來的，拍照的人就是他。\n${shotRules(people, ch)}`;
       const r = await ask((grow
-        ? `他的相簿過了一段時間，多了 2～4 張新照片。之前的照片有：${hp.album.slice(-6).map((p) => p.desc).join('／')}`
+        // 以前只給最後 6 張、沒說不能重複，劇情停在同一幕時就一直重拍同一罐紅豆湯（10/15）
+        ? `他的相簿過了一段時間，多了 2～4 張新照片。相簿裡已經有這些（[隱藏] 是已隱藏的）：\n${hp.album.slice(-30).map((p) => `- ${p.hidden ? '[隱藏] ' : ''}${String(p.desc).slice(0, 50)}`).join('\n')}\n新照片不能跟上面任何一張重複：不要再拍同一個東西、同一個地點的同一刻（同一罐飲料、同一隻動物、同一張長椅都算重複）。劇情裡已經拍過的那一幕不要再拍，寫這段時間他生活裡別的時刻，或劇情裡還沒拍過的新瞬間。`
         : `他相簿裡最近的 12 張照片（用一句話描述照片拍到什麼）。其中 2～4 張是他放進「已隱藏」的，多半是他偷拍或捨不得刪的 ${ch.user}`) + rules,
         '[{"desc":"照片拍到什麼，一句話","shot":"","in":[],"hidden":false,"daysAgo":1}]');
       const now = Date.now();
       const add = (Array.isArray(r) ? r : []).map((p) => ({ desc: String(p.desc || ''), ...(String(p.shot || '').trim() ? { shot: String(p.shot).trim(), in: Array.isArray(p.in) ? p.in.map(String) : [] } : {}), hidden: !!p.hidden, ts: now - Math.max(0, +p.daysAgo || 0) * 864e5 - Math.random() * 36e5 }));
-      hp.album = grow ? [...hp.album, ...add] : add;
+      // 保險：跟已經有的描述太像的（兩字一組重疊四成以上）不收
+      const fresh = grow ? add.filter((p) => !hp.album.some((o) => similar(o.desc, p.desc) >= 0.4)) : add;
+      hp.album = grow ? [...hp.album, ...fresh] : add;
     },
     async memos(grow) {
       const r = await ask(grow
@@ -466,4 +469,13 @@ export function createHisPhone({ host, say, onExit }) {
     close,
     get active() { return host.classList.contains('bp-show'); },
   };
+}
+
+// 兩句描述有多像：兩個字一組切開，看重疊的比例（0～1）
+function similar(a, b) {
+  const grams = (t) => { const x = String(t).replace(/[\s，。、！？「」,.!?]/g, ''); const g = new Set(); for (let i = 0; i < x.length - 1; i++) g.add(x.slice(i, i + 2)); return g; };
+  const A = grams(a); const B = grams(b);
+  if (!A.size || !B.size) return 0;
+  let n = 0; for (const g of A) if (B.has(g)) n++;
+  return n / Math.min(A.size, B.size);
 }
