@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.37';
+const VERSION = '0.18.38';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -257,28 +257,35 @@ function build() {
   };
   applyWall();
 
+  // 桌面照角色卡分：每張卡可以有自己的桌布和照片（desk:角色），沒設過的卡用共用的那份（desk）。
   // 跟伺服器對一次桌面；伺服器上還沒有、這台有舊的就傳上去
   let deskSeen = JSON.stringify(desk);
+  let shared = null; // 共用那份，換照片時用來判斷舊圖還有沒有別的卡在用
+  const deskKey = () => { const c = currentChar(); return c ? `${DESK}:${c.charKey}` : DESK; };
   const loadDesk = async () => {
-    let d = await store.get(DESK);
+    const key = deskKey();
+    shared = await store.get(DESK);
+    let d = key === DESK ? shared : ((await store.get(key)) || shared);
     if (!d && (state.wall || Object.keys(state.photos || {}).length)) {
       d = { wall: '', photos: {} };
       if (state.wall) d.wall = (await uploadImage(state.wall)) || '';
       for (const [k, v] of Object.entries(state.photos || {})) { const u = await uploadImage(v); if (u) d.photos[k] = u; }
       if (d.wall || Object.keys(d.photos).length) {
-        await store.set(DESK, d);
+        await store.set(DESK, d); shared = d;
         delete state.wall; delete state.photos; save(state);
       } else d = null;
     }
-    if (!d) return;
+    d ||= { wall: '', photos: {} };
     if (state.wall || state.photos) { delete state.wall; delete state.photos; save(state); } // 伺服器上已經有了，這台的舊副本不要了
     desk = { wall: d.wall || '', photos: { ...(d.photos || {}) } };
     const now = JSON.stringify(desk);
     if (now === deskSeen) return;
     deskSeen = now; applyWall(); rebuild();
   };
-  const saveDesk = async () => { deskSeen = JSON.stringify(desk); await store.set(DESK, desk); };
-  window.addEventListener('bp-store-late', (e) => { if (e.detail === DESK) loadDesk(); });
+  const saveDesk = async () => { deskSeen = JSON.stringify(desk); const key = deskKey(); await store.set(key, desk); if (key === DESK) shared = desk; };
+  // 換掉的舊圖：共用那份還在用的不刪（這張卡是從共用那份改的）
+  const dropOld = (url) => { if (!url) return; if (shared && shared !== desk && (shared.wall === url || Object.values(shared.photos || {}).includes(url))) return; dropImage(url); };
+  window.addEventListener('bp-store-late', (e) => { if (String(e.detail).startsWith(DESK)) loadDesk(); });
 
   const tick = () => {
     const n = new Date();
@@ -377,8 +384,8 @@ function build() {
     if (act) {
       const a = act.dataset.act;
       if (a === 'wall') { pickTarget = 'wall'; file.click(); }
-      if (a === 'wall-reset') { const old = desk.wall; desk.wall = ''; saveDesk(); if (old) dropImage(old); applyWall(); say('用回預設桌布了'); }
-      if (a === 'photos-reset') { const old = Object.values(desk.photos); desk.photos = {}; saveDesk(); old.forEach(dropImage); rebuild(); say('照片清掉了'); }
+      if (a === 'wall-reset') { const old = desk.wall; desk = { ...desk, wall: '' }; saveDesk(); dropOld(old); applyWall(); say('用回預設桌布了'); }
+      if (a === 'photos-reset') { const old = Object.values(desk.photos); desk = { ...desk, photos: {} }; saveDesk(); old.forEach(dropOld); rebuild(); say('照片清掉了'); }
       if (a === 'close') sheet.classList.remove('bp-show');
       if (a === 'dbg') {
         let txt = ''; try { txt = localStorage.getItem(DBG_KEY) || '[]'; } catch { /* 讀不到 */ }
@@ -453,9 +460,10 @@ function build() {
     const url = await uploadImage(await shrink(f, target === 'wall' ? 1290 : 900));
     if (!url) { say('照片存不上去，等一下再試試'); return; }
     const old = target === 'wall' ? desk.wall : desk.photos[target];
+    desk = { wall: desk.wall, photos: { ...desk.photos } }; // 不要改到共用那份
     if (target === 'wall') desk.wall = url; else desk.photos[target] = url;
     await saveDesk();
-    if (old && old !== url) dropImage(old);
+    if (old && old !== url) dropOld(old);
     if (target === 'wall') { applyWall(); say('桌布換好了'); } else { rebuild(); say('放好了'); }
   });
 
@@ -565,7 +573,7 @@ function build() {
 
   // 換角色時：日曆小點、正文同步都跟著換
   const st = ctx();
-  st?.eventSource?.on?.(st.eventTypes?.CHAT_CHANGED || st.event_types?.CHAT_CHANGED || 'chat_id_changed', () => { calDots(); syncMain(); });
+  st?.eventSource?.on?.(st.eventTypes?.CHAT_CHANGED || st.event_types?.CHAT_CHANGED || 'chat_id_changed', () => { calDots(); syncMain(); loadDesk(); });
   syncMain();
   const music = createMusic({ screen: appScreen, ytHost: overlay.querySelector('.bp-yt'), say });
 
