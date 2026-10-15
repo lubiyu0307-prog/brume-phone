@@ -61,7 +61,8 @@ const APPS = [
 
 export function createHisPhone({ host, say, onExit }) {
   let drawing = false; let rewriting = false;
-  let ch = null; let hp = null; let view = 'lock'; let sub = null; let delArmed = null; // delArmed：刪照片要按兩次，第一次按的是哪一張 let typed = ''; let fails = 0;
+  let ch = null; let hp = null; let view = 'lock'; let sub = null; let typed = ''; let fails = 0;
+  let delArmed = null; // 刪照片要按兩次：第一次按的是哪一張
   const busy = new Set();
 
   const key = () => 'his:' + ch.key;
