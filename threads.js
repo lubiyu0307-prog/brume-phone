@@ -78,7 +78,7 @@ export function createThreads({ screen, say }) {
     return `<article class="bp-th-post${opts.detail ? ' detail' : ''}" ${opts.detail ? '' : `data-post="${p.id}"`}>
       <div class="bp-th-left">${av(p.author)}${opts.line ? '<i class="bp-th-line"></i>' : ''}</div>
       <div class="bp-th-main">
-        <div class="bp-th-top"><b>${esc(p.author.handle)}</b>${p.author.kind === 'char' ? '<em class="bp-th-badge">●</em>' : ''}<span>${ago(p.ts)}</span><i>${IC.more}</i></div>
+        <div class="bp-th-top"><b>${esc(p.author.handle)}</b>${p.author.kind === 'char' ? '<em class="bp-th-badge">●</em>' : ''}<span>${ago(p.ts)}</span><i data-thmore="${p.id}">${IC.more}</i></div>
         <div class="bp-th-text">${esc(p.text)}</div>
         <div class="bp-th-acts">
           <span data-like="${p.id}" class="${p.liked ? 'on' : ''}">${p.liked ? IC.heartOn : IC.heart}${fmt(p.likes + (p.liked ? 1 : 0))}</span>
@@ -166,6 +166,44 @@ export function createThreads({ screen, say }) {
       <div class="bp-th-sheet-body">${av(me())}<div><b>${esc(me().handle)}</b><textarea placeholder="有什麼新鮮事？" rows="5"></textarea></div></div>
       <div class="bp-th-sheet-foot"><span>任何人都能回覆</span><button data-th="post">發佈</button></div></div></div>`);
     screen.querySelector('.bp-th-sheet textarea').focus();
+  }
+
+  function postMenu(id) {
+    const p = find(id); if (!p) return;
+    screen.querySelector('.bp-ig-menu')?.remove();
+    screen.insertAdjacentHTML('beforeend', `<div class="bp-ig-menu"><div class="bp-ig-menu-bg" data-thm="close"></div><div class="bp-ig-menu-card">
+      ${p.author.kind !== 'me' ? `<button data-thm="redo" data-id="${p.id}">重寫這則</button>` : ''}
+      <button data-thm="del" data-id="${p.id}" class="danger">刪除這則</button>
+      <button data-thm="close">取消</button></div></div>`);
+  }
+
+  // 寫歪的貼文重寫：發文的人照角色卡和世界書，帳號不對就換掉（同帳號的其他貼文、回覆一起換）
+  async function rewritePost(p) {
+    const who = ch; const f = feed;
+    say('重寫中⋯');
+    try {
+      const raw = await generate([
+        await worldRoster(),
+        '[Brume Phone · 脆（Threads）]',
+        `現在不是在寫劇情正文。重寫脆上的一則貼文，原本是 @${p.author.handle}（${p.author.name}）發的：${p.text}`,
+        p.author.kind === 'char' ? `這則是 ${who.name} 本人發的，照他的個性和最近發生的事重寫，類型寫「本人」。` : `發文的人是誰、做什麼的、帳號叫什麼，照角色卡、世界書和正文；原本的身分或帳號跟資料不合就改掉。不要寫成 ${who.user} 發的。`,
+        ...WORLD,
+        '',
+        '只寫一行，格式：類型｜顯示名稱｜帳號｜內容｜按讚數',
+        '類型只能是「本人」「配角」「路人」。帳號用英文小寫、數字、底線或點。內容不要換行。不要其他文字。',
+      ].filter(Boolean).join('\n'));
+      const n = parseLines(raw, who, true)[0];
+      if (!n) throw new Error('沒有寫出來');
+      const old = p.author.handle;
+      if (p.author.kind !== 'char' && n.author.kind !== 'char') {
+        const fix = (a) => { if (a && a.kind !== 'me' && a.kind !== 'char' && a.handle === old) { a.handle = n.author.handle; a.name = n.author.name; a.kind = n.author.kind; } };
+        f.posts.forEach((x) => { fix(x.author); (x.replies || []).forEach((r) => fix(r.author)); });
+      }
+      p.text = n.text; p.replies = null; // 內容換了，回覆重來
+      if (who.key === ch?.key) save();
+      say('重寫好了');
+      if (mine()) view === 'post' ? renderPost() : view === 'profile' ? renderProfile() : renderFeed();
+    } catch (err) { say(`沒有重寫成功：${err.message || err}`); }
   }
 
   // ---------- 生成 ----------
@@ -258,6 +296,18 @@ export function createThreads({ screen, say }) {
   // ---------- 事件 ----------
   screen.addEventListener('click', async (e) => {
     if (!mine()) return;
+    // 貼文右上角 ⋯：重寫這則、刪除這則
+    const more = e.target.closest('[data-thmore]');
+    if (more) { e.stopPropagation(); postMenu(more.dataset.thmore); return; }
+    const mm = e.target.closest('[data-thm]');
+    if (mm) {
+      e.stopPropagation();
+      const p = find(mm.dataset.id); const a = mm.dataset.thm;
+      screen.querySelector('.bp-ig-menu')?.remove();
+      if (a === 'del' && p) { feed.posts = feed.posts.filter((x) => x !== p); save(); if (view === 'post') view = 'feed'; view === 'profile' ? renderProfile() : renderFeed(); say('刪掉了'); }
+      if (a === 'redo' && p) await rewritePost(p);
+      return;
+    }
     const like = e.target.closest('[data-like]');
     if (like) { e.stopPropagation(); const p = find(like.dataset.like); p.liked = !p.liked; save(); view === 'post' ? renderPost() : view === 'profile' ? renderProfile() : renderFeed(); return; }
     const rl = e.target.closest('[data-rlike]');
