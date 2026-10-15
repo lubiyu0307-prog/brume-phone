@@ -349,7 +349,7 @@ export function createHisPhone({ host, say, onExit }) {
         await ensureAutoStyle(people, who.charKey);
         // 截圖、插畫、存下來的圖片不是他拍的照片：照那張圖本身畫，不放人、不放手、不帶證件照
         // （10/15「安羽傳過來的 LINE 大頭貼截圖」被畫成她本人＋一隻男生的手）
-        const shot = /截圖|螢幕|截下|插畫|插圖|貼圖|梗圖|海報|圖片|手繪|畫作|頭貼|桌布/.test(p.desc);
+        const shot = /截圖|螢幕|截下|翻拍|插畫|插圖|貼圖|梗圖|海報|圖片|手繪|畫作|頭貼|桌布/.test(p.desc);
         const always = [];
         if (!shot) {
           // 他手機裡的照片是他拍的；寫到自拍、鏡子、倒影他才入鏡
@@ -362,7 +362,8 @@ export function createHisPhone({ host, say, onExit }) {
         }
         const ids = shot ? [] : idsFor(people, p.desc, always);
         // 有寫到手才講是他的手；沒寫就不提，不然模型會硬塞一隻手進來
-        const hand = /手|指|握|托|捧|拿著/.test(p.desc);
+        // 「二手」「手寫」「手機」這些詞裡的手不算（10/15「二手唱片行⋯手寫標價籤」被塞了一隻手在翻唱片）
+        const hand = /(?<!二)手(?![寫機工繪作冊帳錶套續術法])|手指|指尖|握著|托著|捧著|拿著/.test(p.desc);
         const prompt = shot
           ? `${p.desc}. Show only the saved image itself as it appears on a phone screen, full frame, flat. No people, no hands, no phone body.`
           : finalPrompt(people, who, `${p.desc}, photo taken on his phone, candid, natural light`, ids, hand ? { by: HIM } : {});
