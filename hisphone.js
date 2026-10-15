@@ -71,7 +71,8 @@ export function createHisPhone({ host, say, onExit }) {
   async function background() {
     const t = (await store.get('line:' + ch.key).catch(() => null)) || { msgs: [] };
     const mem = (await store.get('memory:' + ch.key).catch(() => null)) || [];
-    const recent = t.msgs.filter((m) => !m.err && m.text).slice(-15).map((m) => `${m.me ? ch.user : ch.name}：${m.text}`).join('\n');
+    // 現實時間聊的不算劇情裡發生的事（10/15 備忘錄寫了「她叫我阿愷」，那是現實時間傳的），除非她打開了「現實聊的也讓劇情知道」
+    const recent = t.msgs.filter((m) => !m.err && m.text && (!m.now || t.nowSync)).slice(-15).map((m) => `${m.me ? ch.user : ch.name}：${m.text}`).join('\n');
     return [
       recent ? `他跟 ${ch.user} 最近在 LINE 上聊的：\n${recent}` : '',
       mem.length ? `他記得關於她的事：\n${mem.map((m) => '- ' + m.text).join('\n')}` : '',
@@ -89,6 +90,7 @@ export function createHisPhone({ host, say, onExit }) {
       `- 跟 ${ch.user} 有關的小地方要自然，不要每一樣都繞著她`,
       `- 他們現在的關係是「${stage.name(st)}」（${stage.tone(st)}）：備註名、聊天、相簿裡跟她有關的東西都要符合這個階段，不要超前`,
       '- 出現的其他人物要符合角色卡和世界觀，年代、用語也一樣',
+      `- 他只知道劇情裡發生過、他親眼看到或 ${ch.user} 親口告訴他的事。${ch.user} 的設定裡還沒在劇情中讓他知道的（職業、家人、過去），他不知道，不能寫進手機；真的寫到也只能是他的猜測，可以猜錯`,
       bg ? `\n${bg}` : '',
       '',
       task,

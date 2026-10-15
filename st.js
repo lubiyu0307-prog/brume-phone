@@ -56,7 +56,8 @@ async function liteContext(c, prompt) {
     description,
     personality ? `個性：${personality}` : '',
     scenario ? `情境：${scenario}` : '',
-    persona ? `【${c.name1}】\n${persona}` : '',
+    // 玩家的設定是寫給模型看的，不是他知道的事：沒在劇情裡講過的，他不知道
+    persona ? `【${c.name1}】（玩家角色的設定。${ch.name} 只知道劇情裡他看到、聽到或她親口說過的部分；還沒在劇情裡揭露的職業、家人、過去，他不知道）\n${persona}` : '',
     wi ? `【世界設定】\n${wi}` : '',
     recent.length ? `【正文最近的劇情】\n${recent.join('\n')}` : '',
   ].filter(Boolean).join('\n\n');
