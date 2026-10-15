@@ -89,6 +89,28 @@ export function canSeeImages() {
   return !s || s.media_inlining !== false;
 }
 
+// 直接打酒館的 chat-completions（不經過擴充的事件），只在聊天接 Vertex／AI Studio 時用；拿不到字回空字串
+async function quickAsk(c, system, prompt) {
+  const o = c.chatCompletionSettings || {};
+  const src = o.chat_completion_source;
+  const model = src === 'vertexai' ? o.vertexai_model : src === 'makersuite' ? o.google_model : '';
+  if (!model) return '';
+  try {
+    const r = await fetch('/api/backends/chat-completions/generate', {
+      method: 'POST', headers: c.getRequestHeaders(),
+      body: JSON.stringify({
+        messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
+        model, chat_completion_source: src, stream: false, max_tokens: 4096, temperature: o.temp_openai ?? 1,
+        reasoning_effort: 'low', include_reasoning: false,
+        vertexai_auth_mode: o.vertexai_auth_mode, vertexai_region: o.vertexai_region, vertexai_express_project_id: o.vertexai_express_project_id,
+        reverse_proxy: o.reverse_proxy, proxy_password: o.proxy_password,
+      }),
+    });
+    if (!r.ok) return '';
+    return String((await r.json())?.choices?.[0]?.message?.content || '').trim();
+  } catch { return ''; }
+}
+
 /**
  * 叫模型寫東西。省 token 模式走 generateRaw（只帶角色卡、世界書、正文最後幾則）；
  * 關掉或有附圖時走 generateQuietPrompt（整份預設＋整段正文，跟正文一樣貴）。image 是 dataURL，酒館一次只吃一張
@@ -97,7 +119,12 @@ export async function generate(prompt, image) {
   const c = ctx();
   if (!c) throw new Error('找不到酒館');
   if (lite.get() && !image && c.generateRaw) {
-    const out = await c.generateRaw({ systemPrompt: await liteContext(c, prompt), prompt });
+    const system = await liteContext(c, prompt);
+    // 聊天接 Google 時直接問模型：走酒館的 generateRaw 會經過模板、變數那些擴充，再照正文的思考設定想很久，
+    // 一句 LINE 要等一兩分鐘（10/15 量到：準備 17 秒＋送出後一分多鐘；直接問六秒）。失敗才退回 generateRaw
+    const fast = await quickAsk(c, system, prompt);
+    if (fast) return stripBlocks(fast);
+    const out = await c.generateRaw({ systemPrompt: system, prompt });
     return stripBlocks(out);
   }
   const fn = c.generateQuietPrompt;
