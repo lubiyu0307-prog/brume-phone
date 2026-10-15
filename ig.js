@@ -8,7 +8,7 @@ import { currentChar, generate, imagine, canSeeImages, imageInfo, canDraw } from
 import { imagineAndPick } from './pick.js';
 import { P } from './prompts.js';
 import { promptEditor } from './promptedit.js';
-import { HIM, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
+import { HIM, ME, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle } from './cast.js';
 
 // 自動生圖：打開的話，他新發的貼文用 Gemini 畫成真的照片（一張要等一下）
 const AUTO_KEY = 'brume-phone:igauto';
@@ -174,6 +174,7 @@ export function createIG({ screen, say }) {
         `- 貼文 1～2 篇是 ${who.name} 本人發的，照他的個性、生活和最近發生的事；其他是角色卡、世界書裡的配角或路人`,
         `- 限時動態至少 1 則是 ${who.name} 的，比貼文更隨性`,
         WORLD, `- 不要寫 ${who.user} 發的`,
+        `- photo 裡如果拍到 ${who.name} 或 ${who.user}（就算是別人偷拍、路人拍到、只當配角），一定要寫出名字（例如「飼育員${who.name}蹲著餵企鵝」），不要只寫「飼育員小哥」「一個女生」`,
         '- photo 會拿去生圖，要寫清楚畫面裡有誰；發文的人的手、手臂、腳或身體入鏡時，寫明是誰的、男生還是女生的（例如「他骨節分明的男生手掌托著⋯」），不要只寫「手」',
         `- ${who.name} 的帳號用：${dd.him.handle === who.name ? '幫他取一個英文小寫帳號' : dd.him.handle}`,
         have ? `已經有的（不要重複）：\n${have}` : '',
@@ -214,6 +215,10 @@ export function createIG({ screen, say }) {
     const self = /自拍|鏡子|鏡中|對鏡|合照|入鏡|露臉|全身照|倒影|反射|映在|映出|鏡面|reflection/i.test(p.desc);
     const author = p.author.kind === 'other' ? p.author.name : p.author.kind === 'him' ? HIM : null;
     const always = self && author ? [author] : [];
+    // 別人拍到他或妳：描述裡寫到名字（或名字裡的字，像「阿愷」）也帶證件照（10/15 動物園粉專拍到飼育員侯愷，沒帶到他的照片）
+    const nameHit = (n) => n && (p.desc.includes(n) || (n.length >= 2 && new RegExp(`阿${n.slice(-1)}|小${n.slice(-1)}`).test(p.desc)));
+    if (nameHit(who.name) && !always.includes(HIM)) always.push(HIM);
+    if (nameHit(who.user) && !always.includes(ME)) always.push(ME);
     const ids = idsFor(people, p.desc, always);
     const by = author;
     const refs = refsFor(people, who, p.desc, always);
