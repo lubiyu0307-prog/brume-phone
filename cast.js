@@ -41,18 +41,19 @@ export async function ensureAutoStyle(data, charKey) {
 
 /** 某個人的資料：{ name, photo, look } */
 export function person({ cast, look }, ch, id) {
-  if (id === HIM) return { id, name: ch.name, photo: cast[HIM]?.photo || '', look: look.him || '' };
-  if (id === ME) return { id, name: ch.user, photo: cast[ME]?.photo || '', look: look.me || '' };
-  return { id, name: id, photo: cast[id]?.photo || '', look: cast[id]?.look || '' };
+  if (id === HIM) return { id, name: ch.name, photo: cast[HIM]?.photo || '', look: look.him || '', hair: cast[HIM]?.hair || '' };
+  if (id === ME) return { id, name: ch.user, photo: cast[ME]?.photo || '', look: look.me || '', hair: cast[ME]?.hair || '' };
+  return { id, name: id, photo: cast[id]?.photo || '', look: cast[id]?.look || '', hair: cast[id]?.hair || '' };
 }
 
-export function setPerson(data, id, { photo, look }) {
+// hair：照片光線暗、灰髮銀髮看起來像黑髮時，玩家另外寫的髮色（10/15 格的深灰髮一直被畫成黑髮）
+export function setPerson(data, id, { photo, look, hair }) {
   if (id === HIM || id === ME) {
     data.look[id === HIM ? 'him' : 'me'] = look || '';
-    if (photo) data.cast[id] = { photo }; else delete data.cast[id];
+    if (photo || hair) data.cast[id] = { photo: photo || '', ...(hair ? { hair } : {}) }; else delete data.cast[id];
     return;
   }
-  if (photo || look) data.cast[id] = { photo: photo || '', look: look || '' }; else delete data.cast[id];
+  if (photo || look || hair) data.cast[id] = { photo: photo || '', look: look || '', ...(hair ? { hair } : {}) }; else delete data.cast[id];
 }
 
 /** 配角名單（不含他和妳） */
@@ -97,7 +98,7 @@ export function finalPrompt(data, ch, prompt, ids = [], { by } = {}) {
   const anyRef = inFrame.some((p) => hasRef(data, p));
   // 有照片的人：臉和頭髮照照片，文字只留身形、衣著；沒照片的人照舊整段長相
   const notes = inFrame.filter((p) => p.look || hasRef(data, p)).map((p) => (hasRef(data, p)
-    ? `${P.PERSON_WITH_REF(p.name)}${lookNote(p.look) ? `${P.SEP}${lookNote(p.look)}` : ''}`
+    ? `${p.hair ? P.PERSON_WITH_REF_HAIR(p.name, p.hair) : P.PERSON_WITH_REF(p.name)}${lookNote(p.look) ? `${P.SEP}${lookNote(p.look)}` : ''}`
     : `${p.name}${P.COLON}${lookNote(p.look) || p.look}`));
   // 場景 prompt 裡寫長相的詞也拿掉（寫 prompt 的模型會把長相抄進去），沒照片的人的長相上面 notes 會補回來
   if (anyRef) prompt = stripFace(prompt);

@@ -159,6 +159,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <div class="bp-al-idpic" data-al="idpic">${editing.photo ? `<img src="${esc(editing.photo)}" alt="">` : '<span>點這裡放照片</span>'}</div>
         ${isNew ? '<label>名字（跟劇情、IG 裡出現的一樣）</label><input class="bp-al-idname" maxlength="20">' : ''}
         <label>長相與身形（生圖會照這段，中文英文都可以，可以不寫）</label><textarea class="bp-al-idlook" rows="4" placeholder="性別年紀、髮色髮型、眼睛、身高身材、常穿的衣服。例如：二十多歲的男生，灰棕色亂髮，灰色眼睛，高、寬肩、結實，常穿黑色針織衫">${esc(p.look)}</textarea>
+        <label>髮色（照片看起來不準才寫，例如：深灰色、銀灰色）</label><input class="bp-al-idhair" maxlength="30" value="${esc(p.hair || '')}" placeholder="可以不寫，不寫就照照片">
         ${editing.id === HIM ? `<button class="bp-al-ghost" data-al="lookauto" ${busy ? 'disabled' : ''}>${busy ? '整理中⋯' : '從角色卡幫我整理'}</button>` : ''}
         ${!isNew && editing.id !== HIM && editing.id !== ME ? '<button class="bp-al-ghost danger" data-al="iddel">刪掉這個配角</button>' : ''}
       </div>
@@ -271,7 +272,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       const id = editing.id || screen.querySelector('.bp-al-idname')?.value.trim();
       if (!id) { say('先寫名字'); return; }
       if (!editing.id && (id === HIM || id === ME || people.cast[id])) { say('已經有這個名字了'); return; }
-      setPerson(people, id, { photo: editing.photo, look: screen.querySelector('.bp-al-idlook')?.value.trim() || '' });
+      setPerson(people, id, { photo: editing.photo, look: screen.querySelector('.bp-al-idlook')?.value.trim() || '', hair: screen.querySelector('.bp-al-idhair')?.value.trim() || '' });
       if (!editing.id && !people.cast[id]) people.cast[id] = { photo: '', look: '' }; // 新配角什麼都沒放也留著，之後再補
       saveCast(ch.charKey, people); say('存好了'); view = 'grid'; tab = 'id'; editing = null; render();
     }

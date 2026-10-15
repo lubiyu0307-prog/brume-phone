@@ -390,7 +390,7 @@ export function createIG({ screen, say }) {
     }
     if (a === 'savecast' && castEdit) {
       const look = screen.querySelector('.bp-ig-look')?.value.trim() || '';
-      setPerson(people, castEdit.name, { photo: castEdit.photo, look });
+      setPerson(people, castEdit.name, { photo: castEdit.photo, look, hair: person(people, ch, castEdit.name).hair });
       castEdit = null; saveCast(); screen.querySelector('.bp-ig-sheet')?.remove(); rerender(); return;
     }
     if (a === 'castclear' && castEdit) { setPerson(people, castEdit.name, {}); castEdit = null; saveCast(); screen.querySelector('.bp-ig-sheet')?.remove(); rerender(); return; }
