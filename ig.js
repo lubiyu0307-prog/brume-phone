@@ -8,7 +8,7 @@ import { currentChar, generate, imagine, canSeeImages, imageInfo, canDraw, world
 import { imagineAndPick } from './pick.js';
 import { P } from './prompts.js';
 import { promptEditor } from './promptedit.js';
-import { HIM, ME, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit } from './cast.js';
+import { HIM, ME, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit, isSavedImage, savedImagePrompt } from './cast.js';
 
 // 自動生圖：打開的話，他新發的貼文用 Gemini 畫成真的照片（一張要等一下）
 const AUTO_KEY = 'brume-phone:igauto';
@@ -216,6 +216,7 @@ export function createIG({ screen, say }) {
   // 照片的生圖 prompt：照片裡有誰入鏡，就帶誰的長相和證件照，最後套上玩家寫的照片風格
   function photoPrompt(p, who, story = false) {
     // 寫照片時一起寫好的畫面描述：入鏡的人照 in，不再從描述裡猜
+    if (p.shot && isSavedImage(p.shot)) return { prompt: savedImagePrompt(p.shot), refs: [] };
     if (p.shot) {
       const ids = shotIds(people, who, p.in);
       const author = p.author.kind === 'other' ? p.author.name : p.author.kind === 'him' ? HIM : null;

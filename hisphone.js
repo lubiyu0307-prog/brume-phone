@@ -4,7 +4,7 @@
 
 import * as store from './store.js';
 import { currentChar, generate, imageInfo, canDraw, worldRoster } from './st.js';
-import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit } from './cast.js';
+import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit, isSavedImage, savedImagePrompt } from './cast.js';
 import { imagineAndPick } from './pick.js';
 import { promptEditor } from './promptedit.js';
 import { verify } from './music.js';
@@ -392,6 +392,12 @@ export function createHisPhone({ host, say, onExit }) {
         const people = await loadCast(who.charKey);
         await ensureAutoStyle(people, who.charKey);
         // 寫照片時一起寫好的畫面描述：照 shot 和 in 畫，不用猜
+        if (p.shot && isSavedImage(p.shot)) {
+          const url = await imagineAndPick(host, savedImagePrompt(p.shot), { refs: [], aspect: '1:1' });
+          if (url) { p.img = url; if (who.key === ch?.key) save(); } else say(imageInfo.why ? `沒有出圖：${imageInfo.why}` : '沒有出圖');
+          drawing = false; if (view === 'album' && sub === i) paint();
+          return;
+        }
         if (p.shot) {
           const ids = shotIds(people, who, p.in);
           const prompt = finalPrompt(people, who, `${p.shot}, photo taken on his phone, candid, natural light`, ids, ids.includes(HIM) ? {} : { by: HIM });
