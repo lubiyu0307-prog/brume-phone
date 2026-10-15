@@ -60,7 +60,7 @@ const APPS = [
 ];
 
 export function createHisPhone({ host, say, onExit }) {
-  let drawing = false;
+  let drawing = false; let rewriting = false;
   let ch = null; let hp = null; let view = 'lock'; let sub = null; let typed = ''; let fails = 0;
   const busy = new Set();
 
@@ -275,7 +275,8 @@ export function createHisPhone({ host, say, onExit }) {
     }
     const c = hp.line.chats.find((x) => x.name === id);
     if (!c) return '';
-    return `<div class="bp-hp-chat">${c.msgs.map((m) => bubble(m.me, m.text, m.ts, m.me ? '' : m.from)).join('')}</div>`;
+    return `<div class="bp-hp-chat">${c.msgs.map((m) => bubble(m.me, m.text, m.ts, m.me ? '' : m.from)).join('')}</div>
+      <div class="bp-hp-pacts"><button data-hp="rechat" ${rewriting ? 'disabled' : ''}>${rewriting ? '重寫中⋯' : '重寫這個聊天室'}</button></div>`;
   }
   function bubble(mine, text, ts, from = '') {
     return `<div class="bp-hp-msg ${mine ? 'me' : 'them'}">${!mine && from ? `<small>${esc(from)}</small>` : ''}<div><p>${esc(text)}</p><em>${when(ts)}</em></div></div>`;
@@ -341,6 +342,23 @@ export function createHisPhone({ host, say, onExit }) {
     if (a === 'exit') { close(); onExit?.(); }
     if (a === 'home') { view = 'home'; sub = null; paint(); }
     if (a === 'sub') { sub = null; paint(); }
+    // 寫歪的聊天室（例如配角身分編錯）重寫一次：照角色卡、世界書，名稱不對可以順便改
+    if (a === 'rechat' && view === 'line' && sub && sub !== 'her' && !rewriting) {
+      const name = sub; const who = ch;
+      rewriting = true; paint();
+      try {
+        const r = await ask(`重寫他跟「${name}」的這個 LINE 聊天室。這個人是誰、做什麼的、跟他什麼關係，照角色卡、世界書和正文；原本的名稱或身分如果跟資料不合就改掉（聊天室名稱就用他手機裡會存的名字）。寫 4～10 則。`,
+          '{"name":"聊天室名稱","type":"朋友","msgs":[{"from":"他 或 對方名字","text":"","hoursAgo":3}]}');
+        const now = Date.now();
+        const c = hp.line.chats.find((x) => x.name === name);
+        if (c && who.key === ch?.key) {
+          c.name = String(r.name || name); c.type = r.type || c.type;
+          c.msgs = (r.msgs || []).map((m) => ({ me: /^他$|^我$/.test(String(m.from || '').trim()) || String(m.from || '').trim() === who.name, from: String(m.from || ''), text: String(m.text || ''), ts: now - Math.max(0, +m.hoursAgo || 0) * 3600e3 }));
+          save(); sub = c.name;
+        }
+      } catch (err) { say(`沒有重寫成功：${err.message || err}`); }
+      rewriting = false; paint();
+    }
     if (a === 'peek') { say(`他輸的是 ${hp.code}`); }
     if (a === 'ungen' && hp.album[sub]) { delete hp.album[sub].img; save(); paint(); }
     if (a === 'gen' && hp.album[sub] && !drawing) await genPhoto(sub);
