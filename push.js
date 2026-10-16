@@ -1,23 +1,43 @@
 // 推播：酒館關著也收得到他傳的 LINE。
-// 伺服器那邊要裝好推播外掛（server/，說明在 PUSH.md）；這裡負責「開啟通知」那顆按鈕、
-// 先把接下來要傳的訊息寫好交給伺服器排時間，以及把已經送出的訊息收進 LINE。
-// 外掛沒裝的酒館，這整塊就安靜不做事，霧語照舊能用。
+// 玩家什麼都不用裝：所有霧語共用比比架的「霧語推播站」（server/relay.mjs），跟以前 brume 的推播一樣按一下就好。
+// 這裡負責「開啟通知」那顆按鈕、先把接下來要傳的訊息寫好交給推播站排時間，以及把已經送出的訊息收進 LINE。
+// 送去推播站的只有：推播訂閱、角色名、預先寫好的幾則訊息、排定時間、安靜時段；聊天的代號先雜湊過。
 
 import { ctx, phoneOff } from './st.js';
 
-const API = '/api/plugins/brume-phone';
+// 霧語推播站的網址（比比的 Railway）。擴充設定裡填了 relay 就用那個（自己架的人用）
+const DEFAULT_RELAY = '';
+const relay = () => String(ctx()?.extensionSettings?.['brume-phone']?.relay || DEFAULT_RELAY).replace(/\/+$/, '');
 const BASE = new URL('.', import.meta.url);
 const FLAG = 'brume-phone:push-device'; // 這台裝置按過「開啟通知」
 
-const headers = () => ctx()?.getRequestHeaders?.() || { 'Content-Type': 'application/json' };
+// 這個酒館在推播站的身分：第一次用時自己產生，存在擴充設定（手機電腦同一份，所以兩邊都收得到）
+function identity() {
+  const c = ctx(); const root = (c?.extensionSettings ? (c.extensionSettings['brume-phone'] ||= {}) : {});
+  if (!/^[a-f0-9]{32}$/.test(root.pushId || '') || !/^[a-f0-9]{64}$/.test(root.pushKey || '')) {
+    const hex = (n) => Array.from(crypto.getRandomValues(new Uint8Array(n)), (b) => b.toString(16).padStart(2, '0')).join('');
+    root.pushId = hex(16); root.pushKey = hex(32);
+    c?.saveSettingsDebounced?.();
+  }
+  return { id: root.pushId, key: root.pushKey };
+}
+// 聊天代號（裡面有角色名）先雜湊再送出去
+function chatId(key) {
+  let h1 = 0x811c9dc5; let h2 = 0x01000193;
+  for (const ch of String(key)) { const c = ch.codePointAt(0); h1 = Math.imul(h1 ^ c, 16777619) >>> 0; h2 = Math.imul(h2 ^ c, 2246822519) >>> 0; }
+  return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+}
 async function call(path, body) {
-  const r = await fetch(API + path, body ? { method: 'POST', headers: headers(), body: JSON.stringify(body) } : { headers: headers() });
+  const base = relay(); if (!base) throw new Error('no relay');
+  const { id, key } = identity();
+  const headers = { 'Content-Type': 'application/json', 'X-BP-Id': id, 'X-BP-Key': key };
+  const r = await fetch(base + path, body ? { method: 'POST', headers, body: JSON.stringify(body) } : { headers });
   if (!r.ok) throw new Error(`${r.status}`);
   return r.json();
 }
 
 let statusCache = null; let statusAt = 0;
-/** 伺服器那邊有沒有裝推播外掛：有就回 { publicKey, subs }，沒有回 null */
+/** 推播站連不連得上：連得上回 { publicKey, subs }，連不上回 null */
 export async function serverStatus(force = false) {
   if (!force && statusCache !== undefined && Date.now() - statusAt < 60000) return statusCache;
   try { statusCache = await call('/status'); } catch { statusCache = null; }
@@ -60,7 +80,7 @@ export async function precheck() {
   if (p.ios && !p.standalone) return { ready: false, why: 'iPhone 要先把酒館加到主畫面：Safari 下面的分享按鈕 →「加入主畫面」，再從主畫面的圖示打開酒館，回來這裡按一次。' };
   if (!('PushManager' in window)) return { ready: false, why: p.ios ? 'iPhone 要 iOS 16.4 以上才收得到網頁通知，先更新系統。' : '這個瀏覽器不支援推播通知，換 Chrome 試試。' };
   const st = await serverStatus(true);
-  if (!st) return { ready: false, why: '酒館伺服器還沒裝霧語的推播外掛。照小手機資料夾裡 PUSH.md 的一步做完、重新啟動酒館，再回來按。' };
+  if (!st) return { ready: false, why: relay() ? '霧語推播站暫時連不上，過一下再試。' : '這個版本的霧語還沒設定推播站，等更新。' };
   if (typeof Notification !== 'undefined' && Notification.permission === 'denied') return { ready: false, why: p.ios ? '通知被關掉了：到 iPhone 的「設定 → 通知」找到酒館，打開「允許通知」。' : '通知被瀏覽器擋了：點網址列左邊的圖示 → 網站設定 → 通知改成允許。' };
   return { ready: true, status: st };
 }
@@ -129,12 +149,12 @@ export async function disable() {
 // ---------- 背景傳訊息 ----------
 const cfg = () => { const s = pushSet.get(); return { tz: -new Date().getTimezoneOffset(), quietFrom: s.quietFrom, quietTo: s.quietTo, real: s.mode === 'real' }; };
 export const queue = {
-  info: (chat) => call(`/queue?chat=${encodeURIComponent(chat)}`),
+  info: (chat) => call(`/queue?chat=${chatId(chat)}`),
   get: (chat) => queue.info(chat).then((r) => r.items || []),
-  // extra：{ title, fallback }——角色名、備用短訊（排好的用完、她又很久沒開時，伺服器從這裡挑一句推）
-  put: (chat, items, extra = {}) => call('/queue', { chat, items, cfg: cfg(), ...extra }),
-  cancel: (chat) => call('/cancel', { chat, cfg: cfg() }).catch(() => {}),
-  ack: (chat, ids) => call('/ack', { chat, ids }).catch(() => {}),
+  // extra：{ title, fallback }——角色名、備用短訊（排好的用完、她又很久沒開時，推播站從這裡挑一句推）
+  put: (chat, items, extra = {}) => call('/queue', { chat: chatId(chat), items, cfg: cfg(), ...extra }),
+  cancel: (chat) => call('/cancel', { chat: chatId(chat), cfg: cfg() }).catch(() => {}),
+  ack: (chat, ids) => call('/ack', { chat: chatId(chat), ids }).catch(() => {}),
 };
 
 /** 這張卡現在要不要在背景排訊息 */

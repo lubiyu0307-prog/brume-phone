@@ -1,4 +1,6 @@
-// 霧語 Brume Phone · 推播伺服器外掛
+// 霧語 Brume Phone · 推播核心
+// 平常由 server/relay.mjs 包成獨立的「霧語推播站」（比比架一台，所有玩家共用，玩家什麼都不用裝）；
+// 也還能當酒館的伺服器外掛自己架（放進 plugins/），兩種用同一份邏輯。
 // 酒館關著、手機鎖著也收得到他傳的 LINE：小手機開著的時候先把接下來要傳的訊息寫好、排好時間交給這裡，
 // 時間到了這裡把它標成「送出」，並推播到玩家允許過通知的每一台裝置。下次打開小手機時，送出的訊息會收進 LINE。
 // 這裡不叫模型、不碰 API 金鑰，只負責「到點送出＋推播」，所以不會偷偷花錢。
@@ -88,7 +90,7 @@ async function fallback(handle, u, chat, now) {
 async function tick() {
   const now = Date.now();
   let handles = [];
-  try { handles = fs.readdirSync(dir()).filter((f) => f.endsWith('.json') && f !== 'vapid.json').map((f) => f.slice(0, -5)); } catch { return; }
+  try { handles = fs.readdirSync(dir()).filter((f) => f.endsWith('.json') && f !== 'vapid.json' && !f.startsWith('_')).map((f) => f.slice(0, -5)); } catch { return; }
   for (const handle of handles) {
     const u = user(handle);
     let changed = false;
