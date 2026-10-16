@@ -133,7 +133,7 @@ export async function syncMain() {
 }
 
 function buildPrompt(ch, msgs, x = {}) {
-  const now = new Date();
+  const now = x.at ? new Date(x.at) : new Date(); // 背景推播照「送到的那一刻」寫
   const when = `${now.getFullYear()}/${now.getMonth() + 1}/${now.getDate()}（週${WEEK[now.getDay()]}）${pad(now.getHours())}:${pad(now.getMinutes())}`;
   const pos = herPositions(msgs);
   const byId = new Map(msgs.map((m) => [m.id, m]));
@@ -1122,13 +1122,14 @@ export function createLine({ screen, say, onUnread, onData }) {
    * 寫出他先傳的幾則，不存：回傳 [{ text, st }]，在一起（[[SKIP]]）或失敗回空陣列。
    * pending：已經排好、她還沒看到的（背景推播排第二則時帶上，才不會重複、也知道她還沒回）
    */
-  async function compose(kind, { pending = [] } = {}) {
+  async function compose(kind, { pending = [], real = false, at = 0 } = {}) {
     const who = await useCurrent();
     if (!who) return [];
     const cur = await stage.get(who.key);
     if (!stage.unlocked(cur, 'proactive')) return [];
     const t = thread;
-    if (t.mode === 'now') return []; // 她在現實時間跟他聊，劇情先停著
+    if (t.mode === 'now' && !real) return []; // 她在現實時間跟他聊，劇情先停著
+    if (real || kind === 'nudge') return composeReal(who, cur, kind, pending, at);
     const today = data.today();
     const [notes, cal, memory] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key)]);
     const together = `先看正文最近的劇情：如果故事裡此刻 ${who.name} 和 ${who.user} 就在一起（同一個空間、看得到彼此、正在相處），他不會拿手機傳訊息給身邊的人——這時整則只寫 [[SKIP]]，其他什麼都不寫。`;
@@ -1157,6 +1158,32 @@ export function createLine({ screen, say, onUnread, onData }) {
     return out;
   }
 
+  // 現實時間的背景推播（推播設成「照現實」），或備用短訊（kind = 'nudge'，不綁時間點）
+  async function composeReal(who, cur, kind, pending, at) {
+    const t = thread; const today = data.today();
+    const [notes, cal, memory] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key)]);
+    const when = new Date(at || Date.now());
+    const instr = kind === 'nudge'
+      ? `【備用的短訊】${who.user} 已經一整天沒打開手機找 ${who.name} 了。寫 4 句他這種時候會傳的 LINE（想她、問她在幹嘛、叫她記得吃飯喝水這類），不綁特定時間和劇情場景，任何時候收到都不突兀。一句一行，4 行，不要寫時間。`
+      : `【這次是他先傳的】這則會在現實的 ${when.getMonth() + 1}/${when.getDate()}（週${WEEK[when.getDay()]}）${pad(when.getHours())}:${pad(when.getMinutes())} 送到她手機，她這段時間沒在找他。照那個時間點，${who.name} 在現實生活裡很自然會傳的話：早上就早安、吃飯時間問吃了沒、晚上問到家了沒，想到她、分享自己在做什麼。寫 1～2 則，一行一則，不要寫時間。不要重複之前說過的話；她還沒回的不要寫成一來一往。`;
+    const msgs = pending.length ? [...t.msgs, ...pending.map((l, i) => ({ id: `p${i}`, me: false, text: l.text, ts: Date.now() + i, now: true }))] : t.msgs;
+    let raw;
+    try {
+      raw = await generate(buildPrompt(who, msgs, {
+        mode: 'now', at: kind === 'nudge' ? 0 : at, stage: cur, proactive: instr, memory,
+        notes: stage.unlocked(cur, 'notes') ? notes.filter((n) => !n.done).slice(0, 8) : [],
+        cal: cal.filter((e) => e.date >= today).slice(0, 8),
+      }));
+    } catch { return []; }
+    const out = [];
+    for (const line of raw.split('\n')) {
+      const text = parseReply(line.replace(/^\s*(\d{1,2}[:：]\d{2}\s*[｜|]|[-・*]|\d+[.、])\s*/, '').trim(), who).lines[0];
+      if (text) out.push({ text });
+      if (out.length >= (kind === 'nudge' ? 4 : 2)) break;
+    }
+    return out;
+  }
+
   // 背景推播已經送出的：收進聊天室，時間用排定送出的時間；同一則不收兩次
   async function deliverBg(items) {
     const who = await useCurrent();
@@ -1167,7 +1194,7 @@ export function createLine({ screen, say, onUnread, onData }) {
       (it.lines || []).forEach((l, i) => {
         const id = `bg-${it.id}-${i}`;
         if (have.has(id) || !l.text) return;
-        thread.msgs.push({ id, me: false, text: l.text, ts: it.at + i * 1000, first: true, story: true, bg: true, ...(l.st ? { st: l.st } : {}) });
+        thread.msgs.push({ id, me: false, text: l.text, ts: it.at + i * 1000, first: true, bg: true, ...(it.real ? { now: true } : { story: true }), ...(l.st ? { st: l.st } : {}) });
         n++;
       });
     }

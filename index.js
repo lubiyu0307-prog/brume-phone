@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.0';
+const VERSION = '0.19.1';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -193,6 +193,8 @@ function build() {
       <p class="bp-sheet-note">開著：正文裡你們分開、約好下次的時候，他之後會自己傳 LINE 或發脆，過幾分鐘手機才響。</p>
       <button data-act="push" class="bp-pushbtn">開啟通知</button>
       <p class="bp-sheet-note bp-pushnote">酒館關著、手機鎖著，他傳 LINE 也會跳通知。</p>
+      <div class="bp-setrow bp-pushrow"><span>訊息照什麼時間寫</span><div class="bp-seg" data-seg="pmode">${[['story', '照劇情'], ['real', '照現實']].map(([v, n]) => `<b data-act="pmode" data-v="${v}">${n}</b>`).join('')}</div></div>
+      <p class="bp-sheet-note bp-pushrow">照劇情：他照故事裡現在幾點、人在哪寫。照現實：照妳收到通知的那一刻寫，早上收到早安、晚上問妳到家了沒。</p>
       <div class="bp-setrow bp-pushrow"><span>他一天最多傳</span><div class="bp-seg" data-seg="pmax">${[1, 2, 3, 5].map((n) => `<b data-act="pmax" data-v="${n}">${n} 次</b>`).join('')}</div></div>
       <div class="bp-setrow bp-pushrow"><span>不吵妳的時段</span><div class="bp-seg" data-seg="pquiet">${[[23, 7], [1, 9], [3, 11]].map(([f, t]) => `<b data-act="pquiet" data-v="${f}-${t}">${f}–${t} 點</b>`).join('')}</div></div>
       <div class="bp-setrow"><span>護眼模式</span><div class="bp-seg" data-seg="eye">${[['off', '關'], ['on', '開'], ['auto', '晚上自動']].map(([k, n]) => `<b data-act="eye" data-v="${k}">${n}</b>`).join('')}</div></div>
@@ -361,6 +363,7 @@ function build() {
     const btn = sheet.querySelector('[data-act="push"]'); const note = sheet.querySelector('.bp-pushnote');
     const ps = push.pushSet.get();
     sheet.querySelectorAll('[data-act="pmax"]').forEach((b) => b.classList.toggle('on', +b.dataset.v === ps.max));
+    sheet.querySelectorAll('[data-act="pmode"]').forEach((b) => b.classList.toggle('on', b.dataset.v === ps.mode));
     sheet.querySelectorAll('[data-act="pquiet"]').forEach((b) => b.classList.toggle('on', b.dataset.v === `${ps.quietFrom}-${ps.quietTo}`));
     const on = push.deviceOn();
     btn.textContent = on ? '關掉這台的通知' : '開啟通知';
@@ -431,6 +434,7 @@ function build() {
     if (act) {
       const a = act.dataset.act;
       if (a === 'push') { togglePush(); return; } // 放最前面：要在點擊當下直接請求通知權限，前面不能有 await
+      if (a === 'pmode') { push.pushSet.set({ mode: act.dataset.v }); const c = currentChar(); if (c) push.queue.cancel(c.key); showPush(); say(act.dataset.v === 'real' ? '之後照現實時間寫' : '之後照劇情時間寫'); return; } // 已經排好的照舊寫法，作廢重排
       if (a === 'pmax') { push.pushSet.set({ max: +act.dataset.v }); showPush(); return; }
       if (a === 'pquiet') { const [f, t] = act.dataset.v.split('-').map(Number); push.pushSet.set({ quietFrom: f, quietTo: t }); showPush(); return; }
       if (a === 'wall') { pickTarget = 'wall'; file.click(); }
@@ -541,6 +545,7 @@ function build() {
   const snap = { open: () => album.open('snap') };
   const his = createHisPhone({ host: overlay.querySelector('.bp-his'), say, onExit: () => say('還給他了，他沒發現') });
   const openLineRoom = () => { openApp(line); line.openRoom(); };
+  setTimeout(() => push.syncIfEnabled(), 6000); // 每次打開酒館檢查一次訂閱還在不在、鑰匙對不對
   push.onOpenRequest(() => { api.open(); life.pullBg?.().finally?.(() => openLineRoom()); });
 
   // ---------- 手機響：紅點、鎖定畫面通知、網頁上方的橫幅 ----------

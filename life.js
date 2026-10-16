@@ -250,21 +250,25 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     if (now - lastPlan < 10 * 60000) return;
     planning = true; lastPlan = now;
     try {
-      const items = await push.queue.get(ch.key);
+      const info = await push.queue.info(ch.key); const items = info.items || [];
       if (items.some((i) => i.status === 'sent')) { await pullBg(); }
       if (items.some((i) => i.status === 'pending')) return;
       const cur = await stage.get(ch.key);
       if (!stage.unlocked(cur, 'proactive')) return;
       const counts = await line.bgCounts();
+      const real = push.pushSet.get().mode === 'real';
       const plan = []; const pending = []; let prev = Math.max(now, last);
       for (let k = 0; k < 2; k++) {
         const at = push.nextSlot(prev, L.away, (t) => { const d = new Date(t).toDateString(); return (counts[d] || 0) + plan.filter((p) => new Date(p.at).toDateString() === d).length; });
-        const lines = await line.compose('away', { pending });
+        const lines = await line.compose('away', { pending, real, at });
         if (!lines.length) break; // 劇情裡兩人在一起，他不會傳
-        plan.push({ id: uid(), at, title: ch.name, body: lines.map((l) => l.text).join('\n'), lines });
+        plan.push({ id: uid(), at, title: ch.name, body: lines.map((l) => l.text).join('\n'), lines, ...(real ? { real: true } : {}) });
         pending.push(...lines); prev = at;
       }
-      if (plan.length && currentChar()?.key === ch.key) await push.queue.put(ch.key, plan);
+      // 備用短訊：排好的都送完、她又一整天沒開時，伺服器從這裡挑一句（快用完或放太久才重寫）
+      let fallback;
+      if ((info.fallbackLeft || 0) < 2 || now - (info.fallbackAt || 0) > 5 * 864e5) fallback = (await line.compose('nudge')).map((l) => l.text);
+      if ((plan.length || fallback?.length) && currentChar()?.key === ch.key) await push.queue.put(ch.key, plan, { title: ch.name, ...(fallback?.length ? { fallback } : {}) });
     } catch { /* 下次再排 */ } finally { planning = false; }
   }
   const cancelBg = async () => { const ch = currentChar(); if (ch && await push.bgActive(ch)) { await push.queue.cancel(ch.key); lastPlan = 0; } };

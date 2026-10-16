@@ -29,7 +29,8 @@ export async function serverStatus(force = false) {
 export const pushSet = {
   get() {
     const s = ctx()?.extensionSettings?.['brume-phone']?.push || {};
-    return { on: !!s.on, max: [1, 2, 3, 5].includes(+s.max) ? +s.max : 3, quietFrom: Number.isFinite(+s.quietFrom) ? +s.quietFrom : 1, quietTo: Number.isFinite(+s.quietTo) ? +s.quietTo : 9 };
+    // mode：story＝照劇情裡的時間寫；real＝照現實送到的時間寫（早上收到早安那種）
+    return { on: !!s.on, mode: s.mode === 'real' ? 'real' : 'story', max: [1, 2, 3, 5].includes(+s.max) ? +s.max : 3, quietFrom: Number.isFinite(+s.quietFrom) ? +s.quietFrom : 1, quietTo: Number.isFinite(+s.quietTo) ? +s.quietTo : 9 };
   },
   set(patch) {
     const c = ctx(); if (!c?.extensionSettings) return;
@@ -94,6 +95,26 @@ export async function enable(status) {
   return { ok: true, tested: !!t?.ok };
 }
 
+/**
+ * 每次打開酒館順手檢查一次（brume B108 的教訓）：伺服器換過鑰匙、或 iPhone 自己把訂閱清掉，
+ * 推播會整個靜音而且看不出來。鑰匙不對或訂閱不見就重訂，再跟伺服器報到一次
+ */
+export async function syncIfEnabled() {
+  if (!deviceOn() || !('serviceWorker' in navigator)) return;
+  const st = await serverStatus(true);
+  if (!st?.publicKey) return;
+  try {
+    const reg = (await navigator.serviceWorker.getRegistration(BASE.pathname)) || (await registration());
+    const key = keyBytes(st.publicKey);
+    let sub = await reg.pushManager.getSubscription();
+    const old = sub?.options?.applicationServerKey ? new Uint8Array(sub.options.applicationServerKey) : null;
+    if (sub && (!old || old.length !== key.length || old.some((b, i) => b !== key[i]))) { await sub.unsubscribe(); sub = null; }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
+    const p = platform();
+    await call('/subscribe', { sub: sub.toJSON(), label: p.ios ? 'iPhone' : p.android ? 'Android' : 'Desktop' });
+  } catch { /* 下次打開再試 */ }
+}
+
 export async function disable() {
   try {
     const reg = await navigator.serviceWorker.getRegistration(BASE.pathname);
@@ -106,10 +127,13 @@ export async function disable() {
 }
 
 // ---------- 背景傳訊息 ----------
+const cfg = () => { const s = pushSet.get(); return { tz: -new Date().getTimezoneOffset(), quietFrom: s.quietFrom, quietTo: s.quietTo, real: s.mode === 'real' }; };
 export const queue = {
-  get: (chat) => call(`/queue?chat=${encodeURIComponent(chat)}`).then((r) => r.items || []),
-  put: (chat, items) => call('/queue', { chat, items }),
-  cancel: (chat) => call('/cancel', { chat }).catch(() => {}),
+  info: (chat) => call(`/queue?chat=${encodeURIComponent(chat)}`),
+  get: (chat) => queue.info(chat).then((r) => r.items || []),
+  // extra：{ title, fallback }——角色名、備用短訊（排好的用完、她又很久沒開時，伺服器從這裡挑一句推）
+  put: (chat, items, extra = {}) => call('/queue', { chat, items, cfg: cfg(), ...extra }),
+  cancel: (chat) => call('/cancel', { chat, cfg: cfg() }).catch(() => {}),
   ack: (chat, ids) => call('/ack', { chat, ids }).catch(() => {}),
 };
 
