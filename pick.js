@@ -51,7 +51,7 @@ export async function imagineAndPick(screen, prompt, opts = {}) {
     const u = await imagine(prompt, opts);
     done++;
     if (u && chosen !== null) { dropImage(u); return; } // 已經挑好了，晚到的直接刪
-    const off = u && imageInfo.model && !imageInfo.model.includes(imageModelPref.get()) ? (/pro/.test(imageInfo.model) ? 'Pro' : 'Flash') : '';
+    const off = u && /gemini/.test(imageInfo.model) && !imageInfo.model.includes(imageModelPref.get()) ? (/pro/.test(imageInfo.model) ? 'Pro' : 'Flash') : '';
     if (u) { const i = urls.push(u) - 1; cells[i].innerHTML = `<img src="${u}" alt="">${off ? `<em>${off}</em>` : ''}`; cells[i].dataset.i = i; }
     note.textContent = done < n ? `生圖中⋯ ${done}/${n}${urls.length ? '（可以先挑）' : ''}` : urls.length ? '點一張用它' : `沒有出圖：${imageInfo.why || '這次失敗了'}`;
   };
