@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.6';
+const VERSION = '0.19.7';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -207,7 +207,8 @@ function build() {
       <button data-act="wall-reset">用回預設桌布</button>
       <button data-act="photos-reset">清掉小工具照片</button>
       <button data-act="homeicon">放到手機桌面</button>
-      <p class="bp-sheet-note">桌面多一個「霧語」圖示，點了直接打開上次那個角色的手機，不用先開酒館、選角色。</p>
+      <button data-act="appicon">換桌面圖示的照片</button>
+      <p class="bp-sheet-note">桌面多一個「霧語」圖示，點了直接打開上次那個角色的手機，不用先開酒館、選角色。圖示可以換成妳喜歡的照片（換好再按一次「放到手機桌面」；已經放過的要先把舊的刪掉）。</p>
       <button data-act="cardoff" class="bp-danger">這張卡不用小手機</button>
       <p class="bp-sheet-note">古風、奇幻這類沒有手機的故事用：手機按鈕收起來、劇情不接手機、他也不會主動傳。要再打開，從輸入框左邊的魔杖選單點霧語。</p>
       <button data-act="dbg">複製除錯紀錄（給格看）</button>
@@ -440,8 +441,11 @@ function build() {
       const a = act.dataset.act;
       if (a === 'push') { togglePush(); return; } // 放最前面：要在點擊當下直接請求通知權限，前面不能有 await
       if (a === 'pmode') { push.pushSet.set({ mode: act.dataset.v }); const c = currentChar(); if (c) push.queue.cancel(c.key); showPush(); say(act.dataset.v === 'real' ? '之後照現實時間寫' : '之後照劇情時間寫'); return; } // 已經排好的照舊寫法，作廢重排
+      if (a === 'appicon') { pickTarget = 'appicon'; file.click(); return; }
       if (a === 'homeicon') {
-        const u = new URL('app.html', import.meta.url).href;
+        const icon = ctx()?.extensionSettings?.['brume-phone']?.appIcon;
+        const page = new URL('app.html', import.meta.url); if (icon) page.searchParams.set('icon', icon);
+        const u = page.href;
         try { await navigator.clipboard.writeText(u); } catch { /* 複製不了就算了 */ }
         window.open(u, '_blank');
         say('照新頁面上的步驟加到桌面；沒跳出來的話，網址已經複製好了，貼到 Safari 或 Chrome 打開');
@@ -529,6 +533,7 @@ function build() {
     const f = file.files[0]; file.value = '';
     if (!f || !pickTarget) return;
     const target = pickTarget;
+    if (target === 'appicon') { await setAppIcon(f); return; }
     say('照片放上去中⋯');
     const url = await uploadImage(await shrink(f, target === 'wall' ? 1290 : 900));
     if (!url) { say('照片存不上去，等一下再試試'); return; }
@@ -733,6 +738,19 @@ function shrink(fileObj, max) {
 // 小手機按鈕。位置記成「離畫面右邊、下面各多遠」，再用實際量到的位置換算成 left/top：
 // 酒館在 <html> 上加了 transform，fixed 會改對 <html> 定位，手機版 <html> 幾乎沒有高度，
 // 只寫 bottom 會把按鈕推到螢幕外面（iPhone 上看不到按鈕就是這樣）
+// 桌面圖示換成玩家自己的照片：裁成正方形、存到酒館伺服器，網址記在擴充設定（app.html 讀 ?icon= 換掉圖示）
+async function setAppIcon(f) {
+  try {
+    const img = await createImageBitmap(f);
+    const s = Math.min(img.width, img.height); const cv = document.createElement('canvas'); cv.width = cv.height = 512;
+    cv.getContext('2d').drawImage(img, (img.width - s) / 2, (img.height - s) / 2, s, s, 0, 0, 512, 512);
+    const url = await uploadImage(cv.toDataURL('image/png'));
+    if (!url) throw new Error('存不上去');
+    const c = ctx(); (c.extensionSettings['brume-phone'] ||= {}).appIcon = url; c.saveSettingsDebounced?.();
+    window.dispatchEvent(new CustomEvent('bp-hint', { detail: '圖示換好了，再按一次「放到手機桌面」加到桌面' }));
+  } catch (e) { window.dispatchEvent(new CustomEvent('bp-hint', { detail: `圖示沒換成功：${e.message || e}` })); }
+}
+
 // 記住上次開手機的是哪個角色（桌面的「霧語」圖示打開時直接回到他）
 function rememberChar() {
   const c = ctx(); const ch = currentChar(); if (!c?.extensionSettings || !ch) return;
