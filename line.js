@@ -582,7 +582,7 @@ export function createLine({ screen, say, onUnread, onData }) {
         <p class="bp-line-subhint">${esc(ch.name)}從 LINE 裡記住的事。每聊三十則會自己整理一次，也可以手動整理；不對的可以改或刪。</p>
         <button class="bp-line-wide" data-line="summarize">現在整理一次</button>
         <button class="bp-line-switch bp-line-lore" data-line="lore">同步寫進酒館的世界書<i class="${loreOn() ? 'on' : ''}"></i></button>
-        <p class="bp-line-subhint">打開之後，新整理出來的記憶會寫成這個聊天綁的世界書條目（沒有就寫角色卡綁的那本），正文跟 Memory Books 的記憶放在一起。條目名稱會標「📱 Brume Phone」。${loreOn() ? '<br><u data-line="loreall">把現在這些也寫進去</u>' : ''}</p>
+        <p class="bp-line-subhint">打開之後，新整理出來的記憶會寫成這個聊天綁的世界書條目（沒有就寫角色卡綁的那本），正文跟 Memory Books 的記憶放在一起。條目名稱會標「📱 霧語」。${loreOn() ? '<br><u data-line="loreall">把現在這些也寫進去</u>' : ''}</p>
         ${mem.length ? mem.map((m) => `<div class="bp-line-mem"><span>${esc(m.text)}</span><i data-memedit="${m.id}">${IC.edit}</i><i data-memdel="${m.id}">${IC.del}</i></div>`).join('') : '<p class="bp-line-subhint">還沒有記憶。</p>'}
       </div><div class="bp-line-pop"></div></div>`;
   }

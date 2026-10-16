@@ -1,4 +1,4 @@
-# Brume Phone
+# 霧語 Brume Phone
 
 SillyTavern 擴充：一支霧面玻璃風的小手機。通用，不綁任何角色。
 

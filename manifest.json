@@ -1,11 +1,11 @@
 {
-  "display_name": "Brume Phone",
+  "display_name": "霧語 Brume Phone",
   "loading_order": 100,
   "requires": [],
   "optional": [],
   "js": "index.js",
   "css": "style.css",
   "author": "lubiyu0307-prog",
-  "version": "0.18.59",
+  "version": "0.18.60",
   "homePage": "https://github.com/lubiyu0307-prog/brume-phone"
 }

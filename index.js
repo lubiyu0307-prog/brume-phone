@@ -1,4 +1,4 @@
-// Brume Phone · 介面樣品 v0.1
+// 霧語 Brume Phone · 介面樣品 v0.1
 // 只有畫面：鎖定畫面、兩頁主畫面、換桌布、換照片小工具。App 點下去還不會開。
 
 import { createLine, syncMain } from './line.js';
@@ -17,7 +17,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.59';
+const VERSION = '0.18.60';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -200,10 +200,10 @@ function build() {
       <button data-act="wall-reset">用回預設桌布</button>
       <button data-act="photos-reset">清掉小工具照片</button>
       <button data-act="cardoff" class="bp-danger">這張卡不用小手機</button>
-      <p class="bp-sheet-note">古風、奇幻這類沒有手機的故事用：手機按鈕收起來、劇情不接手機、他也不會主動傳。要再打開，從輸入框左邊的魔杖選單點 Brume Phone。</p>
+      <p class="bp-sheet-note">古風、奇幻這類沒有手機的故事用：手機按鈕收起來、劇情不接手機、他也不會主動傳。要再打開，從輸入框左邊的魔杖選單點霧語。</p>
       <button data-act="dbg">複製除錯紀錄（給格看）</button>
       <button class="bp-cancel" data-act="close">完成</button>
-      <div class="bp-ver">Brume Phone v${VERSION}</div>
+      <div class="bp-ver">霧語 Brume Phone v${VERSION}</div>
     </div>
     <input type="file" accept="image/*" hidden>
   </div></div>`);
@@ -680,11 +680,11 @@ function shrink(fileObj, max) {
 function syncOff() {
   const ch = currentChar(); const off = !!ch && phoneOff.is(ch.charKey);
   const btn = document.getElementById('bp-launcher'); if (btn) btn.style.display = off ? 'none' : '';
-  const w = document.querySelector('#bp-wand span'); if (w) w.textContent = off ? 'Brume Phone（這張卡關著，點了打開）' : 'Brume Phone';
+  const w = document.querySelector('#bp-wand span'); if (w) w.textContent = off ? '霧語 Brume Phone（這張卡關著，點了打開）' : '霧語 Brume Phone';
 }
 
 function launcher(phone) {
-  const btn = $(`<div id="bp-launcher" title="Brume Phone">${ICON.phone}</div>`);
+  const btn = $(`<div id="bp-launcher" title="霧語 Brume Phone">${ICON.phone}</div>`);
   document.documentElement.appendChild(btn);
   let off = { r: 14, b: 140 };
   if (state.btn && typeof state.btn.r === 'number') off = state.btn;
@@ -734,7 +734,7 @@ function wandEntry(phone) {
   if (!menu) return false;
   if (document.getElementById('bp-wand')) return true;
   const item = $(`<div id="bp-wand" class="list-group-item flex-container flexGap5 interactable" tabindex="0">
-    <div class="fa-solid fa-mobile-screen extensionsMenuExtensionButton"></div><span>Brume Phone</span></div>`);
+    <div class="fa-solid fa-mobile-screen extensionsMenuExtensionButton"></div><span>霧語 Brume Phone</span></div>`);
   item.addEventListener('click', () => {
     menu.style.display = 'none';
     const ch = currentChar();

@@ -413,7 +413,7 @@ export async function writeLore(text, keys = []) {
   const uids = Object.keys(data.entries).map(Number).filter((n) => !Number.isNaN(n));
   const uid = uids.length ? Math.max(...uids) + 1 : 0;
   data.entries[uid] = {
-    uid, key: keys, keysecondary: [], comment: '📱 Brume Phone・LINE 記憶', content: text,
+    uid, key: keys, keysecondary: [], comment: '📱 霧語・LINE 記憶', content: text,
     constant: false, vectorized: false, selective: true, selectiveLogic: 0, addMemo: true,
     order: 100, position: 1, disable: false, ignoreBudget: false, excludeRecursion: false, preventRecursion: false,
     delayUntilRecursion: 0, probability: 100, useProbability: true, depth: 4, group: '', groupOverride: false, groupWeight: 100,
