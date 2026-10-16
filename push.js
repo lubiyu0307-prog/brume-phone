@@ -6,7 +6,7 @@
 import { ctx, phoneOff } from './st.js';
 
 // 霧語推播站的網址（比比的 Railway）。擴充設定裡填了 relay 就用那個（自己架的人用）
-const DEFAULT_RELAY = '';
+const DEFAULT_RELAY = 'https://wuyu-push-production.up.railway.app';
 const relay = () => String(ctx()?.extensionSettings?.['brume-phone']?.relay || DEFAULT_RELAY).replace(/\/+$/, '');
 const BASE = new URL('.', import.meta.url);
 const FLAG = 'brume-phone:push-device'; // 這台裝置按過「開啟通知」
