@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.7';
+const VERSION = '0.19.8';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -208,7 +208,7 @@ function build() {
       <button data-act="photos-reset">清掉小工具照片</button>
       <button data-act="homeicon">放到手機桌面</button>
       <button data-act="appicon">換桌面圖示的照片</button>
-      <p class="bp-sheet-note">桌面多一個「霧語」圖示，點了直接打開上次那個角色的手機，不用先開酒館、選角色。圖示可以換成妳喜歡的照片（換好再按一次「放到手機桌面」；已經放過的要先把舊的刪掉）。</p>
+      <p class="bp-sheet-note">桌面多一個「Brume」圖示，點了直接打開上次那個角色的手機，不用先開酒館、選角色。圖示可以換成妳喜歡的照片（換好再按一次「放到手機桌面」；已經放過的要先把舊的刪掉）。</p>
       <button data-act="cardoff" class="bp-danger">這張卡不用小手機</button>
       <p class="bp-sheet-note">古風、奇幻這類沒有手機的故事用：手機按鈕收起來、劇情不接手機、他也不會主動傳。要再打開，從輸入框左邊的魔杖選單點霧語。</p>
       <button data-act="dbg">複製除錯紀錄（給格看）</button>

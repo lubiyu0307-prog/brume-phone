@@ -18,7 +18,7 @@
     document.querySelector('link[rel="apple-touch-icon"]').href = d180;
     document.querySelector('main img').src = d180;
     var manifest = {
-      name: '霧語', short_name: '霧語', start_url: location.origin + '/?bp-app=1', scope: location.origin + '/',
+      name: 'Brume', short_name: 'Brume', start_url: location.origin + '/?bp-app=1', scope: location.origin + '/',
       display: 'standalone', background_color: '#68747f', theme_color: '#000000',
       icons: [{ src: d192, sizes: '192x192', type: 'image/png' }, { src: d512, sizes: '512x512', type: 'image/png' }],
     };

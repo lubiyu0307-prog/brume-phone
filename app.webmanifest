@@ -1,6 +1,6 @@
 {
-  "name": "霧語",
-  "short_name": "霧語",
+  "name": "Brume",
+  "short_name": "Brume",
   "description": "霧語 Brume Phone：從桌面直接打開他的手機",
   "start_url": "/?bp-app=1",
   "scope": "/",
