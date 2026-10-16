@@ -1257,3 +1257,4 @@
 
 .bp-line-stkh { margin: 14px 2px 8px; font-size: 13px; font-weight: 600; color: #666; }
 .bp-line-stkitem em { position: absolute; top: 3px; left: 6px; font-style: normal; font-size: 12px; color: #999; cursor: pointer; }
+.bp-sheet button.bp-danger { color: #c4553f; }

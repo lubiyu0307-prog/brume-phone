@@ -463,3 +463,20 @@ export async function saveToPhone(urls, say) {
   }
   say?.(files.length > 1 ? `下載了 ${files.length} 張` : '下載了');
 }
+
+/**
+ * 這張卡用不用小手機（古風、奇幻這類沒有手機的世界）：關掉的卡不顯示手機按鈕、劇情不接手機、他不會主動傳。
+ * 存在酒館的擴充設定裡，手機和電腦同一份（10/16 比比：小手機不適用每個角色）
+ */
+export const phoneOff = {
+  list() { const s = ctx()?.extensionSettings?.['brume-phone']; return Array.isArray(s?.offCards) ? s.offCards : []; },
+  is(charKey) { return !!charKey && phoneOff.list().includes(charKey); },
+  set(charKey, off) {
+    const c = ctx(); if (!c?.extensionSettings || !charKey) return;
+    const s = (c.extensionSettings['brume-phone'] ||= {});
+    const list = new Set(Array.isArray(s.offCards) ? s.offCards : []);
+    if (off) list.add(charKey); else list.delete(charKey);
+    s.offCards = [...list];
+    c.saveSettingsDebounced?.();
+  },
+};

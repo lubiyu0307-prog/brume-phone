@@ -11,13 +11,13 @@ import { createGames } from './games.js';
 import { createCall } from './call.js';
 import { createLife, settings as lifeSet, LEVELS } from './life.js';
 import * as stage from './stage.js';
-import { currentChar, ctx, lite, DATA_PREFIXES, uploadImage, dropImage } from './st.js';
+import { currentChar, ctx, lite, DATA_PREFIXES, uploadImage, dropImage, phoneOff } from './st.js';
 import * as store from './store.js';
 import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.58';
+const VERSION = '0.18.59';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -199,6 +199,8 @@ function build() {
       <button data-act="wall">換桌布</button>
       <button data-act="wall-reset">用回預設桌布</button>
       <button data-act="photos-reset">清掉小工具照片</button>
+      <button data-act="cardoff" class="bp-danger">這張卡不用小手機</button>
+      <p class="bp-sheet-note">古風、奇幻這類沒有手機的故事用：手機按鈕收起來、劇情不接手機、他也不會主動傳。要再打開，從輸入框左邊的魔杖選單點 Brume Phone。</p>
       <button data-act="dbg">複製除錯紀錄（給格看）</button>
       <button class="bp-cancel" data-act="close">完成</button>
       <div class="bp-ver">Brume Phone v${VERSION}</div>
@@ -396,6 +398,11 @@ function build() {
       if (a === 'wall-reset') { const old = desk.wall; desk = { ...desk, wall: '' }; saveDesk(); dropOld(old); applyWall(); say('用回預設桌布了'); }
       if (a === 'photos-reset') { const old = Object.values(desk.photos); desk = { ...desk, photos: {} }; saveDesk(); old.forEach(dropOld); rebuild(); say('照片清掉了'); }
       if (a === 'close') sheet.classList.remove('bp-show');
+      if (a === 'cardoff') {
+        const ch = currentChar(); if (!ch) return;
+        if (!confirm(`${ch.name} 這張卡不用小手機？\n手機按鈕會收起來，資料都還在。`)) return;
+        phoneOff.set(ch.charKey, true); sheet.classList.remove('bp-show'); close('cardoff'); life.refreshPrompt(); syncOff();
+      }
       if (a === 'dbg') {
         let txt = ''; try { txt = localStorage.getItem(DBG_KEY) || '[]'; } catch { /* 讀不到 */ }
         txt = `Brume Phone v${VERSION} ${navigator.userAgent}\n${txt}`;
@@ -624,6 +631,7 @@ function build() {
   const api = {
     open() { store.refresh(); loadDesk(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); tint(true); fit(); dbg('open'); },
     close,
+    refreshPrompt: () => life.refreshPrompt(),
   };
   return api;
   function close(why = 'api') { dbg('close', why); overlay.classList.remove('bp-open'); tint(false); refreshNotices(); }
@@ -668,6 +676,13 @@ function shrink(fileObj, max) {
 // 小手機按鈕。位置記成「離畫面右邊、下面各多遠」，再用實際量到的位置換算成 left/top：
 // 酒館在 <html> 上加了 transform，fixed 會改對 <html> 定位，手機版 <html> 幾乎沒有高度，
 // 只寫 bottom 會把按鈕推到螢幕外面（iPhone 上看不到按鈕就是這樣）
+// 這張卡關掉小手機時：按鈕收起來，魔杖選單那一項改成「打開」
+function syncOff() {
+  const ch = currentChar(); const off = !!ch && phoneOff.is(ch.charKey);
+  const btn = document.getElementById('bp-launcher'); if (btn) btn.style.display = off ? 'none' : '';
+  const w = document.querySelector('#bp-wand span'); if (w) w.textContent = off ? 'Brume Phone（這張卡關著，點了打開）' : 'Brume Phone';
+}
+
 function launcher(phone) {
   const btn = $(`<div id="bp-launcher" title="Brume Phone">${ICON.phone}</div>`);
   document.documentElement.appendChild(btn);
@@ -720,7 +735,15 @@ function wandEntry(phone) {
   if (document.getElementById('bp-wand')) return true;
   const item = $(`<div id="bp-wand" class="list-group-item flex-container flexGap5 interactable" tabindex="0">
     <div class="fa-solid fa-mobile-screen extensionsMenuExtensionButton"></div><span>Brume Phone</span></div>`);
-  item.addEventListener('click', () => { menu.style.display = 'none'; phone.open(); });
+  item.addEventListener('click', () => {
+    menu.style.display = 'none';
+    const ch = currentChar();
+    if (ch && phoneOff.is(ch.charKey)) {
+      if (!confirm(`${ch.name} 這張卡要打開小手機嗎？`)) return;
+      phoneOff.set(ch.charKey, false); syncOff(); phone.refreshPrompt?.();
+    }
+    phone.open();
+  });
   menu.appendChild(item);
   return true;
 }
@@ -731,6 +754,8 @@ function wandEntry(phone) {
   launcher(phone);
   if (!wandEntry(phone)) {
     let n = 0;
-    const t = setInterval(() => { if (wandEntry(phone) || ++n > 40) clearInterval(t); }, 500);
+    const t = setInterval(() => { if (wandEntry(phone) || ++n > 40) { clearInterval(t); syncOff(); } }, 500);
   }
+  syncOff();
+  const c = ctx(); c?.eventSource?.on?.(c.eventTypes?.CHAT_CHANGED || c.event_types?.CHAT_CHANGED || 'chat_id_changed', () => { syncOff(); const ch = currentChar(); if (ch && phoneOff.is(ch.charKey)) phone.close?.('cardoff'); });
 })();

@@ -5,7 +5,7 @@
 // 二、他先傳：她離開一陣子再回來，補上這段時間他傳的；酒館開著但一陣子沒說話，他會自己找她。
 // 三、手機響：網頁上方滑下一條通知，小手機按鈕跟 App 有紅點。
 
-import { ctx, currentChar } from './st.js';
+import { ctx, currentChar, phoneOff } from './st.js';
 import * as stage from './stage.js';
 import * as store from './store.js';
 import * as data from './data.js';
@@ -36,7 +36,7 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
   async function bridgePrompt() {
     const c = ctx(); const ch = currentChar();
     if (!c?.setExtensionPrompt) return;
-    if (!ch || !settings.get().bridge) { c.setExtensionPrompt('brume-phone-bridge', '', 1, 0); return; }
+    if (!ch || !settings.get().bridge || phoneOff.is(ch.charKey)) { c.setExtensionPrompt('brume-phone-bridge', '', 1, 0); return; }
     const cur = await stage.get(ch.key);
     const notesOn = stage.unlocked(cur, 'notes');
     const [ns, cs] = await Promise.all([notesOn ? data.notes.all(ch.key) : [], data.cal.all(ch.key)]);
@@ -199,7 +199,7 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
   async function maybeFirst(reason) {
     if (running) return;
     const ch = currentChar();
-    if (!ch) return;
+    if (!ch || phoneOff.is(ch.charKey)) return;
     const cur = await stage.get(ch.key);
     if (!stage.unlocked(cur, 'proactive')) return;
     const L = LEVELS[settings.get().level] || LEVELS.high;
