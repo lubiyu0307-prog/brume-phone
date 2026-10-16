@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.4';
+const VERSION = '0.19.5';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -315,6 +315,9 @@ function build() {
   tick(); setInterval(tick, 10000);
 
   let toastTimer;
+  // 別的地方要提醒玩家的事（例如 GPT 沒看到證件照）：跳一次提示，同一句十分鐘內不重複
+  const hinted = new Map();
+  window.addEventListener('bp-hint', (e) => { const t = String(e.detail || ''); if (!t || Date.now() - (hinted.get(t) || 0) < 600e3) return; hinted.set(t, Date.now()); setTimeout(() => say(t), 1200); });
   const say = (msg) => {
     toast.textContent = msg; toast.classList.add('bp-show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('bp-show'), 1600);

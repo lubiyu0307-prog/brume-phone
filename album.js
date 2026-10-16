@@ -2,7 +2,7 @@
 // 「證件照」分頁放他、妳、配角的參考照片和長相，每張快照都帶著，同一個人才不會每張長得不一樣。
 
 import * as store from './store.js';
-import { currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref, imageResPref, saveToPhone, openaiKey } from './st.js';
+import { ctx, currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref, imageResPref, saveToPhone, openaiKey } from './st.js';
 import { imagineAndPick } from './pick.js';
 import { P, promptLang } from './prompts.js';
 import { promptEditor } from './promptedit.js';
@@ -126,7 +126,8 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     };
     screen.innerHTML = `<div class="bp-al">${head('相本', 'home')}${tabBar()}
       <div class="bp-al-scroll">
-        <p class="bp-al-hint">放每個人的參考照片，快照和 IG 生圖時會拿給 Gemini 看，同一個人才會每張都長一樣。配角的照片也是他在 IG 的大頭貼。</p>
+        <p class="bp-al-hint">放每個人的參考照片，快照和 IG 生圖時會拿給畫圖的模型看，同一個人才會每張都長一樣。配角的照片也是他在 IG 的大頭貼。</p>
+        ${ctx()?.chatCompletionSettings?.chat_completion_source === 'openai' && !openaiKey.get() ? '<p class="bp-al-hint bp-al-warn">妳的正文用 OpenAI：生圖會用 GPT，但酒館那條只送得了文字、看不到這些照片。<u data-al="okeyjump">往下貼一次 OpenAI 金鑰</u>，GPT 才會照證件照畫臉。</p>' : ''}
         <div class="bp-al-ids">${[HIM, ME, ...sideNames(people)].map(card).join('')}<div class="bp-al-id add" data-person=""><span class="bp-al-idnone">＋</span><b>加配角</b><small>名字要跟劇情裡一樣</small></div></div>
         <label>照片風格（每張生圖都會套用，可以不寫）</label>
         <textarea class="bp-al-style" rows="3" placeholder="${people.look.autoStyle ? `沒寫的話照頭像判斷的：${esc(people.look.autoStyle)}` : '沒寫的話，第一次生圖會看角色卡頭像自己判斷寫實或動漫。也可以自己寫：日系動畫風、賽璐璐上色／底片感、暖色調'}">${esc(people.look.style)}</textarea>
@@ -327,6 +328,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (a === 'preset') { people.look.preset = e.target.closest('[data-v]').dataset.v; saveCast(ch.charKey, people); say(people.look.preset === 'candid' ? '之後拍成生活感' : '之後拍成精修'); renderIds(); return; }
     if (a === 'lang') { promptLang.set(e.target.closest('[data-v]').dataset.v); say(promptLang.get() === 'en' ? '生圖指令改用英文' : '生圖指令改用中文'); renderIds(); return; }
     if (a === 'imgcount') { imageCountPref.set(e.target.closest('[data-v]').dataset.v); say(`之後一次生 ${imageCountPref.get()} 張`); renderIds(); return; }
+    if (a === 'okeyjump') { const k = screen.querySelector('.bp-al-okey'); k?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => k?.focus(), 400); return; }
     if (a === 'imgres') { imageResPref.set(e.target.closest('[data-v]').dataset.v); say(`之後用 ${imageResPref.get()} 生圖`); renderIds(); return; }
     if (a === 'imgmodel') { imageModelPref.set(e.target.closest('[data-v]').dataset.v); say(imageModelPref.get() === 'pro' ? '之後用 Pro 生圖' : '之後用 Flash 生圖'); renderIds(); return; }
     if (a === 'idpic') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'idpic'; f.click(); }

@@ -1259,3 +1259,4 @@
 .bp-line-stkitem em { position: absolute; top: 3px; left: 6px; font-style: normal; font-size: 12px; color: #999; cursor: pointer; }
 .bp-sheet button.bp-danger { color: #c4553f; }
 .bp-sheet [hidden] { display: none !important; }
+.bp-al-hint.bp-al-warn { color: #b0563f; }
