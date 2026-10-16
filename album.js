@@ -2,7 +2,7 @@
 // 「證件照」分頁放他、妳、配角的參考照片和長相，每張快照都帶著，同一個人才不會每張長得不一樣。
 
 import * as store from './store.js';
-import { currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref, imageResPref, saveToPhone } from './st.js';
+import { currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref, imageResPref, saveToPhone, openaiKey } from './st.js';
 import { imagineAndPick } from './pick.js';
 import { P, promptLang } from './prompts.js';
 import { promptEditor } from './promptedit.js';
@@ -148,6 +148,9 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <p class="bp-al-hint">生好排成格子讓妳挑最像的那張，沒選的會自動刪掉。張數越多越好挑，費用也是幾倍。</p>
         <label>AI Studio 金鑰（酒館那邊叫不到 Gemini 生圖時，手機直接用這把；跟電話的聲音共用）</label>
         <input class="bp-al-gkey" type="password" autocomplete="off" placeholder="${(() => { try { return localStorage.getItem('brume-phone:gemini-key') ? '已經貼好了（重貼會換掉）' : '貼上 AI Studio 金鑰'; } catch { return '貼上 AI Studio 金鑰'; } })()}">
+        <label>OpenAI 金鑰（用 GPT 生圖，可以不貼）</label>
+        <input class="bp-al-okey" type="password" autocomplete="off" placeholder="${openaiKey.get() ? '已經貼好了（重貼會換掉，清空存檔就拿掉）' : '貼上 OpenAI 金鑰（sk- 開頭）'}">
+        <p class="bp-al-hint">正文用 OpenAI 玩的，沒貼也會借酒館的 OpenAI 金鑰用 GPT 生圖，但那條只送得了文字、看不到證件照，臉會每張不一樣；貼了這把才會帶證件照一起生。GPT 扣的是 OpenAI 的錢，不是 Vertex 抵免額；它比較嚴，親密的畫面常常不給畫。金鑰只存在這台。</p>
       </div></div>`;
   }
 
@@ -215,7 +218,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       if (p.prompt) await ensureAutoStyle(people, who.charKey);
       // 快照用橫的 4:3，像真的相機拍的（跟 GPT 對照時比正方形自然）
       p.img = p.prompt ? await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' }) : '';
-      note = drawnNote(p.img) || (p.img ? '' : '沒有出圖：要聊天接 Google，或在證件照頁貼 AI Studio 金鑰。也可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。');
+      note = drawnNote(p.img) || (p.img ? '' : '沒有出圖：正文要接 Google 或 OpenAI，或在證件照頁貼 AI Studio／OpenAI 金鑰。也可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。');
       if (who.key === ch?.key) { items.push(p); save(); }
       picked = new Set(); openId = p.id; view = 'one';
     } catch (e) { say(`拍照失敗：${e.message || e}`); }
@@ -364,6 +367,10 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       try { localStorage.setItem('brume-phone:gemini-key', v); } catch { /* 存不了 */ }
       e.target.value = ''; e.target.placeholder = '已經貼好了（重貼會換掉）'; say('金鑰存好了，只存在這台'); return;
     }
+    if (mine() && e.target.classList.contains('bp-al-okey')) {
+      const v = e.target.value.trim(); openaiKey.set(v);
+      e.target.value = ''; e.target.placeholder = v ? '已經貼好了（重貼會換掉，清空存檔就拿掉）' : '貼上 OpenAI 金鑰（sk- 開頭）'; say(v ? 'OpenAI 金鑰存好了，只存在這台' : 'OpenAI 金鑰拿掉了'); return;
+    }
     if (mine() && e.target.classList.contains('bp-al-style')) { people.look.style = e.target.value.trim(); saveCast(ch.charKey, people); say('照片風格存好了'); return; }
     if (mine() && e.target.classList.contains('bp-al-cap')) {
       const p = items.find((x) => x.id === openId);
@@ -396,7 +403,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     await ensureAutoStyle(people, ch.charKey);
     const url = await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' });
     if (url) { p.img = url; save(); }
-    note = drawnNote(url) || (url ? '' : '沒有出圖：要聊天接 Google，或在證件照頁貼 AI Studio 金鑰。');
+    note = drawnNote(url) || (url ? '' : '沒有出圖：正文要接 Google 或 OpenAI，或在證件照頁貼 AI Studio／OpenAI 金鑰。');
     if (mine()) renderOne();
   }
 

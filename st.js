@@ -141,10 +141,12 @@ export async function generate(prompt, image) {
 }
 
 /**
- * 生一張圖，回傳圖片網址；都失敗回空字串。只用 Gemini（10/14 比比定的：不要別家的生圖）：
- *   一、聊天接 Google（Vertex／AI Studio）→ 借酒館的連線叫 Gemini
- *   二、酒館那條叫不到 → 用玩家貼在手機裡的 AI Studio 金鑰直接問 Google
- * 酒館擴充的 /imagine（Imagen、GPT、Pollinations⋯）不用：看不到證件照，畫出來是另一張臉
+ * 生一張圖，回傳圖片網址；都失敗回空字串。
+ *   一、Gemini：借酒館存的 Vertex／AI Studio 設定，叫不到再用玩家貼在手機裡的 AI Studio 金鑰
+ *   二、GPT（gpt-image-1）：用 OpenAI 玩酒館的玩家，文字和圖都走 GPT 就好（10/16 比比）。
+ *       手機裡貼了 OpenAI 金鑰 → 帶證件照一起生（臉才對得上）；沒貼 → 借酒館存的 OpenAI 金鑰，只能看文字
+ *   正文接 OpenAI 的先試 GPT，其他人先試 Gemini
+ * 酒館擴充的 /imagine 不用：看不到證件照，畫出來是另一張臉
  */
 /** 上一張圖是誰畫的、Gemini 為什麼沒畫（相本、IG 顯示給玩家看） */
 export const imageInfo = { by: '', why: '', model: '' };
@@ -152,15 +154,71 @@ export const imageInfo = { by: '', why: '', model: '' };
 /** 手機現在畫得出圖嗎：聊天接 Google，或貼了 AI Studio 金鑰 */
 export function canDraw() {
   const src = ctx()?.chatCompletionSettings?.chat_completion_source;
-  return src === 'vertexai' || src === 'makersuite' || !!geminiKeyGet();
+  return src === 'vertexai' || src === 'makersuite' || src === 'openai' || !!geminiKeyGet() || !!openaiKey.get();
 }
 
 export async function imagine(prompt, { refs = [], aspect = '1:1' } = {}) {
   refs = refs.filter((r) => r?.url);
   imageInfo.by = ''; imageInfo.why = ''; imageInfo.model = '';
+  const gptFirst = ctx()?.chatCompletionSettings?.chat_completion_source === 'openai';
+  if (gptFirst) { const o = await viaOpenAI(prompt, refs, aspect); if (o) { imageInfo.by = 'gpt'; return o; } }
   const g = (await viaGemini(prompt, refs, aspect)) || (await viaKey(prompt, refs, aspect));
-  if (g) imageInfo.by = 'gemini';
-  return g;
+  if (g) { imageInfo.by = 'gemini'; return g; }
+  if (!gptFirst && openaiKey.get()) { const o = await viaOpenAI(prompt, refs, aspect); if (o) { imageInfo.by = 'gpt'; return o; } }
+  return '';
+}
+
+// ---------- GPT 生圖 ----------
+const OAI_KEY = 'brume-phone:openai-key';
+/** 玩家貼在手機裡的 OpenAI 金鑰（只存在這台的瀏覽器） */
+export const openaiKey = {
+  get() { try { return localStorage.getItem(OAI_KEY) || ''; } catch { return ''; } },
+  set(v) { try { if (v) localStorage.setItem(OAI_KEY, v); else localStorage.removeItem(OAI_KEY); } catch { /* 存不了 */ } },
+};
+const oaiSize = (aspect) => (aspect === '9:16' || aspect === '3:4' ? '1024x1536' : aspect === '4:3' || aspect === '16:9' ? '1536x1024' : '1024x1024');
+const oaiWhy = (prev, msg) => { imageInfo.why = (prev ? prev + '；' : '') + msg; };
+
+async function viaOpenAI(prompt, refs = [], aspect = '1:1') {
+  const prev = imageInfo.why;
+  const size = oaiSize(aspect); const quality = imageResPref.get() === '2K' ? 'high' : 'medium';
+  const key = openaiKey.get();
+  try {
+    let b64 = '';
+    if (key) {
+      // 手機裡有金鑰：證件照一起送（edits 吃參考圖），臉才會像
+      const req = await refRequest(prompt, refs);
+      let r;
+      if (req.images.length) {
+        const fd = new FormData();
+        fd.append('model', 'gpt-image-1'); fd.append('prompt', req.text); fd.append('size', size); fd.append('quality', quality); fd.append('moderation', 'low');
+        for (const [i, url] of req.images.entries()) fd.append('image[]', await (await fetch(url)).blob(), `ref${i}.png`);
+        r = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: fd });
+      } else {
+        r = await fetch('https://api.openai.com/v1/images/generations', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-image-1', prompt: req.text, size, quality, moderation: 'low', n: 1 }) });
+      }
+      if (!r.ok) {
+        const t = await r.text().catch(() => '');
+        oaiWhy(prev, /moderation|safety|content_policy/i.test(t) ? 'GPT 把這張擋下來了（它比較嚴，親密的畫面常常不給畫）' : `GPT 回 ${r.status}${r.status === 401 ? '（OpenAI 金鑰不對）' : r.status === 429 ? '（額度用完或太頻繁）' : ''}`);
+        return '';
+      }
+      b64 = (await r.json())?.data?.[0]?.b64_json || '';
+    } else {
+      // 沒貼金鑰：借酒館存的 OpenAI 金鑰。酒館這條只收文字，送不了證件照
+      const c = ctx();
+      if (c?.chatCompletionSettings?.chat_completion_source !== 'openai') return '';
+      const req = await refRequest(prompt, []);
+      const r = await fetch('/api/openai/generate-image', { method: 'POST', headers: c.getRequestHeaders(), body: JSON.stringify({ model: 'gpt-image-1', prompt: req.text, size, quality, moderation: 'low', n: 1 }) });
+      if (!r.ok) {
+        const t = await r.text().catch(() => '');
+        oaiWhy(prev, /moderation|safety|content_policy/i.test(t) ? 'GPT 把這張擋下來了（它比較嚴，親密的畫面常常不給畫）' : `酒館的 OpenAI 回 ${r.status}${r.status === 400 ? '（酒館裡沒有存 OpenAI 金鑰）' : ''}`);
+        return '';
+      }
+      b64 = (await r.json())?.data?.[0]?.b64_json || '';
+    }
+    if (!b64) { oaiWhy(prev, 'GPT 沒有回圖'); return ''; }
+    imageInfo.model = 'gpt-image-1';
+    return await saveImage(b64, 'png');
+  } catch (e) { oaiWhy(prev, `GPT 連不上（${e.message || e}）`); return ''; }
 }
 
 // flash 快（十幾秒），pro 慢一點（二十秒上下）但光影細節比較細。玩家在證件照頁選先用哪個，叫不到才換另一個

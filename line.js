@@ -925,7 +925,7 @@ export function createLine({ screen, say, onUnread, onData }) {
         imagine(`${style}, ${look.him || ch.name}, holding the left half of a heart`, { refs: himRef ? [{ name: ch.name, url: himRef }] : [] }),
         imagine(`${style}, ${look.me || 'a young woman'}, holding the right half of a heart`, { refs: meRef ? [{ name: ch.user, url: meRef }] : [] }),
       ]);
-      if (!his || !mine) { say('生圖沒成功：要聊天接 Google，或在相本證件照頁貼 AI Studio 金鑰'); return; }
+      if (!his || !mine) { say('生圖沒成功：正文要接 Google 或 OpenAI，或在相本證件照頁貼 AI Studio／OpenAI 金鑰'); return; }
       coupleDraft = { his, mine }; coupleSheet();
     }
     if (a === 'csave') {
