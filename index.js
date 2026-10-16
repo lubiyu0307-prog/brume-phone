@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.5';
+const VERSION = '0.19.6';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -206,6 +206,8 @@ function build() {
       <button data-act="wall">換桌布</button>
       <button data-act="wall-reset">用回預設桌布</button>
       <button data-act="photos-reset">清掉小工具照片</button>
+      <button data-act="homeicon">放到手機桌面</button>
+      <p class="bp-sheet-note">桌面多一個「霧語」圖示，點了直接打開上次那個角色的手機，不用先開酒館、選角色。</p>
       <button data-act="cardoff" class="bp-danger">這張卡不用小手機</button>
       <p class="bp-sheet-note">古風、奇幻這類沒有手機的故事用：手機按鈕收起來、劇情不接手機、他也不會主動傳。要再打開，從輸入框左邊的魔杖選單點霧語。</p>
       <button data-act="dbg">複製除錯紀錄（給格看）</button>
@@ -438,6 +440,13 @@ function build() {
       const a = act.dataset.act;
       if (a === 'push') { togglePush(); return; } // 放最前面：要在點擊當下直接請求通知權限，前面不能有 await
       if (a === 'pmode') { push.pushSet.set({ mode: act.dataset.v }); const c = currentChar(); if (c) push.queue.cancel(c.key); showPush(); say(act.dataset.v === 'real' ? '之後照現實時間寫' : '之後照劇情時間寫'); return; } // 已經排好的照舊寫法，作廢重排
+      if (a === 'homeicon') {
+        const u = new URL('app.html', import.meta.url).href;
+        try { await navigator.clipboard.writeText(u); } catch { /* 複製不了就算了 */ }
+        window.open(u, '_blank');
+        say('照新頁面上的步驟加到桌面；沒跳出來的話，網址已經複製好了，貼到 Safari 或 Chrome 打開');
+        return;
+      }
       if (a === 'pmax') { push.pushSet.set({ max: +act.dataset.v }); showPush(); return; }
       if (a === 'pquiet') { const [f, t] = act.dataset.v.split('-').map(Number); push.pushSet.set({ quietFrom: f, quietTo: t }); showPush(); return; }
       if (a === 'wall') { pickTarget = 'wall'; file.click(); }
@@ -677,7 +686,7 @@ function build() {
   });
 
   const api = {
-    open() { store.refresh(); loadDesk(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); tint(true); fit(); dbg('open'); },
+    open() { rememberChar(); store.refresh(); loadDesk(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); tint(true); fit(); dbg('open'); },
     close,
     refreshPrompt: () => life.refreshPrompt(),
   };
@@ -724,6 +733,34 @@ function shrink(fileObj, max) {
 // 小手機按鈕。位置記成「離畫面右邊、下面各多遠」，再用實際量到的位置換算成 left/top：
 // 酒館在 <html> 上加了 transform，fixed 會改對 <html> 定位，手機版 <html> 幾乎沒有高度，
 // 只寫 bottom 會把按鈕推到螢幕外面（iPhone 上看不到按鈕就是這樣）
+// 記住上次開手機的是哪個角色（桌面的「霧語」圖示打開時直接回到他）
+function rememberChar() {
+  const c = ctx(); const ch = currentChar(); if (!c?.extensionSettings || !ch) return;
+  const root = (c.extensionSettings['brume-phone'] ||= {});
+  if (root.lastChar !== ch.charKey) { root.lastChar = ch.charKey; c.saveSettingsDebounced?.(); }
+}
+
+// 從桌面的「霧語」圖示打開（網址帶 bp-app）：等酒館載好、選上次那個角色，再打開手機
+function launchFromIcon(phone) {
+  let u; try { u = new URL(location.href); } catch { return; }
+  if (!u.searchParams.has('bp-app')) return;
+  u.searchParams.delete('bp-app'); history.replaceState(null, '', u.href);
+  const c = ctx(); if (!c?.eventSource) return;
+  const go = async () => {
+    const want = c.extensionSettings?.['brume-phone']?.lastChar;
+    const i = want ? (c.characters || []).findIndex((x) => (x.avatar || x.name) === want) : -1;
+    if (i >= 0 && String(c.characterId) !== String(i)) {
+      await new Promise((res) => { c.eventSource.once?.(c.eventTypes?.CHAT_CHANGED || 'chat_id_changed', res); setTimeout(res, 8000); c.selectCharacterById?.(String(i)); });
+    }
+    setTimeout(() => phone.open(), 300);
+  };
+  // 酒館載好會發 APP_READY；有些版本或擴充會讓它晚到，所以也每秒看一次角色清單載好了沒，先到的那個做
+  let done = false;
+  const once = () => { if (done) return; done = true; clearInterval(t); setTimeout(go, 500); };
+  c.eventSource.on(c.eventTypes?.APP_READY || 'app_ready', once);
+  let n = 0; const t = setInterval(() => { const cc = ctx(); if ((cc?.characters?.length && cc.extensionSettings?.['brume-phone']) || ++n > 30) once(); }, 1000);
+}
+
 // 這張卡關掉小手機時：按鈕收起來，魔杖選單那一項改成「打開」
 function syncOff() {
   const ch = currentChar(); const off = !!ch && phoneOff.is(ch.charKey);
@@ -800,6 +837,7 @@ function wandEntry(phone) {
   if (document.getElementById('bp-launcher')) return;
   const phone = build();
   launcher(phone);
+  launchFromIcon(phone);
   if (!wandEntry(phone)) {
     let n = 0;
     const t = setInterval(() => { if (wandEntry(phone) || ++n > 40) { clearInterval(t); syncOff(); } }, 500);

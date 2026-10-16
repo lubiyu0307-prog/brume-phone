@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>霧語</title>
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="霧語">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#000000">
+<style>
+  :root { color-scheme: light dark; }
+  body { margin: 0; min-height: 100vh; font: 16px/1.7 -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; background: linear-gradient(180deg, #68747f, #cec5b8); color: #fff; display: flex; align-items: center; justify-content: center; }
+  main { max-width: 360px; padding: 28px 22px; text-align: center; }
+  img { width: 96px; height: 96px; border-radius: 22px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  h1 { font-size: 22px; margin: 14px 0 6px; }
+  ol { text-align: left; padding-left: 1.3em; background: rgba(0,0,0,.18); border-radius: 14px; padding: 14px 14px 14px 34px; }
+  li + li { margin-top: 6px; }
+  a { color: #fff; }
+  .hide { display: none; }
+</style>
+</head>
+<body>
+<main>
+  <img src="icon-180.png" alt="">
+  <h1>把霧語放到手機桌面</h1>
+  <p>放好之後，點桌面上的「霧語」就會直接打開他的手機，不用先開酒館、選角色。</p>
+  <ol id="ios" class="hide">
+    <li>按 Safari 下面的<b>分享</b>按鈕（方框加箭頭）</li>
+    <li>往下滑，按<b>「加入主畫面」</b></li>
+    <li>名字會是「霧語」，按<b>新增</b></li>
+  </ol>
+  <ol id="android" class="hide">
+    <li>按 Chrome 右上角的<b>⋮</b></li>
+    <li>按<b>「加到主畫面」</b>或<b>「安裝應用程式」</b></li>
+    <li>名字會是「霧語」，按<b>新增</b></li>
+  </ol>
+  <p id="other" class="hide">用手機的瀏覽器打開這一頁，照上面的步驟加到桌面。</p>
+  <p style="font-size:13px;opacity:.85">第一次從桌面打開，酒館有密碼的話要再登入一次；想收通知也要在霧語設定裡再按一次「開啟通知」。</p>
+  <p><a href="/">回酒館</a></p>
+</main>
+<script src="app-launch.js"></script>
+</body>
+</html>
