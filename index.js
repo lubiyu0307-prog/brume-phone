@@ -10,6 +10,7 @@ import { createIG } from './ig.js';
 import { createGames } from './games.js';
 import { createCall } from './call.js';
 import { createLife, settings as lifeSet, LEVELS } from './life.js';
+import * as push from './push.js';
 import * as stage from './stage.js';
 import { currentChar, ctx, lite, DATA_PREFIXES, uploadImage, dropImage, phoneOff } from './st.js';
 import * as store from './store.js';
@@ -17,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.18.60';
+const VERSION = '0.19.0';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -190,6 +191,10 @@ function build() {
       <div class="bp-setrow"><span>他主動的程度</span><div class="bp-seg" data-seg="level">${Object.entries(LEVELS).map(([k, v]) => `<b data-act="level" data-v="${k}">${v.name}</b>`).join('')}</div></div>
       <button data-act="bridge" class="bp-switchrow">劇情接手機<i></i></button>
       <p class="bp-sheet-note">開著：正文裡你們分開、約好下次的時候，他之後會自己傳 LINE 或發脆，過幾分鐘手機才響。</p>
+      <button data-act="push" class="bp-pushbtn">開啟通知</button>
+      <p class="bp-sheet-note bp-pushnote">酒館關著、手機鎖著，他傳 LINE 也會跳通知。</p>
+      <div class="bp-setrow bp-pushrow"><span>他一天最多傳</span><div class="bp-seg" data-seg="pmax">${[1, 2, 3, 5].map((n) => `<b data-act="pmax" data-v="${n}">${n} 次</b>`).join('')}</div></div>
+      <div class="bp-setrow bp-pushrow"><span>不吵妳的時段</span><div class="bp-seg" data-seg="pquiet">${[[23, 7], [1, 9], [3, 11]].map(([f, t]) => `<b data-act="pquiet" data-v="${f}-${t}">${f}–${t} 點</b>`).join('')}</div></div>
       <div class="bp-setrow"><span>護眼模式</span><div class="bp-seg" data-seg="eye">${[['off', '關'], ['on', '開'], ['auto', '晚上自動']].map(([k, n]) => `<b data-act="eye" data-v="${k}">${n}</b>`).join('')}</div></div>
       <p class="bp-sheet-note">畫面暗一點、偏暖色，白底不刺眼。晚上自動：晚上七點到早上七點自動打開。</p>
       <button data-act="lite" class="bp-switchrow">省 token 模式<i></i></button>
@@ -347,6 +352,37 @@ function build() {
     sheet.querySelector('[data-act="bridge"] i').classList.toggle('on', lifeSet.get().bridge);
     sheet.querySelector('.bp-migbtn').hidden = !(await hasOldData());
     sheet.querySelectorAll('[data-act="eye"]').forEach((b) => b.classList.toggle('on', b.dataset.v === (state.eye || 'off')));
+    showPush();
+  }
+
+  // 通知：設定頁一打開就先檢查好（iPhone 只在按下去那一刻讓網頁跳出允許通知的視窗，等檢查就來不及）
+  let pushPre = null;
+  async function showPush() {
+    const btn = sheet.querySelector('[data-act="push"]'); const note = sheet.querySelector('.bp-pushnote');
+    const ps = push.pushSet.get();
+    sheet.querySelectorAll('[data-act="pmax"]').forEach((b) => b.classList.toggle('on', +b.dataset.v === ps.max));
+    sheet.querySelectorAll('[data-act="pquiet"]').forEach((b) => b.classList.toggle('on', b.dataset.v === `${ps.quietFrom}-${ps.quietTo}`));
+    const on = push.deviceOn();
+    btn.textContent = on ? '關掉這台的通知' : '開啟通知';
+    sheet.querySelectorAll('.bp-pushrow').forEach((r) => { r.hidden = !ps.on; });
+    if (on) { note.textContent = '這台會收到通知。他會挑妳沒在玩的時候傳，一天不超過下面的次數，不吵妳的時段不傳。'; pushPre = null; return; }
+    note.textContent = '檢查中⋯';
+    pushPre = await push.precheck();
+    note.textContent = pushPre.ready ? '酒館關著、手機鎖著，他傳 LINE 也會跳通知。按上面的按鈕，跳出來的視窗選「允許」。' : pushPre.why;
+  }
+  async function togglePush() {
+    if (push.deviceOn()) { await push.disable(); say('這台的通知關掉了'); showPush(); return; }
+    if (!pushPre?.ready) { say(pushPre?.why ? '還差一步，看按鈕下面的說明' : '還在檢查，等一下再按'); return; }
+    const note = sheet.querySelector('.bp-pushnote');
+    try {
+      const r = await push.enable(pushPre.status);
+      if (!r.ok) { note.textContent = r.why; return; }
+      const p = push.platform();
+      say(r.tested ? '通知打開了，應該馬上會收到一則測試' : '通知打開了');
+      await showPush();
+      if (p.android) note.textContent += ' 安卓提醒：小米、OPPO、華為這些手機很會關掉背景，到「設定 → 電池」把 Chrome 設成「不受限制」，通知才不會晚到。';
+      if (p.desktop) note.textContent += ' 電腦要瀏覽器開著才收得到。';
+    } catch (err) { note.textContent = `沒有開成功：${err.message || err}。重新整理後再試一次，還是不行就複製除錯紀錄給格。`; dbg('push-fail', String(err?.message || err)); }
   }
 
   // 點圓點跳頁
@@ -394,6 +430,9 @@ function build() {
     const act = e.target.closest('[data-act]');
     if (act) {
       const a = act.dataset.act;
+      if (a === 'push') { togglePush(); return; } // 放最前面：要在點擊當下直接請求通知權限，前面不能有 await
+      if (a === 'pmax') { push.pushSet.set({ max: +act.dataset.v }); showPush(); return; }
+      if (a === 'pquiet') { const [f, t] = act.dataset.v.split('-').map(Number); push.pushSet.set({ quietFrom: f, quietTo: t }); showPush(); return; }
       if (a === 'wall') { pickTarget = 'wall'; file.click(); }
       if (a === 'wall-reset') { const old = desk.wall; desk = { ...desk, wall: '' }; saveDesk(); dropOld(old); applyWall(); say('用回預設桌布了'); }
       if (a === 'photos-reset') { const old = Object.values(desk.photos); desk = { ...desk, photos: {} }; saveDesk(); old.forEach(dropOld); rebuild(); say('照片清掉了'); }
@@ -502,6 +541,7 @@ function build() {
   const snap = { open: () => album.open('snap') };
   const his = createHisPhone({ host: overlay.querySelector('.bp-his'), say, onExit: () => say('還給他了，他沒發現') });
   const openLineRoom = () => { openApp(line); line.openRoom(); };
+  push.onOpenRequest(() => { api.open(); life.pullBg?.().finally?.(() => openLineRoom()); });
 
   // ---------- 手機響：紅點、鎖定畫面通知、網頁上方的橫幅 ----------
   const banner = $(`<div id="bp-banner"><i>${ICON.line}</i><div><b></b><span></span></div></div>`);

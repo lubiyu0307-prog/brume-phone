@@ -1,0 +1,6 @@
+{
+  "name": "brume-phone",
+  "private": true,
+  "description": "霧語 Brume Phone：SillyTavern 小手機擴充。放進 plugins/ 時是推播伺服器外掛（server/index.mjs）。",
+  "main": "server/index.mjs"
+}

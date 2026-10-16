@@ -9,6 +9,7 @@ import { ctx, currentChar, phoneOff } from './st.js';
 import * as stage from './stage.js';
 import * as store from './store.js';
 import * as data from './data.js';
+import * as push from './push.js';
 
 const SET_KEY = 'brume-phone:life';
 const DEFAULTS = { bridge: true, level: 'high' };
@@ -200,6 +201,7 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     if (running) return;
     const ch = currentChar();
     if (!ch || phoneOff.is(ch.charKey)) return;
+    if (await push.bgActive(ch)) return; // 開了推播：改成背景排好時間送（planBg），這裡不再當場傳，免得重複
     const cur = await stage.get(ch.key);
     if (!stage.unlocked(cur, 'proactive')) return;
     const L = LEVELS[settings.get().level] || LEVELS.high;
@@ -223,19 +225,68 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     } finally { running = false; }
   }
 
+  // ---------- 三、背景推播：酒館關著也會傳 ----------
+  // 她沒在玩的時候，先把他接下來要傳的一兩則寫好、排好時間交給伺服器；時間到了伺服器推播，下次打開再收進 LINE。
+  // 她一回話或劇情一動，還沒送的就作廢，等她又離開一陣子再重寫（不然每講一句就要重寫一次，太花錢）
+  let planning = false; let lastPlan = 0;
+  async function pullBg() {
+    const ch = currentChar();
+    if (!(await push.bgActive(ch))) return;
+    try {
+      const sent = (await push.queue.get(ch.key)).filter((i) => i.status === 'sent');
+      if (!sent.length) return;
+      await line.deliverBg(sent);
+      await push.queue.ack(ch.key, sent.map((i) => i.id));
+    } catch { /* 伺服器沒回就下次再收 */ }
+  }
+  async function planBg({ leaving = false } = {}) {
+    if (planning || line.busy) return;
+    const ch = currentChar();
+    if (!(await push.bgActive(ch))) return;
+    const L = LEVELS[settings.get().level] || LEVELS.high;
+    const now = Date.now();
+    const last = Math.max(await line.lastActive(), storyActive());
+    if (!leaving && now - last < 3 * 60000) return; // 她還在玩，等她停下來三分鐘（iPhone 切走後常常來不及排，所以不等太久）
+    if (now - lastPlan < 10 * 60000) return;
+    planning = true; lastPlan = now;
+    try {
+      const items = await push.queue.get(ch.key);
+      if (items.some((i) => i.status === 'sent')) { await pullBg(); }
+      if (items.some((i) => i.status === 'pending')) return;
+      const cur = await stage.get(ch.key);
+      if (!stage.unlocked(cur, 'proactive')) return;
+      const counts = await line.bgCounts();
+      const plan = []; const pending = []; let prev = Math.max(now, last);
+      for (let k = 0; k < 2; k++) {
+        const at = push.nextSlot(prev, L.away, (t) => { const d = new Date(t).toDateString(); return (counts[d] || 0) + plan.filter((p) => new Date(p.at).toDateString() === d).length; });
+        const lines = await line.compose('away', { pending });
+        if (!lines.length) break; // 劇情裡兩人在一起，他不會傳
+        plan.push({ id: uid(), at, title: ch.name, body: lines.map((l) => l.text).join('\n'), lines });
+        pending.push(...lines); prev = at;
+      }
+      if (plan.length && currentChar()?.key === ch.key) await push.queue.put(ch.key, plan);
+    } catch { /* 下次再排 */ } finally { planning = false; }
+  }
+  const cancelBg = async () => { const ch = currentChar(); if (ch && await push.bgActive(ch)) { await push.queue.cancel(ch.key); lastPlan = 0; } };
+  window.addEventListener('bp-line-sent', cancelBg);
+
   // ---------- 啟動 ----------
   const c = ctx();
   const ev = c?.eventTypes || c?.event_types || {};
-  c?.eventSource?.on?.(ev.MESSAGE_RECEIVED || 'message_received', (id) => onReceived(id));
+  c?.eventSource?.on?.(ev.MESSAGE_RECEIVED || 'message_received', (id) => { onReceived(id); cancelBg(); });
   c?.eventSource?.on?.(ev.CHARACTER_MESSAGE_RENDERED || 'character_message_rendered', (id) => onReceived(id)); // 串流時第一個事件可能還拿不到完整內容，再看一次
-  c?.eventSource?.on?.(ev.CHAT_CHANGED || 'chat_id_changed', () => { bridgePrompt(); setTimeout(() => maybeFirst('open'), 3000); });
+  c?.eventSource?.on?.(ev.CHAT_CHANGED || 'chat_id_changed', () => { bridgePrompt(); setTimeout(() => { pullBg(); maybeFirst('open'); }, 3000); });
   bridgePrompt();
-  setInterval(() => { deliverDue(); if (document.visibilityState === 'visible') maybeFirst('tick'); }, 30000);
+  setInterval(() => { deliverDue(); if (document.visibilityState === 'visible') { maybeFirst('tick'); planBg(); } }, 30000);
   setTimeout(() => { deliverDue(); maybeFirst('open'); }, 4000);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { deliverDue(); maybeFirst('open'); } });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') { deliverDue(); pullBg(); maybeFirst('open'); }
+    else planBg({ leaving: true }); // 她要離開了：趁還醒著排好（iPhone 切走後只給幾秒，排不完就等下次）
+  });
 
   return {
-    onPhoneOpen() { deliverDue(); maybeFirst('open'); },
+    onPhoneOpen() { deliverDue(); pullBg(); maybeFirst('open'); },
+    planBg, pullBg,
     refreshPrompt: bridgePrompt,
   };
 }

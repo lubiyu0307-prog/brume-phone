@@ -707,6 +707,7 @@ export function createLine({ screen, say, onUnread, onData }) {
   }
 
   function send(msg) {
+    window.dispatchEvent(new CustomEvent('bp-line-sent', { detail: { key: ch?.key } })); // 她回話了：背景排好、還沒送的那幾則作廢（push.js）
     thread.msgs = thread.msgs.filter((m) => !m.err);
     const m = { id: uid(), me: true, ts: Date.now(), ...(thread.mode === 'now' ? { now: true } : { story: true }), ...msg, ...(quoting ? { quote: quoting } : {}) };
     thread.msgs.push(m);
@@ -1106,10 +1107,28 @@ export function createLine({ screen, say, onUnread, onData }) {
     if (busy) return 0;
     const who = await useCurrent();
     if (!who) return 0;
-    const cur = await stage.get(who.key);
-    if (!stage.unlocked(cur, 'proactive')) return 0;
+    const lines = await compose(kind);
+    if (!lines?.length) return 0;
     const t = thread; const now = Date.now();
-    if (t.mode === 'now') return 0; // 她在現實時間跟他聊，劇情先停著
+    lines.forEach((l, i) => {
+      // 排序用現實時間（一則隔一分鐘），畫面上顯示劇情時間
+      t.msgs.push({ id: uid(), me: false, text: l.text, ts: now - (lines.length - i) * 60000, first: true, story: true, ...(l.st ? { st: l.st } : {}) });
+    });
+    t.msgs.sort((a, b) => a.ts - b.ts); await saveThread(who.key, t); if (showing() && view === 'room') refreshLog(); onUnread?.(unreadCount()); syncMain();
+    return lines.length;
+  }
+
+  /**
+   * 寫出他先傳的幾則，不存：回傳 [{ text, st }]，在一起（[[SKIP]]）或失敗回空陣列。
+   * pending：已經排好、她還沒看到的（背景推播排第二則時帶上，才不會重複、也知道她還沒回）
+   */
+  async function compose(kind, { pending = [] } = {}) {
+    const who = await useCurrent();
+    if (!who) return [];
+    const cur = await stage.get(who.key);
+    if (!stage.unlocked(cur, 'proactive')) return [];
+    const t = thread;
+    if (t.mode === 'now') return []; // 她在現實時間跟他聊，劇情先停著
     const today = data.today();
     const [notes, cal, memory] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key)]);
     const together = `先看正文最近的劇情：如果故事裡此刻 ${who.name} 和 ${who.user} 就在一起（同一個空間、看得到彼此、正在相處），他不會拿手機傳訊息給身邊的人——這時整則只寫 [[SKIP]]，其他什麼都不寫。`;
@@ -1117,27 +1136,55 @@ export function createLine({ screen, say, onUnread, onData }) {
       ? `【這次是他先傳的】${together}\n不在一起的話：從劇情判斷故事裡現在的時間，寫 ${who.name} 在這之後、兩人分開的時候，很自然傳給她的幾則 LINE：想到她、分享自己在做什麼、問她在幹嘛，內容符合劇情裡那個時間點和他正在做的事。\n請寫 1～3 則，每則一行，格式：HH:MM｜訊息（HH:MM 是劇情裡的時刻），照先後排。她都還沒回，所以不要寫成一來一往。`
       : `【這次是他先傳的】${together}\n不在一起的話：${who.name} 想到她，主動傳 LINE 給她。照劇情裡現在的時間和他正在做的事寫 1～2 則，每則一行，格式：HH:MM｜訊息（HH:MM 是劇情裡的時刻）。不要重複之前說過的話。`;
     let raw;
+    const msgs = pending.length ? [...t.msgs, ...pending.map((l, i) => ({ id: `p${i}`, me: false, text: l.text, ts: Date.now() + i, story: true, ...(l.st ? { st: l.st } : {}) }))] : t.msgs;
     try {
-      raw = await generate(buildPrompt(who, t.msgs, {
+      raw = await generate(buildPrompt(who, msgs, {
         mode: 'story', nowSync: !!t.nowSync, stage: cur, proactive: instr, memory,
         notes: stage.unlocked(cur, 'notes') ? notes.filter((n) => !n.done).slice(0, 8) : [],
         cal: cal.filter((e) => e.date >= today).slice(0, 8),
       }));
-    } catch { return 0; }
-    if (/\[\[SKIP\]\]/i.test(raw)) return 0;
-    let added = 0;
+    } catch { return []; }
+    if (/\[\[SKIP\]\]/i.test(raw)) return [];
+    const out = [];
     for (const line of raw.split('\n')) {
       const m = line.trim().match(/^(\d{1,2})[:：](\d{2})\s*[｜|]\s*(.+)$/);
       let text = (m ? m[3] : line).trim();
       text = parseReply(text, who).lines[0];
       if (!text) continue;
-      // 排序用現實時間（一則隔一分鐘），畫面上顯示劇情時間
-      const ts = now - (3 - added) * 60000;
-      t.msgs.push({ id: uid(), me: false, text, ts, first: true, story: true, ...(m ? { st: `${m[1].padStart(2, '0')}:${m[2]}` } : {}) });
-      if (++added >= (kind === 'away' ? 3 : 2)) break;
+      out.push({ text, ...(m ? { st: `${m[1].padStart(2, '0')}:${m[2]}` } : {}) });
+      if (out.length >= (kind === 'away' ? 3 : 2)) break;
     }
-    if (added) { t.msgs.sort((a, b) => a.ts - b.ts); await saveThread(who.key, t); if (showing() && view === 'room') refreshLog(); onUnread?.(unreadCount()); syncMain(); }
-    return added;
+    return out;
+  }
+
+  // 背景推播已經送出的：收進聊天室，時間用排定送出的時間；同一則不收兩次
+  async function deliverBg(items) {
+    const who = await useCurrent();
+    if (!who || !items.length) return 0;
+    const have = new Set(thread.msgs.map((m) => m.id));
+    let n = 0;
+    for (const it of items) {
+      (it.lines || []).forEach((l, i) => {
+        const id = `bg-${it.id}-${i}`;
+        if (have.has(id) || !l.text) return;
+        thread.msgs.push({ id, me: false, text: l.text, ts: it.at + i * 1000, first: true, story: true, bg: true, ...(l.st ? { st: l.st } : {}) });
+        n++;
+      });
+    }
+    if (!n) return 0;
+    thread.msgs.sort((a, b) => a.ts - b.ts);
+    await saveThread(who.key, thread);
+    if (showing() && view === 'room') { thread.seen = Date.now(); refreshLog(); } else onUnread?.(unreadCount());
+    syncMain();
+    return n;
+  }
+  // 背景推播收進來的，每天各幾次（一天上限用）：{ 'Fri Oct 16 2026': 2 }
+  async function bgCounts() {
+    const who = await useCurrent(); if (!who) return {};
+    const seen = new Map();
+    for (const m of thread.msgs) if (m.bg) seen.set(m.id.replace(/-\d+$/, ''), new Date(m.ts).toDateString());
+    const out = {}; for (const d of seen.values()) out[d] = (out[d] || 0) + 1;
+    return out;
   }
 
   // 劇情裡附來的訊息：現在送進聊天室
@@ -1181,7 +1228,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     refresh: render,
     // 從別的 App（相本）傳一則給他：先換到目前這個角色的紀錄，再照一般送出走
     async share(msg) { if (await useCurrent()) send(msg); },
-    himFirst, deliver, unseen, lastActive, unansweredRun,
+    himFirst, compose, deliverBg, bgCounts, deliver, unseen, lastActive, unansweredRun,
     forget() { ch = null; thread = null; }, // 換聊天或資料搬家之後，下次重讀
     get busy() { return !!busy; },
   };
