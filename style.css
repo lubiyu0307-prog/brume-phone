@@ -15,6 +15,10 @@
 
 /* ---------- 外框 ---------- */
 #bp-overlay, #bp-overlay *, #bp-overlay *::before, #bp-overlay *::after { box-sizing: border-box; }
+/* 酒館用 `* { text-shadow: 0 0 var(--shadowWidth) var(--SmartThemeShadowColor) }` 給每個元素上字影，
+   深色主題（黑森林）底下小手機的字會糊一圈（10/16 比比發現）。在手機這層把那兩個變數歸零；
+   手機自己寫死的字影（桌布上的圖示名稱）不受影響 */
+#bp-overlay, #bp-launcher { --shadowWidth: 0; --SmartThemeShadowColor: transparent; }
 #bp-overlay {
   position: fixed; top: 0; left: 0; z-index: 2147483000;
   width: var(--bp-w, 100vw); height: var(--bp-h, 100vh);
