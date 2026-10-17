@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.18';
+const VERSION = '0.19.19';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -794,7 +794,7 @@ function setSplash(patch) {
 // 開機畫面的樣式直接寫在這裡、開的時候才塞進去：style.css 被瀏覽器快取住舊版時，畫面會蓋不出來（10/17 按預覽沒反應）
 const SPLASH_CSS = `/* Brume 開機畫面（從桌面圖示打開時，酒館載入那幾秒蓋在最上面） */
 #bp-splash {
-  position: fixed; inset: 0; z-index: 2147483600; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2147483600; display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: linear-gradient(180deg, #687484 0%, #8d95a0 45%, #cec5b8 100%);
   background-image: var(--bp-splash-bg, none), linear-gradient(180deg, #687484 0%, #8d95a0 45%, #cec5b8 100%);
   background-size: cover; background-position: center;
@@ -802,7 +802,7 @@ const SPLASH_CSS = `/* Brume 開機畫面（從桌面圖示打開時，酒館載
   font-family: Georgia, "Times New Roman", "Noto Serif TC", "Songti TC", serif;
 }
 #bp-splash.on { opacity: 1; }
-#bp-splash.has-bg::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20, 24, 32, .15) 0%, rgba(20, 24, 32, .05) 40%, rgba(20, 24, 32, .55) 100%); }
+#bp-splash.has-bg::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(180deg, rgba(20, 24, 32, .15) 0%, rgba(20, 24, 32, .05) 40%, rgba(20, 24, 32, .55) 100%); }
 #bp-splash .bp-splash-mist {
   position: absolute; left: -30%; right: -30%; bottom: -10%; height: 55%;
   background: radial-gradient(ellipse at 30% 60%, rgba(255, 255, 255, .55), transparent 60%), radial-gradient(ellipse at 75% 75%, rgba(255, 255, 255, .45), transparent 55%);
@@ -831,6 +831,10 @@ function showSplash(why = 'launch') {
   el.className = sp.bg ? 'has-bg' : '';
   const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
   el.innerHTML = `<div class="bp-splash-mist"></div><div class="bp-splash-txt"><b>${esc(sp.title || 'Brume')}</b><span>${esc(sp.line || '霧語')}</span></div><i class="bp-splash-dots"><u></u><u></u><u></u></i>`;
+  // iPhone 的 Brume App 裡 inset:0 量出來高度是 0（10/17 除錯紀錄 rect=0,0,393x0），
+  // 所以跟 #bp-overlay 一樣直接給它看得到的範圍那麼大
+  const vv = window.visualViewport;
+  el.style.width = `${Math.round(vv ? vv.width : innerWidth)}px`; el.style.height = `${Math.round(vv ? vv.height : innerHeight)}px`;
   document.documentElement.appendChild(el);
   requestAnimationFrame(() => el.classList.add('on'));
   // 10/17 比比的 iPhone 按預覽沒畫面：記下蓋上去之後它到底長怎樣（透明度、層級、位置），給格看
