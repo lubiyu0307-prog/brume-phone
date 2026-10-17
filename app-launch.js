@@ -47,11 +47,12 @@
     applyConf(conf);
 
     // 大小跟著看得到的範圍走（iPhone 彈鍵盤時 visualViewport 會變矮，酒館那層要跟著縮，手機才不會被鍵盤蓋住）
+    // 只縮高度、不要搬位置：這一頁本身捲不動，彈鍵盤時 pageTop 會報一個數字但看得到的範圍其實就在最上面，
+    // 照它搬會把整層推到畫面外（10/17 比比打字時整個手機不見，只剩底色）
     function fit() {
       var vv = window.visualViewport;
       var W = Math.round(vv ? vv.width : innerWidth); var H = Math.round(vv ? vv.height : innerHeight);
-      var Y = Math.round(vv ? (vv.pageTop != null ? vv.pageTop - scrollY : vv.offsetTop) : 0);
-      sh.style.width = W + 'px'; sh.style.height = H + 'px'; sh.style.top = Y + 'px';
+      sh.style.width = W + 'px'; sh.style.height = H + 'px'; sh.style.top = '0px'; sh.style.left = '0px';
     }
     fit();
     if (window.visualViewport) { visualViewport.addEventListener('resize', fit); visualViewport.addEventListener('scroll', fit); }
