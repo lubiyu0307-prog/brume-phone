@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.17';
+const VERSION = '0.19.18';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -450,7 +450,7 @@ function build() {
       if (a === 'pmode') { push.pushSet.set({ mode: act.dataset.v }); const c = currentChar(); if (c) push.queue.cancel(c.key); showPush(); say(act.dataset.v === 'real' ? '之後照現實時間寫' : '之後照劇情時間寫'); return; } // 已經排好的照舊寫法，作廢重排
       if (a === 'appicon') { pickTarget = 'appicon'; file.click(); return; }
       if (a === 'splashbg') { pickTarget = 'splashbg'; file.click(); return; }
-      if (a === 'splashprev') { showSplash(); setTimeout(hideSplash, 2600); return; }
+      if (a === 'splashprev') { try { showSplash('preview'); } catch (err) { dbg('splash-err', String(err?.message || err)); } setTimeout(hideSplash, 2600); return; }
       if (a === 'splashreset') { setSplash(null); sheet.querySelectorAll('.bp-splash-in').forEach((i) => { i.value = ''; }); say('開機畫面用回預設了'); return; }
       if (a === 'homeicon') {
         const icon = ctx()?.extensionSettings?.['brume-phone']?.appIcon;
@@ -820,8 +820,10 @@ const SPLASH_CSS = `/* Brume 開機畫面（從桌面圖示打開時，酒館載
 @keyframes bp-sdot { 0%, 100% { opacity: .25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
 #bp-splash:not(.has-bg) .bp-splash-dots u { background: rgba(70, 78, 92, .55); }
 `;
-function showSplash() {
-  if (document.getElementById('bp-splash')) return;
+function showSplash(why = 'launch') {
+  // 上一張還掛著（例如預覽按太快、或開機那張沒收乾淨）就先拆掉重蓋，不要默默不動
+  document.getElementById('bp-splash')?.remove();
+  dbg('splash-show', why);
   if (!document.getElementById('bp-splash-css')) { const st = document.createElement('style'); st.id = 'bp-splash-css'; st.textContent = SPLASH_CSS; document.head.appendChild(st); }
   const sp = splashConf();
   const el = document.createElement('div'); el.id = 'bp-splash';
@@ -831,6 +833,8 @@ function showSplash() {
   el.innerHTML = `<div class="bp-splash-mist"></div><div class="bp-splash-txt"><b>${esc(sp.title || 'Brume')}</b><span>${esc(sp.line || '霧語')}</span></div><i class="bp-splash-dots"><u></u><u></u><u></u></i>`;
   document.documentElement.appendChild(el);
   requestAnimationFrame(() => el.classList.add('on'));
+  // 10/17 比比的 iPhone 按預覽沒畫面：記下蓋上去之後它到底長怎樣（透明度、層級、位置），給格看
+  setTimeout(() => { try { const cs = getComputedStyle(el); const b = el.getBoundingClientRect(); dbg('splash-vis', `${el.isConnected ? 'in' : 'gone'} op=${cs.opacity} z=${cs.zIndex} pos=${cs.position} disp=${cs.display} rect=${Math.round(b.top)},${Math.round(b.left)},${Math.round(b.width)}x${Math.round(b.height)} top=${(() => { const t = document.elementFromPoint(innerWidth / 2, innerHeight / 2); return t ? t.tagName + '.' + String(t.className || t.id || '').slice(0, 20) : null; })()}`); } catch (err) { dbg('splash-vis-err', String(err?.message || err)); } }, 400);
 }
 function hideSplash() {
   const el = document.getElementById('bp-splash'); if (!el) return;
