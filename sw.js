@@ -7,6 +7,8 @@ self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 self.addEventListener('push', (e) => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { body: e.data ? e.data.text() : '' }; }
+  // 桌面圖示右上角的紅色數字（iPhone 16.4 以上的主畫面 App、安卓 Chrome 都吃）
+  if (d.badge && self.navigator.setAppBadge) self.navigator.setAppBadge(d.badge).catch(() => {});
   e.waitUntil(self.registration.showNotification(d.title || '霧語', {
     body: d.body || '',
     tag: d.tag || 'bp',

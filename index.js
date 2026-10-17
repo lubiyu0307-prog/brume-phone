@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.15';
+const VERSION = '0.19.16';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -684,7 +684,10 @@ function build() {
       w.querySelector('[data-mw="toggle"]').innerHTML = p.playing ? ICON.pause : ICON.play;
     });
   });
+  // LINE 的未讀也同步到桌面圖示的紅色數字；看完就清掉
+  const appBadge = (n) => { try { if (n) navigator.setAppBadge?.(n).catch(() => {}); else navigator.clearAppBadge?.().catch(() => {}); } catch { /* 不支援就算了 */ } };
   function setBadge(app, n) {
+    if (app === 'line') appBadge(n);
     overlay.querySelectorAll(`[data-open="${app}"] .bp-icon`).forEach((ic) => {
       ic.querySelector('.bp-badge')?.remove();
       if (n) ic.insertAdjacentHTML('beforeend', `<span class="bp-badge">${n > 99 ? '99+' : n}</span>`);

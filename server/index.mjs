@@ -82,9 +82,12 @@ async function fallback(handle, u, chat, now) {
   const it = { id: `fb${now.toString(36)}`, at: now, title: m.title || '', body: text, lines: [{ text, st: '' }], status: 'sent', sentAt: now, ...(cfg.real ? { real: true } : {}) };
   u.queue[chat] = [...items, it];
   m.lastFallback = now;
-  await pushAll(handle, { title: it.title, body: it.body, tag: `bp-${chat}`, chat, id: it.id, url: '/' });
+  await pushAll(handle, { title: it.title, body: it.body, tag: `bp-${chat}`, chat, id: it.id, url: '/', badge: unread(u) });
   return true;
 }
+
+// 送出了還沒被收進 LINE 的有幾則（桌面圖示右上角的數字）
+const unread = (u) => Object.values(u.queue).reduce((n, items) => n + items.filter((it) => it.status === 'sent').reduce((k, it) => k + (it.lines?.length || 1), 0), 0);
 
 // 每 20 秒看一次：時間到的訊息標成送出並推播
 async function tick() {
@@ -100,7 +103,7 @@ async function tick() {
         it.status = 'sent'; it.sentAt = now; changed = true;
         // 太久以前就該送的（伺服器關機那段）不推了，免得一開機連響好幾則；打開小手機時一樣會收進 LINE
         if (now - it.at < 30 * 60000 && u.subs.length) {
-          await pushAll(handle, { title: it.title, body: it.body, tag: `bp-${chat}`, chat, id: it.id, url: '/' });
+          await pushAll(handle, { title: it.title, body: it.body, tag: `bp-${chat}`, chat, id: it.id, url: '/', badge: unread(u) });
         }
       }
       // 送出超過七天還沒被收走的就丟掉
