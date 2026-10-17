@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.16';
+const VERSION = '0.19.17';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -791,8 +791,38 @@ function setSplash(patch) {
   c?.saveSettingsDebounced?.();
   try { localStorage.setItem(SPLASH_KEY, JSON.stringify(root.splash)); } catch { /* 存不了 */ }
 }
+// 開機畫面的樣式直接寫在這裡、開的時候才塞進去：style.css 被瀏覽器快取住舊版時，畫面會蓋不出來（10/17 按預覽沒反應）
+const SPLASH_CSS = `/* Brume 開機畫面（從桌面圖示打開時，酒館載入那幾秒蓋在最上面） */
+#bp-splash {
+  position: fixed; inset: 0; z-index: 2147483600; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: linear-gradient(180deg, #687484 0%, #8d95a0 45%, #cec5b8 100%);
+  background-image: var(--bp-splash-bg, none), linear-gradient(180deg, #687484 0%, #8d95a0 45%, #cec5b8 100%);
+  background-size: cover; background-position: center;
+  opacity: 0; transition: opacity .6s ease; overflow: hidden; color: #fff;
+  font-family: Georgia, "Times New Roman", "Noto Serif TC", "Songti TC", serif;
+}
+#bp-splash.on { opacity: 1; }
+#bp-splash.has-bg::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20, 24, 32, .15) 0%, rgba(20, 24, 32, .05) 40%, rgba(20, 24, 32, .55) 100%); }
+#bp-splash .bp-splash-mist {
+  position: absolute; left: -30%; right: -30%; bottom: -10%; height: 55%;
+  background: radial-gradient(ellipse at 30% 60%, rgba(255, 255, 255, .55), transparent 60%), radial-gradient(ellipse at 75% 75%, rgba(255, 255, 255, .45), transparent 55%);
+  filter: blur(18px); animation: bp-mist 9s ease-in-out infinite alternate;
+}
+#bp-splash.has-bg .bp-splash-mist { opacity: .45; }
+@keyframes bp-mist { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
+#bp-splash .bp-splash-txt { position: relative; text-align: center; transform: translateY(-6vh); }
+#bp-splash .bp-splash-txt b { display: block; font-weight: 400; font-size: clamp(44px, 14vw, 72px); letter-spacing: .04em; text-shadow: 0 2px 18px rgba(30, 34, 44, .35); }
+#bp-splash .bp-splash-txt span { display: block; margin-top: 8px; font-size: 16px; letter-spacing: .3em; opacity: .9; text-shadow: 0 1px 8px rgba(30, 34, 44, .4); }
+#bp-splash .bp-splash-dots { position: absolute; bottom: calc(48px + env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+#bp-splash .bp-splash-dots u { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, .85); animation: bp-sdot 1.2s ease-in-out infinite; }
+#bp-splash .bp-splash-dots u:nth-child(2) { animation-delay: .2s; }
+#bp-splash .bp-splash-dots u:nth-child(3) { animation-delay: .4s; }
+@keyframes bp-sdot { 0%, 100% { opacity: .25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+#bp-splash:not(.has-bg) .bp-splash-dots u { background: rgba(70, 78, 92, .55); }
+`;
 function showSplash() {
   if (document.getElementById('bp-splash')) return;
+  if (!document.getElementById('bp-splash-css')) { const st = document.createElement('style'); st.id = 'bp-splash-css'; st.textContent = SPLASH_CSS; document.head.appendChild(st); }
   const sp = splashConf();
   const el = document.createElement('div'); el.id = 'bp-splash';
   if (sp.bg) el.style.setProperty('--bp-splash-bg', `url("${String(sp.bg).replace(/"/g, '%22')}")`);
