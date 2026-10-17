@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.20.7';
+const VERSION = '0.20.8';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -385,7 +385,17 @@ function build() {
     const on = push.deviceOn();
     btn.textContent = on ? '關掉這台的通知' : '開啟通知';
     sheet.querySelectorAll('.bp-pushrow').forEach((r) => { r.hidden = !ps.on; });
-    if (on) { note.textContent = '這台會收到通知。他會挑妳沒在玩的時候傳，一天不超過下面的次數，不吵妳的時段不傳。'; pushPre = null; return; }
+    if (on) {
+      note.textContent = '這台會收到通知。他會挑妳沒在玩的時候傳，一天不超過下面的次數，不吵妳的時段不傳。';
+      pushPre = null;
+      // 有沒有真的排到：關係階段不夠、劇情在一起都會讓他整個不出聲，寫出來才看得到
+      const c = currentChar(); let bg = null; try { bg = life.bgStatus(); } catch { /* 還沒建好 */ }
+      const cur = c ? await stage.get(c.key) : null;
+      if (c && !stage.unlocked(cur, 'proactive')) note.textContent += ` 但「${c.name}」的關係階段還在「${stage.name(cur)}」，要到「${stage.needFor('proactive')}」以上他才會主動傳。`;
+      else if (bg?.text) note.textContent += ` ${bg.text}`;
+      else note.textContent += ' 妳停下來一分鐘左右，他就會先把訊息寫好排上去。';
+      return;
+    }
     note.textContent = '檢查中⋯';
     pushPre = await push.precheck();
     note.textContent = pushPre.ready ? '酒館關著、手機鎖著，他傳 LINE 也會跳通知。按上面的按鈕，跳出來的視窗選「允許」。' : pushPre.why;

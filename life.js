@@ -234,6 +234,10 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
   // 她沒在玩的時候，先把他接下來要傳的一兩則寫好、排好時間交給伺服器；時間到了伺服器推播，下次打開再收進 LINE。
   // 她一回話或劇情一動，還沒送的就作廢，等她又離開一陣子再重寫（不然每講一句就要重寫一次，太花錢）
   let planning = false; let lastPlan = 0;
+  // 最近一次排程的結果，設定頁的通知區顯示（以前沒排到也看不出來，比比 10/17 等了一整天才發現是關係階段沒設）
+  let bgStatus = { at: 0, text: '' };
+  const note = (text) => { bgStatus = { at: Date.now(), text }; };
+  const hm = (t) => { const d = new Date(t); return `${d.getMonth() + 1}/${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
   async function pullBg() {
     const ch = currentChar();
     if (!(await push.bgActive(ch))) return;
@@ -251,30 +255,39 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     const L = LEVELS[settings.get().level] || LEVELS.high;
     const now = Date.now();
     const last = Math.max(await line.lastActive(), storyActive());
-    if (!leaving && now - last < 3 * 60000) return; // 她還在玩，等她停下來三分鐘（iPhone 切走後常常來不及排，所以不等太久）
+    // 她停下來一分鐘就先排（以前等三分鐘；她講完就切走的話 iPhone 只給幾秒，走酒館橋的卡一則要一分鐘，永遠排不到）
+    if (!leaving && now - last < 60000) return;
     if (now - lastPlan < 10 * 60000) return;
+    const cur = await stage.get(ch.key);
+    if (!stage.unlocked(cur, 'proactive')) { note(`關係階段還在「${stage.name(cur)}」，要到「${stage.needFor('proactive')}」以上他才會主動傳。`); return; }
     planning = true; lastPlan = now;
     try {
       const info = await push.queue.info(ch.key); const items = info.items || [];
       if (items.some((i) => i.status === 'sent')) { await pullBg(); }
-      if (items.some((i) => i.status === 'pending')) return;
-      const cur = await stage.get(ch.key);
-      if (!stage.unlocked(cur, 'proactive')) return;
+      const waiting = items.filter((i) => i.status === 'pending');
+      if (waiting.length) { note(`下一則排在 ${hm(Math.min(...waiting.map((i) => i.at)))}。`); return; }
+      note('正在寫他接下來要傳的訊息⋯');
       const counts = await line.bgCounts();
       const real = push.pushSet.get().mode === 'real';
       const plan = []; const pending = []; let prev = Math.max(now, last);
+      const put = (extra = {}) => (currentChar()?.key === ch.key && lastPlan === now ? push.queue.put(ch.key, plan, { title: ch.name, ...extra }) : null);
       for (let k = 0; k < 2; k++) {
         const at = push.nextSlot(prev, L.away, (t) => { const d = new Date(t).toDateString(); return (counts[d] || 0) + plan.filter((p) => new Date(p.at).toDateString() === d).length; });
-        const lines = await line.compose('away', { pending, real, at });
-        if (!lines.length) break; // 劇情裡兩人在一起，他不會傳
-        plan.push({ id: uid(), at, title: ch.name, body: lines.map((l) => l.text).join('\n'), lines, ...(real ? { real: true } : {}) });
+        // 照劇情時混用：劇情裡兩人在一起寫不出來，就改照現實寫（那幾行帶 now）
+        const lines = await line.compose('away', { pending, real, at, mix: true });
+        if (!lines.length) break;
+        const isReal = real || lines.some((l) => l.now);
+        plan.push({ id: uid(), at, title: ch.name, body: lines.map((l) => l.text).join('\n'), lines, ...(isReal ? { real: true } : {}) });
         pending.push(...lines); prev = at;
+        await put(); // 寫好一則就先交出去：她中途切走、第二則沒寫完，至少第一則排到了
       }
       // 備用短訊：排好的都送完、她又一整天沒開時，伺服器從這裡挑一句（快用完或放太久才重寫）
       let fallback;
       if ((info.fallbackLeft || 0) < 2 || now - (info.fallbackAt || 0) > 5 * 864e5) fallback = (await line.compose('nudge')).map((l) => l.text);
-      if ((plan.length || fallback?.length) && currentChar()?.key === ch.key) await push.queue.put(ch.key, plan, { title: ch.name, ...(fallback?.length ? { fallback } : {}) });
-    } catch { /* 下次再排 */ } finally { planning = false; }
+      if (fallback?.length) await put({ fallback });
+      if (plan.length) note(`下一則排在 ${hm(plan[0].at)}。`);
+      else note('這次沒寫出來，等妳下次停下來再排。');
+    } catch { note('這次沒排成功（連不上模型或推播站），等妳下次停下來再排。'); } finally { planning = false; }
   }
   const cancelBg = async () => { const ch = currentChar(); if (ch && await push.bgActive(ch)) { await push.queue.cancel(ch.key); lastPlan = 0; } };
   window.addEventListener('bp-line-sent', cancelBg);
@@ -296,6 +309,7 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
   return {
     onPhoneOpen() { deliverDue(); pullBg(); maybeFirst('open'); },
     planBg, pullBg,
+    bgStatus: () => bgStatus,
     refreshPrompt: bridgePrompt,
   };
 }

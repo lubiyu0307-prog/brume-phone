@@ -1127,14 +1127,17 @@ export function createLine({ screen, say, onUnread, onData }) {
   /**
    * 寫出他先傳的幾則，不存：回傳 [{ text, st }]，在一起（[[SKIP]]）或失敗回空陣列。
    * pending：已經排好、她還沒看到的（背景推播排第二則時帶上，才不會重複、也知道她還沒回）
+   * mix：照劇情寫不出來（劇情裡在一起、或她正在用現實時間跟他聊）就改照現實寫，回來的每一行帶 now: true。
+   *   背景推播用（10/17 比比定的混用）：不然玩家的角色多半跟她在同一個場景，開了通知卻一直收不到
    */
-  async function compose(kind, { pending = [], real = false, at = 0 } = {}) {
+  async function compose(kind, { pending = [], real = false, at = 0, mix = false } = {}) {
     const who = await useCurrent();
     if (!who) return [];
     const cur = await stage.get(who.key);
     if (!stage.unlocked(cur, 'proactive')) return [];
     const t = thread;
-    if (t.mode === 'now' && !real) return []; // 她在現實時間跟他聊，劇情先停著
+    const asReal = async () => (mix ? (await composeReal(who, cur, kind, pending, at)).map((l) => ({ ...l, now: true })) : []);
+    if (t.mode === 'now' && !real) return asReal(); // 她在現實時間跟他聊，劇情先停著
     if (real || kind === 'nudge') return composeReal(who, cur, kind, pending, at);
     const today = (await data.storyDay.get(who.key)) || data.today();
     const [notes, calAll, memory] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key)]);
@@ -1152,7 +1155,7 @@ export function createLine({ screen, say, onUnread, onData }) {
         cal: cal.filter((e) => e.date >= today).slice(0, 8),
       }));
     } catch { return []; }
-    if (/\[\[SKIP\]\]/i.test(raw)) return [];
+    if (/\[\[SKIP\]\]/i.test(raw)) return asReal();
     const out = [];
     for (const line of raw.split('\n')) {
       const m = line.trim().match(/^(\d{1,2})[:：](\d{2})\s*[｜|]\s*(.+)$/);
