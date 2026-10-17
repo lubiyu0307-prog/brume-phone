@@ -49,14 +49,26 @@
     // 大小跟著看得到的範圍走（iPhone 彈鍵盤時 visualViewport 會變矮，酒館那層要跟著縮，手機才不會被鍵盤蓋住）
     // 只縮高度、不要搬位置：這一頁本身捲不動，彈鍵盤時 pageTop 會報一個數字但看得到的範圍其實就在最上面，
     // 照它搬會把整層推到畫面外（10/17 比比打字時整個手機不見，只剩底色）
-    function fit() {
+    // 0.20.2：照 iOS 的老規矩跟著 visualViewport 的 offsetTop 走（0.20.0 用 pageTop−scrollY、0.20.1 釘在 0 都還是不見）
+    // 每次量到的數字一起寫進霧語的除錯紀錄（同一個 localStorage），設定裡「複製除錯紀錄」會帶出來給格看
+    function shellDbg(tag) {
+      try {
+        var vv = window.visualViewport; var b = sh.getBoundingClientRect();
+        var row = { t: new Date().toTimeString().slice(0, 8), tag: 'shell-' + tag, vv: vv ? [Math.round(vv.width), Math.round(vv.height), Math.round(vv.offsetTop), Math.round(vv.pageTop || 0)] : null, win: [innerWidth, innerHeight, Math.round(scrollY)], sh: [Math.round(b.top), Math.round(b.height)], html: getComputedStyle(document.documentElement).position };
+        var a = JSON.parse(localStorage.getItem('brume-phone:dbg') || '[]'); a.push(row); localStorage.setItem('brume-phone:dbg', JSON.stringify(a.slice(-80)));
+      } catch (e) { /* 記不了就算了 */ }
+    }
+    function fit(why) {
       var vv = window.visualViewport;
       var W = Math.round(vv ? vv.width : innerWidth); var H = Math.round(vv ? vv.height : innerHeight);
-      sh.style.width = W + 'px'; sh.style.height = H + 'px'; sh.style.top = '0px'; sh.style.left = '0px';
+      var Y = Math.round(vv ? vv.offsetTop : 0);
+      sh.style.width = W + 'px'; sh.style.height = H + 'px'; sh.style.top = Y + 'px'; sh.style.left = '0px';
+      if (why) { shellDbg(why); setTimeout(function () { shellDbg(why + '+400'); }, 400); }
     }
     fit();
-    if (window.visualViewport) { visualViewport.addEventListener('resize', fit); visualViewport.addEventListener('scroll', fit); }
-    addEventListener('resize', fit);
+    if (window.visualViewport) { visualViewport.addEventListener('resize', function () { fit('vv-resize'); }); visualViewport.addEventListener('scroll', function () { fit('vv-scroll'); }); }
+    addEventListener('resize', function () { fit('resize'); });
+    addEventListener('scroll', function () { fit('scroll'); });
 
     var revealed = false; var shownAt = Date.now();
     function reveal() { if (revealed) return; revealed = true; sh.classList.add('ready'); }
