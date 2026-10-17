@@ -1264,3 +1264,7 @@
 .bp-sheet button.bp-danger { color: #c4553f; }
 .bp-sheet [hidden] { display: none !important; }
 .bp-al-hint.bp-al-warn { color: #b0563f; }
+/* 行事曆：劇情／現實兩本 */
+.bp-ap-tabs { display: flex; gap: 4px; margin: 4px 0 6px; padding: 3px; border-radius: 12px; background: rgba(60, 50, 40, .08); }
+.bp-ap-tabs b { flex: 1; text-align: center; padding: 7px 0; border-radius: 9px; font-weight: 600; font-size: 14px; color: #7a6f63; cursor: pointer; }
+.bp-ap-tabs b.on { background: #fff; color: #2b2824; box-shadow: 0 1px 3px rgba(0, 0, 0, .08); }

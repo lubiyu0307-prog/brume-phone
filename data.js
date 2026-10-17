@@ -23,13 +23,15 @@ export const notes = {
   async remove(key, id) { await save('notes', key, (await list('notes', key)).filter((x) => x.id !== id)); },
 };
 
-// 行事曆：{ id, date: 'YYYY-MM-DD', title, by, ts }
+// 行事曆：{ id, date: 'YYYY-MM-DD', title, by, ts, kind: 'story'|'real' }
+// 分兩本（10/17 比比）：劇情裡的日子和現實的日子常對不上，放同一本怎麼對都怪。舊的沒標 kind 的當劇情
+export const calKind = (e) => (e.kind === 'real' ? 'real' : 'story');
 export const cal = {
   all: (key) => list('cal', key),
   async add(key, e) {
     const a = await list('cal', key);
     // 同一天同一件事只記一次（重新生成時不會重複落地）
-    if (a.some((x) => x.date === e.date && x.title === e.title)) return;
+    if (a.some((x) => x.date === e.date && x.title === e.title && calKind(x) === calKind(e))) return;
     a.push({ id: uid(), ts: Date.now(), ...e }); a.sort((x, y) => x.date.localeCompare(y.date));
     await save('cal', key, a);
   },
@@ -64,4 +66,9 @@ export const stickers = {
   async for(charKey) { return (await list('stickers', 'all')).filter((x) => !x.only || x.only === charKey); },
 };
 
+// 故事裡現在是哪一天（劇情的 <phone> 每次會報一行「劇情日期」），劇情那本行事曆的「今天」
+export const storyDay = {
+  get: async (key) => (await store.get(`storyday:${key}`).catch(() => null)) || '',
+  set: (key, d) => store.set(`storyday:${key}`, d).catch(() => {}),
+};
 export const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };

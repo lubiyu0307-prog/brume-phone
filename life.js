@@ -41,21 +41,21 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     const cur = await stage.get(ch.key);
     const notesOn = stage.unlocked(cur, 'notes');
     const [ns, cs] = await Promise.all([notesOn ? data.notes.all(ch.key) : [], data.cal.all(ch.key)]);
+    const sday = await data.storyDay.get(ch.key);
     const have = [
-      ...cs.slice(-8).map((e) => `行事曆 ${e.date} ${e.title}`),
+      ...cs.filter((e) => data.calKind(e) === 'story').slice(-8).map((e) => `行事曆 ${e.date} ${e.title}`),
       ...ns.filter((n) => !n.done).slice(0, 6).map((n) => `便條 ${n.text}`),
     ];
     c.setExtensionPrompt('brume-phone-bridge', [
       `[手機] ${ch.user} 和 ${ch.name} 平常也會用手機聯絡（LINE、脆），也共用一本行事曆${notesOn ? '，冰箱門上會貼便條' : ''}。兩人現在的關係：${stage.name(cur)}。`,
       `這段劇情之後，如果手機上很自然會多出什麼，就在整段回覆的最後加一個區塊（只寫用得到的行）：`,
       '<phone>',
+      `劇情日期｜YYYY-MM-DD（每次都寫這一行：故事裡現在是哪一天。故事沒交代年份就用 ${new Date().getFullYear()}${sday ? `；上次是 ${sday}，照劇情往後推` : ''}）`,
       `LINE｜${ch.name} 之後傳給她的訊息（只有兩人分開了才寫：剛道別、各自在外面、他想用手機聯絡她；或劇情裡他真的拿手機傳了訊息。一行一則）`,
       `脆｜${ch.name} 發的貼文（他自己一個人、有空滑手機的時候才會發）`,
-      `行事曆｜YYYY-MM-DD｜標題（日期是今天就省略，寫成 行事曆｜標題）`,
+      `行事曆｜YYYY-MM-DD｜標題（日期用劇情裡的日子；就是劇情裡的今天就省略，寫成 行事曆｜標題）`,
       notesOn ? `便條｜${ch.name} 貼在冰箱上給她的叮嚀（20 字內）` : '',
       '</phone>',
-      // 10/17 比比：同一件事被記在兩天（劇情的「今天」和現實的今天不同天，又換了個說法）。行事曆一律用現實的日子
-      `行事曆的日期一律用現實的日子，不用劇情裡的日期：現實的今天是 ${data.today()}（週${'日一二三四五六'[new Date().getDay()]}）。劇情裡剛發生的事就是今天（省略日期）；約好之後要做的事，照劇情裡隔幾天，換算成今天之後的第幾天。`,
       `行事曆要勤勞記：劇情裡真的發生、值得記住的「第一次」和轉折（第一次說出口的話、第一次一起做的事）、約好的事、紀念日、回診檢查這類跟兩人生活有關的日子。標題 12 字內，像他會寫的字。`,
       notesOn ? `便條也要勤勞貼：劇情裡她的身體、作息、天氣、要吃的藥或補品、他出門前放不下心的事，他都會寫一張貼著，內容要接得上劇情。一次一兩張。` : '',
       have.length ? `手機上已經有的，不要再寫一次（同一件事換個說法也算重複）：\n${have.map((h) => '- ' + h).join('\n')}` : '',
@@ -97,9 +97,12 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     const ch = currentChar();
     if (!body || !ch) return;
     const lines = []; const posts = []; const cals = []; const notes = []; let rel = null; let mode = null;
+    let storyToday = (await data.storyDay.get(ch.key)) || data.today();
     // 看起來像寫作計畫、檢查清單的行不收（拍、節拍、玩家、區塊、輸出、正文、標籤）
     for (const raw of body.split('\n')) {
       const l = raw.trim(); if (!l) continue;
+      const sd = l.match(/^劇情日期\s*[｜|:：]\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+      if (sd) { storyToday = `${sd[1]}-${sd[2].padStart(2, '0')}-${sd[3].padStart(2, '0')}`; await data.storyDay.set(ch.key, storyToday); mode = null; continue; }
       const m = l.match(/^(LINE|脆|Threads|關係|行事曆|便條|便利貼)\s*[｜|:：]\s*(.*)$/i);
       if (m) { mode = m[1].toUpperCase() === 'THREADS' ? '脆' : m[1] === '便利貼' ? '便條' : m[1]; if (!m[2]) continue; }
       else if (!mode || mode === '關係' || l.length > 80) continue; // 開頭沒標是哪一種、或太長的，不是要放進手機的東西
@@ -107,7 +110,7 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
       const text = (m ? m[2].trim() : l).replace(/^[-・*]\s*/, '');
       if (mode === '關係') rel = stage.fromWord(text);
       else if (mode === '脆') posts.push(text);
-      else if (mode === '行事曆') { const ev = calLine(text); if (ev) cals.push(ev); }
+      else if (mode === '行事曆') { const ev = calLine(text, storyToday); if (ev) cals.push({ ...ev, kind: 'story' }); }
       else if (mode === '便條') notes.push(text.replace(/^[「『"]+|[」』"]+$/g, '').slice(0, 40));
       else lines.push(text.replace(/^[「『"]+|[」』"]+$/g, ''));
     }
@@ -121,14 +124,14 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
   }
 
   // 「行事曆｜2026-10-20｜回診」「行事曆｜10/20｜回診」「行事曆｜他第一次說想要寶寶」都收
-  function calLine(text) {
+  function calLine(text, day = data.today()) {
     const parts = text.split(/\s*[｜|]\s*/).filter(Boolean);
     if (!parts.length) return null;
-    let date = data.today(); let title = parts.join(' ');
+    let date = day; let title = parts.join(' ');
     const full = parts[0].match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
     const short = parts[0].match(/^(\d{1,2})[-/.](\d{1,2})$/);
     if ((full || short) && parts.length > 1) {
-      const y = full ? +full[1] : new Date().getFullYear();
+      const y = full ? +full[1] : +day.slice(0, 4);
       const mo = +(full ? full[2] : short[1]); const d = +(full ? full[3] : short[2]);
       if (mo >= 1 && mo <= 12 && d >= 1 && d <= 31) date = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
       title = parts.slice(1).join(' ');

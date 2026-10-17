@@ -188,7 +188,9 @@ function buildPrompt(ch, msgs, x = {}) {
     x.stickerTags?.length ? `- 傳貼圖：在回覆最後獨立一行寫 [[STICKER|標籤]]，只寫標籤（括號裡是那張圖畫什麼，幫你挑，不用寫進去）。可以用的有：${x.stickerTags.join('、')}。一次最多一張` : '',
     '- 她明確請你設鬧鐘或提醒時（例如「明天六點叫我」），先答應，再在最後獨立一行寫 [[ALARM|HH:MM|鬧鐘名稱]]，24 小時制，名稱是你留給她的一句話，10 字內、不用 emoji。她沒要求就不要寫',
     x.notesOn ? '- 在她冰箱上貼便條：最後獨立一行寫 [[NOTE|內容]] 或 [[NOTE|內容|YYYY-MM-DD]]，20 字內。她提到身體、作息、天氣、要吃的藥或補品、要帶的東西，你放不下心就貼一張，貼了在訊息裡順口提一下' : '',
-    `- 記上你們共用的行事曆：最後獨立一行寫 [[CAL|YYYY-MM-DD|標題]]，標題 12 字內。約好的事、紀念日、回診檢查、兩人之間的「第一次」都記；行事曆上已經有的不要再記（同一件事換個說法也算重複）。日期一律用現實的日子：現實的今天是 ${(() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}（週${WEEK[d.getDay()]}）`; })()}，剛發生的事寫今天，約好的事照隔幾天換算`,
+    `- 記上你們共用的行事曆：最後獨立一行寫 [[CAL|YYYY-MM-DD|標題]]，標題 12 字內。約好的事、紀念日、回診檢查、兩人之間的「第一次」都記；行事曆上已經有的不要再記（同一件事換個說法也算重複）。${nowMode
+      ? `日期用現實的日子，今天是 ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}（週${WEEK[now.getDay()]}）`
+      : `日期用劇情裡的日子${x.storyDay ? `，劇情裡的今天是 ${x.storyDay}` : '，照劇情判斷是哪一天'}`}`,
     '- 想送她小禮物（她說累了、餓了、心情不好、值得慶祝，或你單純想寵她）：最後獨立一行寫 [[GIFT|品項|附一句話]]，品項像「一杯熱拿鐵」「電影票兩張」，一句話 20 字內。偶爾才送，送了不用在訊息裡再講一次',
     '- 想讓她知道你在哪（到了、在等她、路過想到她）：最後獨立一行寫 [[LOC|地點名稱|一句話]]，地點照劇情和你們的世界寫。很偶爾才用',
     '- 想讓她知道你正在做什麼（不是對她說話，像「他去洗澡了」那種旁白小字）：寫 [[MOMENT|一句話]]。很偶爾才用',
@@ -745,10 +747,14 @@ export function createLine({ screen, say, onUnread, onData }) {
       const seeing = roundPhotos.length > 0 && canSeeImages();
       if (roundPhotos.length && !seeing && !warnedImages) { warnedImages = true; say('酒館沒開「Send inline images」，他看不到照片'); }
       const image = seeing ? await collage(roundPhotos.map((m) => m.img)) : null;
-      const today = data.today();
-      const [notes, cal, memory, stks] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key), data.stickers.for(who.charKey)]);
+      // 行事曆分兩本：現實時間聊天看現實那本，劇情聊天看劇情那本（「今天」也各自算）
+      const calKind = t.mode === 'now' ? 'real' : 'story';
+      const sday = await data.storyDay.get(who.key);
+      const today = calKind === 'real' ? data.today() : (sday || data.today());
+      const [notes, calAll, memory, stks] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key), data.stickers.for(who.charKey)]);
+      const cal = calAll.filter((e) => data.calKind(e) === calKind);
       const cur = await stage.get(who.key);
-      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => (x.desc ? `${x.tag}（${x.desc}）` : x.tag)))], photos: roundPhotos.length, photosSeen: !!image, couple: couple ? `${new Date(couple.ts).getMonth() + 1}/${new Date(couple.ts).getDate()} 換的` : '', pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
+      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), storyDay: sday, notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => (x.desc ? `${x.tag}（${x.desc}）` : x.tag)))], photos: roundPhotos.length, photosSeen: !!image, couple: couple ? `${new Date(couple.ts).getMonth() + 1}/${new Date(couple.ts).getDate()} 換的` : '', pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
       out = parseReply(await generate(buildPrompt(who, t.msgs, extra), image), who);
       // 他偶爾會連括號裡的描述一起抄，只取標籤；同一個標籤有好幾張就隨機挑一張
       const stkTag = out.sticker ? String(out.sticker).replace(/[（(].*$/, '').trim() : '';
@@ -784,7 +790,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     for (const l of out.locs.slice(0, 1)) extras.push({ loc: l });
     for (const mo of out.moments) extras.push({ moment: mo });
     for (const n of out.notes) { await data.notes.add(who.key, { ...n, by: 'him' }); extras.push({ notice: `📌 ${who.name}在便條上寫了：${n.text}`, goto: 'notes' }); }
-    for (const c of out.cals) { await data.cal.add(who.key, { ...c, by: 'him' }); extras.push({ notice: `📅 ${who.name}記上行事曆：${c.date.slice(5).replace('-', '/')} ${c.title}`, goto: 'calendar' }); }
+    for (const c of out.cals) { await data.cal.add(who.key, { ...c, by: 'him', kind: t.mode === 'now' ? 'real' : 'story' }); extras.push({ notice: `📅 ${who.name}記上行事曆：${c.date.slice(5).replace('-', '/')} ${c.title}`, goto: 'calendar' }); }
     for (const x of extras) {
       if (x.sticker || x.alarm || x.gift || x.loc) { busy = 'typing'; if (view === 'room') refreshLog(); await sleep(700); }
       t.msgs.push({ id: uid(), me: false, text: '', ts: Date.now(), ...flag, ...x });
@@ -1130,8 +1136,9 @@ export function createLine({ screen, say, onUnread, onData }) {
     const t = thread;
     if (t.mode === 'now' && !real) return []; // 她在現實時間跟他聊，劇情先停著
     if (real || kind === 'nudge') return composeReal(who, cur, kind, pending, at);
-    const today = data.today();
-    const [notes, cal, memory] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key)]);
+    const today = (await data.storyDay.get(who.key)) || data.today();
+    const [notes, calAll, memory] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key)]);
+    const cal = calAll.filter((e) => data.calKind(e) === 'story');
     const together = `先看正文最近的劇情：如果故事裡此刻 ${who.name} 和 ${who.user} 就在一起（同一個空間、看得到彼此、正在相處），他不會拿手機傳訊息給身邊的人——這時整則只寫 [[SKIP]]，其他什麼都不寫。`;
     const instr = kind === 'away'
       ? `【這次是他先傳的】${together}\n不在一起的話：從劇情判斷故事裡現在的時間，寫 ${who.name} 在這之後、兩人分開的時候，很自然傳給她的幾則 LINE：想到她、分享自己在做什麼、問她在幹嘛，內容符合劇情裡那個時間點和他正在做的事。\n請寫 1～3 則，每則一行，格式：HH:MM｜訊息（HH:MM 是劇情裡的時刻），照先後排。她都還沒回，所以不要寫成一來一往。`
@@ -1161,7 +1168,8 @@ export function createLine({ screen, say, onUnread, onData }) {
   // 現實時間的背景推播（推播設成「照現實」），或備用短訊（kind = 'nudge'，不綁時間點）
   async function composeReal(who, cur, kind, pending, at) {
     const t = thread; const today = data.today();
-    const [notes, cal, memory] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key)]);
+    const [notes, calAll, memory] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key)]);
+    const cal = calAll.filter((e) => data.calKind(e) === 'real');
     const when = new Date(at || Date.now());
     const instr = kind === 'nudge'
       ? `【備用的短訊】${who.user} 已經一整天沒打開手機找 ${who.name} 了。寫 4 句他這種時候會傳的 LINE（想她、問她在幹嘛、叫她記得吃飯喝水這類），不綁特定時間和劇情場景，任何時候收到都不突兀。一句一行，4 行，不要寫時間。`
