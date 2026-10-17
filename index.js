@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.19';
+const VERSION = '0.19.20';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -857,6 +857,7 @@ function launchFromIcon(phone) {
   if (ios && standalone) { try { localStorage.setItem('brume-phone:app-mode', '1'); } catch { /* 存不了 */ } }
   if (u.searchParams.has('bp-app')) { u.searchParams.delete('bp-app'); history.replaceState(null, '', u.href); }
   showSplash(); setTimeout(hideSplash, 30000); // 萬一卡住，三十秒後還是讓她看得到酒館
+  const shownAt = Date.now(); // 10/17 比比說照片只閃一秒：酒館載得快的時候，開機畫面至少留 2.5 秒再收
   const c = ctx(); if (!c?.eventSource) { hideSplash(); return; }
   const go = async () => {
     const want = c.extensionSettings?.['brume-phone']?.lastChar;
@@ -864,7 +865,7 @@ function launchFromIcon(phone) {
     if (i >= 0 && String(c.characterId) !== String(i)) {
       await new Promise((res) => { c.eventSource.once?.(c.eventTypes?.CHAT_CHANGED || 'chat_id_changed', res); setTimeout(res, 8000); c.selectCharacterById?.(String(i)); });
     }
-    setTimeout(() => { phone.open(); setTimeout(hideSplash, 250); }, 300);
+    setTimeout(() => { phone.open(); setTimeout(hideSplash, Math.max(250, 2500 - (Date.now() - shownAt))); }, 300);
   };
   // 酒館載好會發 APP_READY；有些版本或擴充會讓它晚到，所以也每秒看一次角色清單載好了沒，先到的那個做
   let done = false;
