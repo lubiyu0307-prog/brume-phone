@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.13';
+const VERSION = '0.19.14';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -761,8 +761,14 @@ function rememberChar() {
 // 從桌面的「霧語」圖示打開（網址帶 bp-app）：等酒館載好、選上次那個角色，再打開手機
 function launchFromIcon(phone) {
   let u; try { u = new URL(location.href); } catch { return; }
-  if (!u.searchParams.has('bp-app')) return;
-  u.searchParams.delete('bp-app'); history.replaceState(null, '', u.href);
+  // iPhone 桌面上每個網頁 App 的儲存是分開的：從 Brume 圖示開過一次就記一筆，
+  // 之後就算網址上的 bp-app 掉了（例如被登入頁轉走），在這個 App 裡一樣直接開手機
+  const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
+  const standalone = !!navigator.standalone || matchMedia('(display-mode: standalone)').matches;
+  let remembered = false; try { remembered = ios && standalone && localStorage.getItem('brume-phone:app-mode') === '1'; } catch { /* 讀不到 */ }
+  if (!u.searchParams.has('bp-app') && !remembered) return;
+  if (ios && standalone) { try { localStorage.setItem('brume-phone:app-mode', '1'); } catch { /* 存不了 */ } }
+  if (u.searchParams.has('bp-app')) { u.searchParams.delete('bp-app'); history.replaceState(null, '', u.href); }
   const c = ctx(); if (!c?.eventSource) return;
   const go = async () => {
     const want = c.extensionSettings?.['brume-phone']?.lastChar;
