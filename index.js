@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.14';
+const VERSION = '0.19.15';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -208,7 +208,12 @@ function build() {
       <button data-act="photos-reset">清掉小工具照片</button>
       <button data-act="homeicon">放到手機桌面</button>
       <button data-act="appicon">換桌面圖示的照片</button>
-      <p class="bp-sheet-note">桌面多一個「Brume」圖示，點了直接打開上次那個角色的手機，不用先開酒館、選角色。圖示可以換成妳喜歡的照片（換好再按一次「放到手機桌面」；已經放過的要先把舊的刪掉）。</p>
+      <div class="bp-setrow"><span>開機畫面的大字</span><input class="bp-splash-in" data-splash="title" maxlength="20" placeholder="Brume"></div>
+      <div class="bp-setrow"><span>開機畫面的小字</span><input class="bp-splash-in" data-splash="line" maxlength="40" placeholder="霧語"></div>
+      <button data-act="splashbg">換開機畫面的照片</button>
+      <button data-act="splashprev">看一下開機畫面</button>
+      <button data-act="splashreset">開機畫面用回預設</button>
+      <p class="bp-sheet-note">桌面多一個「Brume」圖示，點了直接打開上次那個角色的手機，不用先開酒館、選角色。圖示可以換成妳喜歡的照片（換好再按一次「放到手機桌面」；已經放過的要先把舊的刪掉）。從 Brume 打開時，酒館載入那幾秒會先蓋一張開機畫面，照片和字都可以自己換。</p>
       <button data-act="cardoff" class="bp-danger">這張卡不用小手機</button>
       <p class="bp-sheet-note">古風、奇幻這類沒有手機的故事用：手機按鈕收起來、劇情不接手機、他也不會主動傳。要再打開，從輸入框左邊的魔杖選單點霧語。</p>
       <button data-act="dbg">複製除錯紀錄（給格看）</button>
@@ -361,7 +366,9 @@ function build() {
     sheet.querySelector('.bp-migbtn').hidden = !(await hasOldData());
     sheet.querySelectorAll('[data-act="eye"]').forEach((b) => b.classList.toggle('on', b.dataset.v === (state.eye || 'off')));
     showPush();
+    const sp = splashConf(); sheet.querySelectorAll('.bp-splash-in').forEach((i) => { i.value = sp[i.dataset.splash] || ''; });
   }
+  sheet.addEventListener('change', (e) => { const i = e.target.closest('.bp-splash-in'); if (i) { setSplash({ [i.dataset.splash]: i.value.trim() }); say('開機畫面改好了'); } });
 
   // 通知：設定頁一打開就先檢查好（iPhone 只在按下去那一刻讓網頁跳出允許通知的視窗，等檢查就來不及）
   let pushPre = null;
@@ -442,6 +449,9 @@ function build() {
       if (a === 'push') { togglePush(); return; } // 放最前面：要在點擊當下直接請求通知權限，前面不能有 await
       if (a === 'pmode') { push.pushSet.set({ mode: act.dataset.v }); const c = currentChar(); if (c) push.queue.cancel(c.key); showPush(); say(act.dataset.v === 'real' ? '之後照現實時間寫' : '之後照劇情時間寫'); return; } // 已經排好的照舊寫法，作廢重排
       if (a === 'appicon') { pickTarget = 'appicon'; file.click(); return; }
+      if (a === 'splashbg') { pickTarget = 'splashbg'; file.click(); return; }
+      if (a === 'splashprev') { showSplash(); setTimeout(hideSplash, 2600); return; }
+      if (a === 'splashreset') { setSplash(null); sheet.querySelectorAll('.bp-splash-in').forEach((i) => { i.value = ''; }); say('開機畫面用回預設了'); return; }
       if (a === 'homeicon') {
         const icon = ctx()?.extensionSettings?.['brume-phone']?.appIcon;
         const page = new URL('app.html', import.meta.url); if (icon) page.searchParams.set('icon', icon);
@@ -534,6 +544,12 @@ function build() {
     if (!f || !pickTarget) return;
     const target = pickTarget;
     if (target === 'appicon') { await setAppIcon(f); return; }
+    if (target === 'splashbg') {
+      say('照片放上去中⋯');
+      const u = await uploadImage(await shrink(f, 1290));
+      if (!u) { say('照片存不上去，等一下再試試'); return; }
+      setSplash({ bg: u }); say('開機畫面的照片換好了，按「看一下開機畫面」看看'); return;
+    }
     say('照片放上去中⋯');
     const url = await uploadImage(await shrink(f, target === 'wall' ? 1290 : 900));
     if (!url) { say('照片存不上去，等一下再試試'); return; }
@@ -758,6 +774,36 @@ function rememberChar() {
   if (root.lastChar !== ch.charKey) { root.lastChar = ch.charKey; c.saveSettingsDebounced?.(); }
 }
 
+// ---------- Brume 開機畫面：從桌面圖示打開時，酒館載入那幾秒先蓋一張，載好了直接變成手機 ----------
+// 玩家可以換照片、大字、小字。設定存在酒館的擴充設定；也抄一份在這台的 localStorage，
+// 開機時酒館的設定還沒載好也能馬上蓋上去
+const SPLASH_KEY = 'brume-phone:splash';
+function splashConf() {
+  let local = {}; try { local = JSON.parse(localStorage.getItem(SPLASH_KEY) || '{}'); } catch { /* 讀不到 */ }
+  return { ...local, ...(ctx()?.extensionSettings?.['brume-phone']?.splash || {}) };
+}
+function setSplash(patch) {
+  const c = ctx(); const root = c?.extensionSettings ? (c.extensionSettings['brume-phone'] ||= {}) : {};
+  root.splash = patch ? { ...(root.splash || {}), ...patch } : {};
+  c?.saveSettingsDebounced?.();
+  try { localStorage.setItem(SPLASH_KEY, JSON.stringify(root.splash)); } catch { /* 存不了 */ }
+}
+function showSplash() {
+  if (document.getElementById('bp-splash')) return;
+  const sp = splashConf();
+  const el = document.createElement('div'); el.id = 'bp-splash';
+  if (sp.bg) el.style.setProperty('--bp-splash-bg', `url("${String(sp.bg).replace(/"/g, '%22')}")`);
+  el.className = sp.bg ? 'has-bg' : '';
+  const esc = (t) => String(t).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  el.innerHTML = `<div class="bp-splash-mist"></div><div class="bp-splash-txt"><b>${esc(sp.title || 'Brume')}</b><span>${esc(sp.line || '霧語')}</span></div><i class="bp-splash-dots"><u></u><u></u><u></u></i>`;
+  document.documentElement.appendChild(el);
+  requestAnimationFrame(() => el.classList.add('on'));
+}
+function hideSplash() {
+  const el = document.getElementById('bp-splash'); if (!el) return;
+  el.classList.remove('on'); setTimeout(() => el.remove(), 700);
+}
+
 // 從桌面的「霧語」圖示打開（網址帶 bp-app）：等酒館載好、選上次那個角色，再打開手機
 function launchFromIcon(phone) {
   let u; try { u = new URL(location.href); } catch { return; }
@@ -769,14 +815,15 @@ function launchFromIcon(phone) {
   if (!u.searchParams.has('bp-app') && !remembered) return;
   if (ios && standalone) { try { localStorage.setItem('brume-phone:app-mode', '1'); } catch { /* 存不了 */ } }
   if (u.searchParams.has('bp-app')) { u.searchParams.delete('bp-app'); history.replaceState(null, '', u.href); }
-  const c = ctx(); if (!c?.eventSource) return;
+  showSplash(); setTimeout(hideSplash, 30000); // 萬一卡住，三十秒後還是讓她看得到酒館
+  const c = ctx(); if (!c?.eventSource) { hideSplash(); return; }
   const go = async () => {
     const want = c.extensionSettings?.['brume-phone']?.lastChar;
     const i = want ? (c.characters || []).findIndex((x) => (x.avatar || x.name) === want) : -1;
     if (i >= 0 && String(c.characterId) !== String(i)) {
       await new Promise((res) => { c.eventSource.once?.(c.eventTypes?.CHAT_CHANGED || 'chat_id_changed', res); setTimeout(res, 8000); c.selectCharacterById?.(String(i)); });
     }
-    setTimeout(() => phone.open(), 300);
+    setTimeout(() => { phone.open(); setTimeout(hideSplash, 250); }, 300);
   };
   // 酒館載好會發 APP_READY；有些版本或擴充會讓它晚到，所以也每秒看一次角色清單載好了沒，先到的那個做
   let done = false;
