@@ -184,4 +184,6 @@ export function onOpenRequest(fn) {
     if (u.searchParams.get('bp-open')) { u.searchParams.delete('bp-open'); history.replaceState(null, '', u.href); setTimeout(() => fn('line'), 2500); }
   } catch { /* 網址讀不到就算了 */ }
   navigator.serviceWorker?.addEventListener?.('message', (e) => { if (e.data?.type === 'bp-open') fn(e.data.app || 'line'); });
+  // 被 app.html 包著的時候，小幫手的話會先到外面那頁，再轉進來
+  addEventListener('message', (e) => { if (e.origin === location.origin && e.source === window.parent && e.data?.type === 'bp-open') fn(e.data.app || 'line'); });
 }

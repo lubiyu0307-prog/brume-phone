@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.19.20';
+const VERSION = '0.20.0';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -845,7 +845,11 @@ function hideSplash() {
   el.classList.remove('on'); setTimeout(() => el.remove(), 700);
 }
 
-// 從桌面的「霧語」圖示打開（網址帶 bp-app）：等酒館載好、選上次那個角色，再打開手機
+// 被 app.html 那層包著（桌面圖示打開的是霧語自己那頁，酒館在它的 iframe 裡）：開機畫面由外面那頁蓋，這裡只要報「手機開好了」
+const SHELL = (() => { try { return window.parent !== window && !!window.parent.document.getElementById('bp-shell'); } catch { return false; } })();
+const tellShell = (msg) => { if (!SHELL) return; try { window.parent.postMessage(msg, location.origin); } catch { /* 外面那頁不在就算了 */ } };
+
+// 從桌面的「霧語」圖示打開（網址帶 bp-app，或被 app.html 包著）：等酒館載好、選上次那個角色，再打開手機
 function launchFromIcon(phone) {
   let u; try { u = new URL(location.href); } catch { return; }
   // iPhone 桌面上每個網頁 App 的儲存是分開的：從 Brume 圖示開過一次就記一筆，
@@ -853,19 +857,19 @@ function launchFromIcon(phone) {
   const ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (/Macintosh/.test(navigator.userAgent) && navigator.maxTouchPoints > 1);
   const standalone = !!navigator.standalone || matchMedia('(display-mode: standalone)').matches;
   let remembered = false; try { remembered = ios && standalone && localStorage.getItem('brume-phone:app-mode') === '1'; } catch { /* 讀不到 */ }
-  if (!u.searchParams.has('bp-app') && !remembered) return;
+  if (!u.searchParams.has('bp-app') && !remembered && !SHELL) return;
   if (ios && standalone) { try { localStorage.setItem('brume-phone:app-mode', '1'); } catch { /* 存不了 */ } }
-  if (u.searchParams.has('bp-app')) { u.searchParams.delete('bp-app'); history.replaceState(null, '', u.href); }
-  showSplash(); setTimeout(hideSplash, 30000); // 萬一卡住，三十秒後還是讓她看得到酒館
+  if (u.searchParams.has('bp-app') || u.searchParams.has('bp-shell')) { u.searchParams.delete('bp-app'); u.searchParams.delete('bp-shell'); history.replaceState(null, '', u.href); }
+  if (SHELL) tellShell({ type: 'bp-splash', conf: splashConf() }); else { showSplash(); setTimeout(hideSplash, 30000); } // 萬一卡住，三十秒後還是讓她看得到酒館
   const shownAt = Date.now(); // 10/17 比比說照片只閃一秒：酒館載得快的時候，開機畫面至少留 2.5 秒再收
-  const c = ctx(); if (!c?.eventSource) { hideSplash(); return; }
+  const c = ctx(); if (!c?.eventSource) { hideSplash(); tellShell({ type: 'bp-ready' }); return; }
   const go = async () => {
     const want = c.extensionSettings?.['brume-phone']?.lastChar;
     const i = want ? (c.characters || []).findIndex((x) => (x.avatar || x.name) === want) : -1;
     if (i >= 0 && String(c.characterId) !== String(i)) {
       await new Promise((res) => { c.eventSource.once?.(c.eventTypes?.CHAT_CHANGED || 'chat_id_changed', res); setTimeout(res, 8000); c.selectCharacterById?.(String(i)); });
     }
-    setTimeout(() => { phone.open(); setTimeout(hideSplash, Math.max(250, 2500 - (Date.now() - shownAt))); }, 300);
+    setTimeout(() => { phone.open(); tellShell({ type: 'bp-ready' }); setTimeout(hideSplash, Math.max(250, 2500 - (Date.now() - shownAt))); }, 300);
   };
   // 酒館載好會發 APP_READY；有些版本或擴充會讓它晚到，所以也每秒看一次角色清單載好了沒，先到的那個做
   let done = false;
