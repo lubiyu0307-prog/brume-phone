@@ -47,28 +47,47 @@
     applyConf(conf);
 
     // 大小跟著看得到的範圍走（iPhone 彈鍵盤時 visualViewport 會變矮，酒館那層要跟著縮，手機才不會被鍵盤蓋住）
-    // 只縮高度、不要搬位置：這一頁本身捲不動，彈鍵盤時 pageTop 會報一個數字但看得到的範圍其實就在最上面，
-    // 照它搬會把整層推到畫面外（10/17 比比打字時整個手機不見，只剩底色）
-    // 0.20.2：照 iOS 的老規矩跟著 visualViewport 的 offsetTop 走（0.20.0 用 pageTop−scrollY、0.20.1 釘在 0 都還是不見）
+    // 10/17 比比打字時整個手機不見只剩底色，0.20.0 照 pageTop−scrollY 搬、0.20.1 釘在 0、0.20.2 照 offsetTop 搬都還是不見。
+    // 10/18 她的截圖：鍵盤上面只剩這一頁 body 的漸層（而且是漸層的下半段），也就是整頁被 iOS 往下推去找輸入框，外殼跟著被推出畫面。
+    // 0.20.3 不猜位置了：<html> 釘死（手機版酒館也是這樣擋 iOS 捲頁的）、每次畫面一動就先把頁面捲回最上面，
+    // 外殼永遠在 0、只把高度縮成看得到的那段；酒館那層跟著縮，輸入框落在看得到的範圍裡，iOS 就沒理由再推。
     // 每次量到的數字一起寫進霧語的除錯紀錄（同一個 localStorage），設定裡「複製除錯紀錄」會帶出來給格看
+    document.documentElement.style.cssText += ';position:fixed;top:0;left:0;width:100%;height:100%;overflow:hidden';
+    var lastDbg = {};
     function shellDbg(tag) {
       try {
-        var vv = window.visualViewport; var b = sh.getBoundingClientRect();
-        var row = { t: new Date().toTimeString().slice(0, 8), tag: 'shell-' + tag, vv: vv ? [Math.round(vv.width), Math.round(vv.height), Math.round(vv.offsetTop), Math.round(vv.pageTop || 0)] : null, win: [innerWidth, innerHeight, Math.round(scrollY)], sh: [Math.round(b.top), Math.round(b.height)], html: getComputedStyle(document.documentElement).position };
+        var now = Date.now(); if (lastDbg[tag] && now - lastDbg[tag] < 150) return; lastDbg[tag] = now; // 捲動事件一秒好幾十次，同一種留一筆就好
+        var vv = window.visualViewport; var b = sh.getBoundingClientRect(); var se = document.scrollingElement || document.documentElement;
+        var row = { t: new Date().toTimeString().slice(0, 8), tag: 'shell-' + tag, vv: vv ? [Math.round(vv.width), Math.round(vv.height), Math.round(vv.offsetTop), Math.round(vv.pageTop || 0)] : null, win: [innerWidth, innerHeight, Math.round(scrollY)], sh: [Math.round(b.top), Math.round(b.height)], doc: [Math.round(se.scrollTop), se.scrollHeight, document.body.scrollHeight], html: getComputedStyle(document.documentElement).position };
         var a = JSON.parse(localStorage.getItem('brume-phone:dbg') || '[]'); a.push(row); localStorage.setItem('brume-phone:dbg', JSON.stringify(a.slice(-80)));
       } catch (e) { /* 記不了就算了 */ }
     }
+    function unscroll() {
+      var vv = window.visualViewport;
+      try { if (scrollY || (vv && (vv.pageTop || vv.offsetTop))) window.scrollTo(0, 0); } catch (e) { /* 捲不動就算了 */ }
+      try { var se = document.scrollingElement; if (se && se.scrollTop) se.scrollTop = 0; } catch (e) { /* 同上 */ }
+    }
     function fit(why) {
+      unscroll();
       var vv = window.visualViewport;
       var W = Math.round(vv ? vv.width : innerWidth); var H = Math.round(vv ? vv.height : innerHeight);
-      var Y = Math.round(vv ? vv.offsetTop : 0);
-      sh.style.width = W + 'px'; sh.style.height = H + 'px'; sh.style.top = Y + 'px'; sh.style.left = '0px';
+      sh.style.width = W + 'px'; sh.style.height = H + 'px'; sh.style.top = '0px'; sh.style.left = '0px';
       if (why) { shellDbg(why); setTimeout(function () { shellDbg(why + '+400'); }, 400); }
     }
+    // 鍵盤的動畫大約三百毫秒，visualViewport 的事件有時只在最後來一次：多量幾次，把中間被推走的那段也拉回來
+    function refit(why) { fit(why); [60, 160, 320, 600].forEach(function (ms) { setTimeout(function () { fit(); }, ms); }); }
     fit();
-    if (window.visualViewport) { visualViewport.addEventListener('resize', function () { fit('vv-resize'); }); visualViewport.addEventListener('scroll', function () { fit('vv-scroll'); }); }
-    addEventListener('resize', function () { fit('resize'); });
+    if (window.visualViewport) { visualViewport.addEventListener('resize', function () { refit('vv-resize'); }); visualViewport.addEventListener('scroll', function () { fit('vv-scroll'); }); }
+    addEventListener('resize', function () { refit('resize'); });
     addEventListener('scroll', function () { fit('scroll'); });
+    // 酒館跟這一頁同網域，裡面哪個輸入框被點到、鍵盤收掉，這裡都聽得到：不等 iOS 推完才反應
+    function hookFrame() {
+      try {
+        var d = fr.contentWindow.document;
+        d.addEventListener('focusin', function () { refit('focusin'); }, true);
+        d.addEventListener('focusout', function () { setTimeout(function () { refit('focusout'); }, 50); }, true);
+      } catch (e) { /* 跨網域就算了 */ }
+    }
 
     var revealed = false; var shownAt = Date.now();
     function reveal() { if (revealed) return; revealed = true; sh.classList.add('ready'); }
@@ -82,6 +101,7 @@
     });
     // 酒館要登入的時候，照片得讓開，不然她看不到登入框
     fr.addEventListener('load', function () {
+      hookFrame();
       try { if (/login/i.test(fr.contentWindow.location.pathname)) reveal(); } catch (e) { /* 跨網域讀不到就算了 */ }
     });
     // 通知小幫手傳話（點通知時酒館已經開著）：小幫手找到的可能是這一頁，轉給裡面的霧語

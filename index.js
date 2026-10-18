@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.20.2';
+const VERSION = '0.20.3';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -473,8 +473,20 @@ function build() {
         phoneOff.set(ch.charKey, true); sheet.classList.remove('bp-show'); close('cardoff'); life.refreshPrompt(); syncOff();
       }
       if (a === 'dbg') {
-        let txt = ''; try { txt = localStorage.getItem(DBG_KEY) || '[]'; } catch { /* 讀不到 */ }
-        txt = `Brume Phone v${VERSION} ${navigator.userAgent}\n${txt}`;
+        // 10/18：整包 JSON 貼進 Discord 會被字數限制切掉，只剩尾巴；改成一列一行的精簡版，固定不變的欄位放最上面一次
+        let rows = []; try { rows = JSON.parse(localStorage.getItem(DBG_KEY) || '[]'); } catch { /* 讀不到 */ }
+        const last = rows[rows.length - 1] || {};
+        const os = (navigator.userAgent.match(/OS (\d+[_.]\d+)/) || [])[1] || navigator.userAgent.slice(0, 40);
+        const n = (v) => (Array.isArray(v) ? v.join(',') : '-');
+        const line = (r) => {
+          const s = [r.t, r.tag + (r.x ? `(${String(r.x).slice(0, 20)})` : ''), `vv${n(r.vv)}`, `win${n(r.win)}`];
+          if (r.sh) s.push(`sh${n(r.sh)}`); else s.push(`ov${n(r.ov)}`, `ph${n(r.ph)}`, r.open ? 'open' : 'closed');
+          if (r.doc) s.push(`doc${n(r.doc)}`);
+          s.push(r.html, r.act ? `act=${String(r.act).slice(0, 8)}` : '');
+          return s.filter(Boolean).join(' ');
+        };
+        let txt = `Brume Phone v${VERSION} iOS${os} pwa=${last.pwa} safe=${last.safe} tc=${last.tc || ''}\nmeta=${last.meta || ''}\n`;
+        txt += rows.slice(-20).map(line).join('\n');
         try { await navigator.clipboard.writeText(txt); say('複製好了，貼給格'); } catch {
           sheet.insertAdjacentHTML('beforeend', '<textarea class="bp-dbgbox" readonly></textarea>');
           const box = sheet.querySelector('.bp-dbgbox'); box.value = txt; box.select(); say('自動複製不行，全選這格長按複製');
