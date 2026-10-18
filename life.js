@@ -60,7 +60,8 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
       notesOn ? `便條｜${ch.name} 貼在冰箱上給她的叮嚀（20 字內）` : '',
       '</phone>',
       `行事曆要勤勞記：劇情裡真的發生、值得記住的「第一次」和轉折（第一次說出口的話、第一次一起做的事）、約好的事、紀念日、回診檢查這類跟兩人生活有關的日子。標題 12 字內，像他會寫的字。`,
-      notesOn ? `便條也要勤勞貼：劇情裡她的身體、作息、天氣、要吃的藥或補品、他出門前放不下心的事，他都會寫一張貼著，內容要接得上劇情。一次一兩張。` : '',
+      // 10/18 比比：冰箱門一整片、每則都跳出來。改成偶爾一張
+      notesOn ? `便條偶爾才貼：只有他要出門、她要自己待一陣子，而且真的有放不下心的事（身體、要吃的藥、天氣）才寫，內容要接得上劇情。一次最多一張，大部分回覆都不寫。` : '',
       have.length ? `手機上已經有的，不要再寫一次（同一件事換個說法也算重複）：\n${have.map((h) => '- ' + h).join('\n')}` : '',
       '如果這段劇情裡兩人的關係明顯往前一步（告白成功、開始交往、搬去一起住、結婚），在 <phone> 裡加一行：關係｜新的關係（曖昧、交往、同居、結婚其中一個）。',
       // 10/16 比比：兩個人還在床上，LINE 一直跳通知。人就在旁邊，不會傳訊息
@@ -165,8 +166,11 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
       if ((await data.cal.all(ch.key)).length > before) onNotify?.({ app: 'calendar', who: ch.name, text: `記上行事曆：${e.date.slice(5).replace('-', '/')} ${e.title}` });
     }
     if (stage.unlocked(cur, 'notes')) {
-      const have = new Set((await data.notes.all(ch.key)).map((n) => n.text));
-      for (const t of notes.slice(0, 3)) {
+      const all = await data.notes.all(ch.key);
+      const have = new Set(all.map((n) => n.text));
+      // 一次一張，而且離他上一張至少一個半小時（模型還是每則都寫的話，程式這邊擋）
+      const lastHim = Math.max(0, ...all.filter((n) => n.by === 'him').map((n) => n.ts || 0));
+      for (const t of Date.now() - lastHim < 90 * 60000 ? [] : notes.slice(0, 1)) {
         if (!t || have.has(t)) continue;
         await data.notes.add(ch.key, { text: t, by: 'him' }); have.add(t);
         onNotify?.({ app: 'notes', who: ch.name, text: `在冰箱貼了便條：${t}` });
