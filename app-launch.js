@@ -72,6 +72,8 @@
       var vv = window.visualViewport;
       var W = Math.round(vv ? vv.width : innerWidth); var H = Math.round(vv ? vv.height : innerHeight);
       sh.style.width = W + 'px'; sh.style.height = H + 'px'; sh.style.top = '0px'; sh.style.left = '0px';
+      // 鍵盤彈出來的時候，底下 home 橫條那一條不在畫面裡了，酒館那層不用再讓它（10/18 輸入框跟鍵盤之間多一條黑的）
+      fr.style.height = (H < innerHeight - 120) ? '100%' : '';
       if (why) { shellDbg(why); setTimeout(function () { shellDbg(why + '+400'); }, 400); }
     }
     // 鍵盤的動畫大約三百毫秒，visualViewport 的事件有時只在最後來一次：多量幾次，把中間被推走的那段也拉回來

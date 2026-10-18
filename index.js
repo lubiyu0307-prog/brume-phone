@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.20.3';
+const VERSION = '0.20.4';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -229,12 +229,14 @@ function build() {
   // fixed 的原點就不是螢幕左上角，所以放好之後量一次實際位置，差多少補多少
   const fit = () => {
     const vv = window.visualViewport;
-    const W = Math.round(vv ? vv.width : innerWidth); const H = Math.round(vv ? vv.height : innerHeight);
+    // 被 app.html 包著的時候，iframe 的大小就是看得到的範圍（鍵盤的事外面那頁已經處理掉了），
+    // 直接用 innerWidth／innerHeight；iframe 裡的 visualViewport 在 iOS 彈鍵盤時會少報一截（10/18 輸入框下面多一條白的）
+    const W = Math.round(SHELL ? innerWidth : vv ? vv.width : innerWidth); const H = Math.round(SHELL ? innerHeight : vv ? vv.height : innerHeight);
     // 看得到的範圍在網頁座標裡的左上角。用 pageTop − scrollY，不用 offsetTop：
     // iPhone（iOS 26）彈出鍵盤時整頁捲下去 404，offsetTop 也報 404，但其實看得到的範圍就在最上面，
     // 照 offsetTop 擺會把手機擺到鍵盤後面（0.11.1 的除錯紀錄抓到的）
-    const X = Math.round(vv ? (vv.pageLeft != null ? vv.pageLeft - scrollX : vv.offsetLeft) : 0);
-    const Y = Math.round(vv ? (vv.pageTop != null ? vv.pageTop - scrollY : vv.offsetTop) : 0);
+    const X = SHELL ? 0 : Math.round(vv ? (vv.pageLeft != null ? vv.pageLeft - scrollX : vv.offsetLeft) : 0);
+    const Y = SHELL ? 0 : Math.round(vv ? (vv.pageTop != null ? vv.pageTop - scrollY : vv.offsetTop) : 0);
     overlay.style.setProperty('--bp-w', `${W}px`); overlay.style.setProperty('--bp-h', `${H}px`);
     overlay.style.left = `${X}px`; overlay.style.top = `${Y}px`;
     overlay.style.setProperty('--bp-left', `${X}px`); overlay.style.setProperty('--bp-top', `${Y}px`);
