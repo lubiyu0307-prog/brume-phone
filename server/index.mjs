@@ -76,7 +76,7 @@ async function fallback(handle, u, chat, now) {
   const local = new Date(now + (Number(cfg.tz) || 0) * 60000); // 玩家那邊的時間（用 UTC 欄位讀）
   const h = local.getUTCHours();
   const qf = Number.isFinite(cfg.quietFrom) ? cfg.quietFrom : 1; const qt = Number.isFinite(cfg.quietTo) ? cfg.quietTo : 9;
-  if (qf < qt ? h >= qf && h < qt : h >= qf || h < qt) return false;
+  if (qf !== qt && (qf < qt ? h >= qf && h < qt : h >= qf || h < qt)) return false; // 起訖一樣＝不限
   if (m.lastFallback && now - m.lastFallback < 20 * 3600e3) return false;
   const text = m.fallback.splice(Math.floor(Math.random() * m.fallback.length), 1)[0];
   const it = { id: `fb${now.toString(36)}`, at: now, title: m.title || '', body: text, lines: [{ text, st: '' }], status: 'sent', sentAt: now, ...(cfg.real ? { real: true } : {}) };

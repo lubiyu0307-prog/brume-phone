@@ -170,7 +170,7 @@ export async function bgActive(ch) {
 export function nextSlot(from, gap, dayCount) {
   const { max, quietFrom, quietTo } = pushSet.get();
   let at = from + gap * (0.8 + Math.random() * 0.8);
-  const inQuiet = (d) => { const h = d.getHours() + d.getMinutes() / 60; return quietFrom < quietTo ? h >= quietFrom && h < quietTo : h >= quietFrom || h < quietTo; };
+  const inQuiet = (d) => { const h = d.getHours() + d.getMinutes() / 60; if (quietFrom === quietTo) return false; /* 不限 */ return quietFrom < quietTo ? h >= quietFrom && h < quietTo : h >= quietFrom || h < quietTo; };
   const wake = (d) => { const w = new Date(d); w.setHours(quietTo, 0, 0, 0); if (w <= d) w.setDate(w.getDate() + 1); return w.getTime() + Math.random() * 3600e3; };
   if (inQuiet(new Date(at))) at = wake(new Date(at));
   if (dayCount(at) >= max) { const d = new Date(at); d.setDate(d.getDate() + 1); d.setHours(quietTo, 0, 0, 0); at = d.getTime() + Math.random() * 3 * 3600e3; }

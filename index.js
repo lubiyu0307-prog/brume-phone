@@ -19,7 +19,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.21.2';
+const VERSION = '0.21.3';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -208,7 +208,7 @@ function build() {
         <div class="bp-setrow bp-pushrow"><span>訊息照什麼時間寫</span><div class="bp-seg" data-seg="pmode">${[['story', '照劇情'], ['real', '照現實']].map(([v, n]) => `<b data-act="pmode" data-v="${v}">${n}</b>`).join('')}</div></div>
         <p class="bp-sheet-note bp-pushrow">照劇情：照故事裡的時間寫，你們在劇情裡待在一起時改照現實。照現實：照妳收到的那一刻寫。</p>
         <div class="bp-setrow bp-pushrow"><span>他一天最多傳</span><div class="bp-seg" data-seg="pmax">${[1, 2, 3, 5].map((n) => `<b data-act="pmax" data-v="${n}">${n} 次</b>`).join('')}</div></div>
-        <div class="bp-setrow bp-pushrow"><span>不吵妳的時段</span><div class="bp-seg" data-seg="pquiet">${[[23, 7], [1, 9], [3, 11]].map(([f, t]) => `<b data-act="pquiet" data-v="${f}-${t}">${f}–${t} 點</b>`).join('')}</div></div>
+        <div class="bp-setrow bp-pushrow"><span>不吵妳的時段</span><div class="bp-seg" data-seg="pquiet">${[[23, 7], [1, 9], [3, 11], [0, 0]].map(([f, t]) => `<b data-act="pquiet" data-v="${f}-${t}">${f === t ? '不限' : `${f}–${t} 點`}</b>`).join('')}</div></div>
       </section>
       <section class="bp-setgrp"><h4>畫面</h4>
         <div class="bp-setrow"><span>護眼模式</span><div class="bp-seg" data-seg="eye">${[['off', '關'], ['on', '開'], ['auto', '晚上自動']].map(([k, n]) => `<b data-act="eye" data-v="${k}">${n}</b>`).join('')}</div></div>
