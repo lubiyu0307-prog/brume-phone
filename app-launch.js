@@ -67,13 +67,15 @@
       try { if (scrollY || (vv && (vv.pageTop || vv.offsetTop))) window.scrollTo(0, 0); } catch (e) { /* 捲不動就算了 */ }
       try { var se = document.scrollingElement; if (se && se.scrollTop) se.scrollTop = 0; } catch (e) { /* 同上 */ }
     }
+    var fullH = 0; // 沒鍵盤時的整頁高度：iOS 18 彈鍵盤時 innerHeight 有時會跟著縮（10/18 的紀錄一下 793 一下 389），不能拿它當基準
     function fit(why) {
       unscroll();
       var vv = window.visualViewport;
       var W = Math.round(vv ? vv.width : innerWidth); var H = Math.round(vv ? vv.height : innerHeight);
+      fullH = Math.max(fullH, innerHeight, H);
       sh.style.width = W + 'px'; sh.style.height = H + 'px'; sh.style.top = '0px'; sh.style.left = '0px';
       // 鍵盤彈出來的時候，底下 home 橫條那一條不在畫面裡了，酒館那層不用再讓它（10/18 輸入框跟鍵盤之間多一條黑的）
-      fr.style.height = (H < innerHeight - 120) ? '100%' : '';
+      fr.style.height = (H < fullH - 120) ? '100%' : '';
       if (why) { shellDbg(why); setTimeout(function () { shellDbg(why + '+400'); }, 400); }
     }
     // 鍵盤的動畫大約三百毫秒，visualViewport 的事件有時只在最後來一次：多量幾次，把中間被推走的那段也拉回來

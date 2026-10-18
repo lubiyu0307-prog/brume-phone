@@ -24,7 +24,7 @@
   .hide { display: none; }
 
   /* 從桌面圖示打開時：這一頁自己當門面。先蓋開機畫面，酒館在後面那層偷偷載，手機開好了照片才退場 */
-  body.shell { display: block; overflow: hidden; height: 100%; }
+  body.shell { display: block; overflow: hidden; height: 100%; min-height: 0; }
   body.shell main { display: none; }
   #bp-shell { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; background: #0b0b0c; }
   /* iframe 裡拿不到 env(safe-area-inset-*)：底下 home 橫條那一條由這一頁留出來，不然手機底部會被壓在橫條下面 */
