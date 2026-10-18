@@ -18,7 +18,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.20.5';
+const VERSION = '0.20.6';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -482,7 +482,7 @@ function build() {
         const n = (v) => (Array.isArray(v) ? v.join(',') : '-');
         const line = (r) => {
           const s = [r.t, r.tag + (r.x ? `(${String(r.x).slice(0, 20)})` : ''), `vv${n(r.vv)}`, `win${n(r.win)}`];
-          if (r.sh) s.push(`sh${n(r.sh)}`); else s.push(`ov${n(r.ov)}`, `ph${n(r.ph)}`, r.open ? 'open' : 'closed');
+          if (r.sh) s.push(`sh${n(r.sh)}`, r.sv ? `sv${r.sv}` : 'sv?'); else s.push(`ov${n(r.ov)}`, `ph${n(r.ph)}`, r.open ? 'open' : 'closed');
           if (r.doc) s.push(`doc${n(r.doc)}`);
           s.push(r.html, r.act ? `act=${String(r.act).slice(0, 8)}` : '');
           return s.filter(Boolean).join(' ');
@@ -862,6 +862,17 @@ function hideSplash() {
 // 被 app.html 那層包著（桌面圖示打開的是霧語自己那頁，酒館在它的 iframe 裡）：開機畫面由外面那頁蓋，這裡只要報「手機開好了」
 const SHELL = (() => { try { return window.parent !== window && !!window.parent.document.getElementById('bp-shell'); } catch { return false; } })();
 const tellShell = (msg) => { if (!SHELL) return; try { window.parent.postMessage(msg, location.origin); } catch { /* 外面那頁不在就算了 */ } };
+// 10/18：iPhone 把 app.html 和 app-launch.js 留在快取裡，擴充更新了門面還是舊的（比比更新到 0.20.5，外殼還在跑 0.20.3 的行為）。
+// 門面跟擴充版本對不上，就把外面那頁換個帶版本的網址重載一次（新網址不會命中快取）；同一版只試一次，免得轉圈
+if (SHELL) {
+  try {
+    const pv = window.parent.BP_SHELL_VERSION; const k = 'brume-phone:shell-refresh';
+    if (pv !== VERSION && sessionStorage.getItem(k) !== VERSION) {
+      sessionStorage.setItem(k, VERSION); dbg('shell-refresh', `${pv || '?'}->${VERSION}`);
+      window.parent.location.replace(new URL(`app.html?v=${VERSION}`, window.parent.location.href).href);
+    }
+  } catch { /* 讀不到外面那頁就算了 */ }
+}
 
 // 從桌面的「霧語」圖示打開（網址帶 bp-app，或被 app.html 包著）：等酒館載好、選上次那個角色，再打開手機
 function launchFromIcon(phone) {

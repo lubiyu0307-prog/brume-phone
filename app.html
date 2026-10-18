@@ -23,40 +23,6 @@
   a { color: #fff; }
   .hide { display: none; }
 
-  /* 從桌面圖示打開時：這一頁自己當門面。先蓋開機畫面，酒館在後面那層偷偷載，手機開好了照片才退場 */
-  body.shell { display: block; overflow: hidden; height: 100%; min-height: 0; }
-  body.shell main { display: none; }
-  #bp-shell { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; overflow: hidden; background: #0b0b0c; }
-  /* iframe 裡拿不到 env(safe-area-inset-*)：底下 home 橫條那一條由這一頁留出來，不然手機底部會被壓在橫條下面 */
-  #bp-shell[hidden] { display: none; }
-  #bp-shell-frame { position: absolute; top: 0; left: 0; width: 100%; height: calc(100% - env(safe-area-inset-bottom, 0px)); border: 0; display: block; background: #687484; opacity: 0; transition: opacity .5s ease; }
-  #bp-shell.ready #bp-shell-frame { opacity: 1; }
-  #bp-shell-splash {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; display: flex; flex-direction: column; align-items: center; justify-content: center;
-    background: linear-gradient(180deg, #687484 0%, #8d95a0 45%, #cec5b8 100%);
-    background-image: var(--bp-splash-bg, none), linear-gradient(180deg, #687484 0%, #8d95a0 45%, #cec5b8 100%);
-    background-size: cover; background-position: center;
-    opacity: 1; transition: opacity .7s ease; overflow: hidden; color: #fff;
-    font-family: Georgia, "Times New Roman", "Noto Serif TC", "Songti TC", serif;
-  }
-  #bp-shell.ready #bp-shell-splash { opacity: 0; pointer-events: none; }
-  #bp-shell-splash.has-bg::before { content: ''; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(180deg, rgba(20, 24, 32, .15) 0%, rgba(20, 24, 32, .05) 40%, rgba(20, 24, 32, .55) 100%); }
-  #bp-shell-splash .mist {
-    position: absolute; left: -30%; right: -30%; bottom: -10%; height: 55%;
-    background: radial-gradient(ellipse at 30% 60%, rgba(255, 255, 255, .55), transparent 60%), radial-gradient(ellipse at 75% 75%, rgba(255, 255, 255, .45), transparent 55%);
-    filter: blur(18px); animation: bp-mist 9s ease-in-out infinite alternate;
-  }
-  #bp-shell-splash.has-bg .mist { opacity: .45; }
-  @keyframes bp-mist { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
-  #bp-shell-splash .txt { position: relative; text-align: center; transform: translateY(-6vh); }
-  #bp-shell-splash .txt b { display: block; font-weight: 400; font-size: clamp(44px, 14vw, 72px); letter-spacing: .04em; text-shadow: 0 2px 18px rgba(30, 34, 44, .35); }
-  #bp-shell-splash .txt span { display: block; margin-top: 8px; font-size: 16px; letter-spacing: .3em; opacity: .9; text-shadow: 0 1px 8px rgba(30, 34, 44, .4); }
-  #bp-shell-splash .dots { position: absolute; bottom: calc(48px + env(safe-area-inset-bottom)); display: flex; gap: 8px; }
-  #bp-shell-splash .dots u { width: 6px; height: 6px; border-radius: 50%; background: rgba(255, 255, 255, .85); animation: bp-sdot 1.2s ease-in-out infinite; }
-  #bp-shell-splash .dots u:nth-child(2) { animation-delay: .2s; }
-  #bp-shell-splash .dots u:nth-child(3) { animation-delay: .4s; }
-  @keyframes bp-sdot { 0%, 100% { opacity: .25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
-  #bp-shell-splash:not(.has-bg) .dots u { background: rgba(70, 78, 92, .55); }
 </style>
 </head>
 <body>
@@ -82,6 +48,10 @@
   <iframe id="bp-shell-frame" title="酒館" allow="camera; microphone; clipboard-read; clipboard-write; autoplay"></iframe>
   <div id="bp-shell-splash"><div class="mist"></div><div class="txt"><b>Brume</b><span>霧語</span></div><i class="dots"><u></u><u></u><u></u></i></div>
 </div>
-<script src="app-launch.js"></script>
+<script>
+// 10/18：iPhone 會把這一頁和 app-launch.js 留在快取裡，擴充更新了門面還在跑舊的（比比更新到 0.20.5 紀錄還是 0.20.3 的行為）。
+// 所以這一頁只留固定不變的骨架，外殼的樣式和程式全在 app-launch.js，每次都帶時間戳去抓最新的
+(function () { var s = document.createElement('script'); s.src = 'app-launch.js?t=' + Date.now(); document.body.appendChild(s); })();
+</script>
 </body>
 </html>
