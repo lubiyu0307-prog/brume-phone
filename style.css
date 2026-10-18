@@ -1057,6 +1057,14 @@
 .bp-sheet button[hidden] { display: none; }
 .bp-sheet button.bp-cancel { background: transparent; color: #8a8378; }
 .bp-ver { text-align: center; font-size: 11px; color: #a39b8f; margin-top: 4px; }
+/* 設定分組（10/18 比比說太雜）：常用的三組攤開，桌面圖示和進階收起來 */
+.bp-setgrp { margin: 0 0 12px; padding: 4px 12px 6px; border-radius: 18px; background: rgba(255, 255, 255, .42); }
+.bp-setgrp h4, .bp-setgrp summary { margin: 8px 2px 2px; font-size: 12px; font-weight: 700; letter-spacing: .08em; color: #9a8f80; }
+.bp-setgrp summary { cursor: pointer; list-style: none; padding: 4px 0 6px; }
+.bp-setgrp summary::-webkit-details-marker { display: none; }
+.bp-setgrp summary::after { content: "›"; float: right; font-size: 16px; line-height: 1; transition: transform .2s; }
+.bp-setgrp[open] summary::after { transform: rotate(90deg); }
+.bp-setgrp button { background: rgba(255, 255, 255, .85); }
 
 /* ---------- 手機寬度（放最後，才蓋得過上面的規則） ---------- */
 @media (max-width: 500px) {
@@ -1273,3 +1281,43 @@
 /* 設定頁：開機畫面的字 */
 .bp-setrow input.bp-splash-in { width: 100%; box-sizing: border-box; padding: 9px 10px; border: 1px solid #e3ddd3; border-radius: 10px; font: inherit; font-size: 16px; background: #fff; color: #2b2824; }
 
+/* ---------- 尋找、天氣、包裹（0.21.0） ---------- */
+.bp-ap-find { background: #eef0ea; }
+.bp-find-map { position: relative; flex: 1; min-height: 240px; overflow: hidden; background: #e7eadf; }
+.bp-find-map i { position: absolute; background: #fbfaf6; box-shadow: 0 0 0 1px rgba(0, 0, 0, .04); }
+.bp-find-map .r1 { left: -10%; right: -10%; top: 38%; height: 14px; transform: rotate(-8deg); }
+.bp-find-map .r2 { top: -10%; bottom: -10%; left: 30%; width: 12px; transform: rotate(12deg); }
+.bp-find-map .r3 { top: -10%; bottom: -10%; left: 72%; width: 9px; transform: rotate(-4deg); }
+.bp-find-map .r4 { left: -10%; right: -10%; top: 74%; height: 9px; transform: rotate(5deg); }
+.bp-find-map .park { left: 52%; top: 12%; width: 26%; height: 20%; border-radius: 30px; background: #cfdcc0; box-shadow: none; }
+.bp-find-pin { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; border: 3px solid #fff; background: #c98b5a; box-shadow: 0 4px 14px rgba(0, 0, 0, .2); display: grid; place-items: center; color: #fff; font-weight: 700; font-size: 20px; }
+.bp-find-pin img { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; }
+.bp-find-pin u { position: absolute; inset: -14px; border-radius: 50%; background: rgba(201, 139, 90, .25); animation: bp-find-pulse 2.4s ease-out infinite; z-index: -1; }
+.bp-find-pin.off { filter: grayscale(1); opacity: .5; }
+.bp-find-pin.off u { display: none; }
+@keyframes bp-find-pulse { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+.bp-find-card { background: #fff; border-radius: 22px 22px 0 0; padding: 16px 20px 26px; box-shadow: 0 -4px 18px rgba(0, 0, 0, .06); }
+.bp-find-card b { display: block; font-size: 18px; }
+.bp-find-card span { display: block; margin-top: 6px; font-size: 15px; color: #4b463f; }
+.bp-find-card p { margin: 8px 0 6px; font-size: 14px; color: #6b655c; line-height: 1.6; }
+.bp-find-card small { font-size: 11.5px; color: #a39b8f; }
+.bp-ap-wx { background: linear-gradient(180deg, #8ea3b5, #c6d0d6); color: #fff; }
+.bp-ap-wx.sun { background: linear-gradient(180deg, #7fb2d9, #cfe3ef); }
+.bp-ap-wx.rain { background: linear-gradient(180deg, #5f6f7d, #9aa6ae); }
+.bp-ap-wx .bp-ap-head, .bp-ap-wx .bp-ap-empty { color: #fff; }
+.bp-wx-main { text-align: center; margin-top: 40px; text-shadow: 0 1px 4px rgba(0, 0, 0, .15); }
+.bp-wx-main small { display: block; font-size: 22px; }
+.bp-wx-main b { display: block; font-size: 84px; font-weight: 200; line-height: 1.1; }
+.bp-wx-main span { display: block; font-size: 18px; }
+.bp-wx-main em { display: block; margin-top: 14px; font-style: normal; font-size: 12px; opacity: .85; }
+.bp-wx-tip { margin: 28px 24px 0; padding: 12px 14px; border-radius: 14px; background: rgba(255, 255, 255, .22); font-size: 13.5px; text-align: center; }
+.bp-parcel { display: flex; gap: 12px; align-items: center; background: #fff; border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; cursor: pointer; }
+.bp-parcel > i { font-style: normal; font-size: 28px; width: 40px; text-align: center; }
+.bp-parcel > div { flex: 1; min-width: 0; }
+.bp-parcel b { display: block; font-size: 15px; }
+.bp-parcel p { margin: 4px 0; font-size: 13.5px; color: #6b655c; line-height: 1.5; }
+.bp-parcel small { font-size: 11.5px; color: #a39b8f; }
+.bp-parcel.coming { opacity: .75; cursor: default; }
+.bp-parcel.coming > i { animation: bp-parcel-bob 1.6s ease-in-out infinite; }
+.bp-parcel:not(.coming):not(.open) { border-left: 4px solid #c98b5a; }
+@keyframes bp-parcel-bob { 50% { transform: translateY(-3px); } }

@@ -51,6 +51,9 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
       `這段劇情之後，如果手機上很自然會多出什麼，就在整段回覆的最後加一個區塊（只寫用得到的行）：`,
       '<phone>',
       `劇情日期｜YYYY-MM-DD（每次都寫這一行：故事裡現在是哪一天。故事沒交代年份就用 ${new Date().getFullYear()}${sday ? `；上次是 ${sday}，照劇情往後推` : ''}）`,
+      `位置｜地點｜一句話（每次都寫：這段結束時 ${ch.name} 人在哪、在做什麼。地點 10 字內，像地圖上的名字；一句話是他當下的狀態，15 字內。兩人在一起就寫同一個地方）`,
+      `天氣｜城市｜天氣｜氣溫（每次都寫：故事裡那個地方現在的天氣，例如 天氣｜台北｜小雨｜18。故事沒交代就照季節和時間合理推，跟上次差不多就照抄）`,
+      `包裹｜東西｜附的小卡（只有兩人分開、他有理由的時候才寫：她生病、加班、心情不好、紀念日，他幫她叫了外送或寄了東西。東西 12 字內，小卡 30 字內像他會寫的話。很少發生，大部分回覆不寫）`,
       `LINE｜${ch.name} 之後傳給她的訊息（只有兩人分開了才寫：剛道別、各自在外面、他想用手機聯絡她；或劇情裡他真的拿手機傳了訊息。一行一則）`,
       `脆｜${ch.name} 發的貼文（他自己一個人、有空滑手機的時候才會發）`,
       `行事曆｜YYYY-MM-DD｜標題（日期用劇情裡的日子；就是劇情裡的今天就省略，寫成 行事曆｜標題）`,
@@ -61,8 +64,8 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
       have.length ? `手機上已經有的，不要再寫一次（同一件事換個說法也算重複）：\n${have.map((h) => '- ' + h).join('\n')}` : '',
       '如果這段劇情裡兩人的關係明顯往前一步（告白成功、開始交往、搬去一起住、結婚），在 <phone> 裡加一行：關係｜新的關係（曖昧、交往、同居、結婚其中一個）。',
       // 10/16 比比：兩個人還在床上，LINE 一直跳通知。人就在旁邊，不會傳訊息
-      `這段劇情結束時兩人如果還在一起（同一個空間、在親熱、躺在一起、一起吃飯出門），就不寫 LINE 也不寫脆：人就在旁邊，他不會拿手機傳給她。行事曆、便條照常可以寫。`,
-      '劇情裡沒發生值得記的事就不用加。正文裡不要提到這個區塊。',
+      `這段劇情結束時兩人如果還在一起（同一個空間、在親熱、躺在一起、一起吃飯出門），就不寫 LINE、脆、包裹：人就在旁邊，他不會拿手機傳給她。位置、天氣、行事曆、便條照常寫。`,
+      '劇情日期、位置、天氣每次都寫；其他的，劇情裡沒發生值得記的事就不用寫。正文裡不要提到這個區塊。',
     ].filter(Boolean).join('\n'), 1, 0);
   }
 
@@ -96,14 +99,19 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     const body = takeTag(id);
     const ch = currentChar();
     if (!body || !ch) return;
-    const lines = []; const posts = []; const cals = []; const notes = []; let rel = null; let mode = null;
+    const lines = []; const posts = []; const cals = []; const notes = []; const parcels = []; let rel = null; let mode = null;
     let storyToday = (await data.storyDay.get(ch.key)) || data.today();
     // 看起來像寫作計畫、檢查清單的行不收（拍、節拍、玩家、區塊、輸出、正文、標籤）
     for (const raw of body.split('\n')) {
       const l = raw.trim(); if (!l) continue;
       const sd = l.match(/^劇情日期\s*[｜|:：]\s*(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
       if (sd) { storyToday = `${sd[1]}-${sd[2].padStart(2, '0')}-${sd[3].padStart(2, '0')}`; await data.storyDay.set(ch.key, storyToday); mode = null; continue; }
-      const m = l.match(/^(LINE|脆|Threads|關係|行事曆|便條|便利貼)\s*[｜|:：]\s*(.*)$/i);
+      // 位置、天氣：一行一筆，直接存（尋找、天氣 App 讀）
+      const loc = l.match(/^位置\s*[｜|:：]\s*([^｜|]{1,20})(?:\s*[｜|]\s*(.{1,40}))?$/);
+      if (loc) { if (!META.test(l)) await data.where.set(ch.key, { place: loc[1].trim(), line: (loc[2] || '').trim(), day: storyToday, ts: Date.now() }); mode = null; continue; }
+      const wx = l.match(/^天氣\s*[｜|:：]\s*([^｜|]{1,12})\s*[｜|]\s*([^｜|]{1,10})(?:\s*[｜|]\s*(-?\d{1,2}))?/);
+      if (wx) { if (!META.test(l)) await data.weather.set(ch.key, { city: wx[1].trim(), sky: wx[2].trim(), temp: wx[3] != null ? +wx[3] : null, day: storyToday, ts: Date.now() }); mode = null; continue; }
+      const m = l.match(/^(LINE|脆|Threads|關係|行事曆|便條|便利貼|包裹)\s*[｜|:：]\s*(.*)$/i);
       if (m) { mode = m[1].toUpperCase() === 'THREADS' ? '脆' : m[1] === '便利貼' ? '便條' : m[1]; if (!m[2]) continue; }
       else if (!mode || mode === '關係' || l.length > 80) continue; // 開頭沒標是哪一種、或太長的，不是要放進手機的東西
       if (META.test(l)) continue;
@@ -111,6 +119,7 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
       if (mode === '關係') rel = stage.fromWord(text);
       else if (mode === '脆') posts.push(text);
       else if (mode === '行事曆') { const ev = calLine(text, storyToday); if (ev) cals.push({ ...ev, kind: 'story' }); }
+      else if (mode === '包裹') { const [item, ...rest] = text.split(/\s*[｜|]\s*/); if (item) parcels.push({ item: item.replace(/^[「『"]+|[」』"]+$/g, '').slice(0, 24), note: rest.join(' ').replace(/^[「『"]+|[」』"]+$/g, '').slice(0, 60) }); }
       else if (mode === '便條') notes.push(text.replace(/^[「『"]+|[」』"]+$/g, '').slice(0, 40));
       else lines.push(text.replace(/^[「『"]+|[」』"]+$/g, ''));
     }
@@ -119,6 +128,12 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     // 不是一說完就傳：過幾分鐘手機才響
     if (lines.length) pending.push({ id: uid(), key: ch.key, type: 'line', lines: lines.slice(0, 4), at: now + (2 + Math.random() * 3) * 60000 });
     if (posts.length) pending.push({ id: uid(), key: ch.key, type: 'post', posts: posts.slice(0, 2), at: now + (6 + Math.random() * 10) * 60000 });
+    // 包裹：先出現在包裹 App 裡「配送中」，二三十分鐘後送達才響
+    for (const p of parcels.slice(0, 1)) {
+      const eta = now + (20 + Math.random() * 20) * 60000;
+      const x = await data.parcels.add(ch.key, { ...p, eta });
+      if (x) { pending.push({ id: uid(), key: ch.key, type: 'parcel', parcel: x.id, item: x.item, at: eta }); onNotify?.({ app: 'parcel', who: ch.name, text: `幫妳寄了東西，配送中` }); }
+    }
     savePending();
     if (rel && !stage.atLeast(await stage.get(ch.key), rel)) onStageHint?.(ch.key, rel);
   }
@@ -182,6 +197,7 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     for (const p of due) {
       const lines = (p.lines || []).map(clean).filter(Boolean); const posts = (p.posts || []).map(clean).filter(Boolean);
       if (p.type === 'line' && lines.length) { await line.deliver(lines); onNotify?.({ app: 'line', who: ch.name, text: lines[lines.length - 1] }); }
+      if (p.type === 'parcel') onNotify?.({ app: 'parcel', who: ch.name, text: `妳有一份包裹送到了：${p.item}` });
       if (p.type === 'post' && posts.length) { for (const t of posts) await addPost(ch.key, ch.name, t); onNotify?.({ app: 'threads', who: ch.name, text: `發了一篇串文：${posts[0]}` }); }
     }
   }

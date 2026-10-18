@@ -10,6 +10,7 @@ import { createIG } from './ig.js';
 import { createGames } from './games.js';
 import { createCall } from './call.js';
 import { createLife, settings as lifeSet, LEVELS } from './life.js';
+import { createFind, createWeather, createParcels, skyIcon } from './world.js';
 import * as push from './push.js';
 import * as stage from './stage.js';
 import { currentChar, ctx, lite, DATA_PREFIXES, uploadImage, dropImage, phoneOff } from './st.js';
@@ -18,7 +19,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.20.8';
+const VERSION = '0.21.0';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -56,6 +57,9 @@ const ICON = {
   music: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V6l11-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/></svg>',
   calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
   notes: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="4.5" y="3.5" width="15" height="17" rx="3"/><path d="M8 9h8M8 12.5h8M8 16h5"/></svg>',
+  find: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></svg>',
+  weather: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7.5 18.5h9a3.5 3.5 0 0 0 .4-7 5 5 0 0 0-9.6-1.3A4.2 4.2 0 0 0 7.5 18.5z"/></svg>',
+  parcel: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3.5 7.5 12 3l8.5 4.5v9L12 21l-8.5-4.5z"/><path d="M3.5 7.5 12 12l8.5-4.5M12 12v9M7.8 5.2l8.4 4.6"/></svg>',
   settings: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',
   swap: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 7h11l-3-3M17 17H6l3 3"/></svg>',
   torch: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M8 3h8v4l-2 3v11h-4V10L8 7z"/><path d="M12 13v2"/></svg>',
@@ -88,6 +92,9 @@ const PAGES = [
     { w: 'w2', kind: 'music' },
     { w: 'w2', kind: 'photo', slot: 'p3' },
     { w: 'w4', kind: 'photo', slot: 'p4' },
+    { app: 'find', name: '尋找' },
+    { app: 'weather', name: '天氣' },
+    { app: 'parcel', name: '包裹' },
     { app: 'settings', name: '設定' },
   ],
 ];
@@ -173,7 +180,7 @@ function build() {
       <div class="bp-notifs"></div>
       <div class="bp-lock-bottom">
         <div class="bp-lock-row">
-          <div class="bp-weather"><b>☁︎ 24°</b><br>多雲<br>高 27° 低 21°</div>
+          <div class="bp-weather" hidden></div>
           <div class="bp-lock-chips"><div class="bp-round" data-act="music" title="音樂">${ICON.music}</div></div>
         </div>
         <div class="bp-lock-tools"><div class="bp-round bp-swap" data-act="his" title="偷看他的手機">${ICON.swap}</div><div class="bp-round" data-act="snap" title="快照">${ICON.camera}</div></div>
@@ -187,37 +194,47 @@ function build() {
     <div class="bp-toast"></div>
     <div class="bp-sheet">
       <h3>設定</h3>
-      <div class="bp-setrow"><span>你們的關係</span><div class="bp-seg" data-seg="stage">${stage.STAGES.map((x) => `<b data-act="stage" data-v="${x.id}">${x.name}</b>`).join('')}</div></div>
-      <p class="bp-sheet-note">有些功能等關係到了才打開：曖昧開始他會主動找妳，交往之後有陪睡模式，同居之後有冰箱門。他的手機隨時都可以偷看。劇情裡關係往前一步時，手機會問妳要不要改。</p>
-      <div class="bp-setrow"><span>他主動的程度</span><div class="bp-seg" data-seg="level">${Object.entries(LEVELS).map(([k, v]) => `<b data-act="level" data-v="${k}">${v.name}</b>`).join('')}</div></div>
-      <button data-act="bridge" class="bp-switchrow">劇情接手機<i></i></button>
-      <p class="bp-sheet-note">開著：正文裡你們分開、約好下次的時候，他之後會自己傳 LINE 或發脆，過幾分鐘手機才響。</p>
-      <button data-act="push" class="bp-pushbtn">開啟通知</button>
-      <p class="bp-sheet-note bp-pushnote">酒館關著、手機鎖著，他傳 LINE 也會跳通知。</p>
-      <div class="bp-setrow bp-pushrow"><span>訊息照什麼時間寫</span><div class="bp-seg" data-seg="pmode">${[['story', '照劇情'], ['real', '照現實']].map(([v, n]) => `<b data-act="pmode" data-v="${v}">${n}</b>`).join('')}</div></div>
-      <p class="bp-sheet-note bp-pushrow">照劇情：他照故事裡現在幾點、人在哪寫。照現實：照妳收到通知的那一刻寫，早上收到早安、晚上問妳到家了沒。</p>
-      <div class="bp-setrow bp-pushrow"><span>他一天最多傳</span><div class="bp-seg" data-seg="pmax">${[1, 2, 3, 5].map((n) => `<b data-act="pmax" data-v="${n}">${n} 次</b>`).join('')}</div></div>
-      <div class="bp-setrow bp-pushrow"><span>不吵妳的時段</span><div class="bp-seg" data-seg="pquiet">${[[23, 7], [1, 9], [3, 11]].map(([f, t]) => `<b data-act="pquiet" data-v="${f}-${t}">${f}–${t} 點</b>`).join('')}</div></div>
-      <div class="bp-setrow"><span>護眼模式</span><div class="bp-seg" data-seg="eye">${[['off', '關'], ['on', '開'], ['auto', '晚上自動']].map(([k, n]) => `<b data-act="eye" data-v="${k}">${n}</b>`).join('')}</div></div>
-      <p class="bp-sheet-note">畫面暗一點、偏暖色，白底不刺眼。晚上自動：晚上七點到早上七點自動打開。</p>
-      <button data-act="lite" class="bp-switchrow">省 token 模式<i></i></button>
-      <p class="bp-sheet-note">開著：只送角色卡、被叫到的世界書和正文最後幾則，比正文一次少很多。關掉：送整份預設和整段正文，跟正文一樣貴，但他看得最完整。傳照片給他時一律走完整的。</p>
-      <button data-act="mig-yes" class="bp-migbtn" hidden>把之前的紀錄搬進這個聊天</button>
-      <button data-act="his">偷看他的手機</button>
-      <button data-act="wall">換桌布</button>
-      <button data-act="wall-reset">用回預設桌布</button>
-      <button data-act="photos-reset">清掉小工具照片</button>
-      <button data-act="homeicon">放到手機桌面</button>
-      <button data-act="appicon">換桌面圖示的照片</button>
-      <div class="bp-setrow"><span>開機畫面的大字</span><input class="bp-splash-in" data-splash="title" maxlength="20" placeholder="Brume"></div>
-      <div class="bp-setrow"><span>開機畫面的小字</span><input class="bp-splash-in" data-splash="line" maxlength="40" placeholder="霧語"></div>
-      <button data-act="splashbg">換開機畫面的照片</button>
-      <button data-act="splashprev">看一下開機畫面</button>
-      <button data-act="splashreset">開機畫面用回預設</button>
-      <p class="bp-sheet-note">桌面多一個「Brume」圖示，點了直接打開上次那個角色的手機，不用先開酒館、選角色。圖示可以換成妳喜歡的照片（換好再按一次「放到手機桌面」；已經放過的要先把舊的刪掉）。從 Brume 打開時，酒館載入那幾秒會先蓋一張開機畫面，照片和字都可以自己換。</p>
-      <button data-act="cardoff" class="bp-danger">這張卡不用小手機</button>
-      <p class="bp-sheet-note">古風、奇幻這類沒有手機的故事用：手機按鈕收起來、劇情不接手機、他也不會主動傳。要再打開，從輸入框左邊的魔杖選單點霧語。</p>
-      <button data-act="dbg">複製除錯紀錄（給格看）</button>
+      <section class="bp-setgrp"><h4>你們</h4>
+        <div class="bp-setrow"><span>你們的關係</span><div class="bp-seg" data-seg="stage">${stage.STAGES.map((x) => `<b data-act="stage" data-v="${x.id}">${x.name}</b>`).join('')}</div></div>
+        <p class="bp-sheet-note">曖昧起他會主動找妳，交往有陪睡模式，同居有冰箱門。劇情裡關係往前一步，手機會問妳要不要改。</p>
+        <div class="bp-setrow"><span>他主動的程度</span><div class="bp-seg" data-seg="level">${Object.entries(LEVELS).map(([k, v]) => `<b data-act="level" data-v="${k}">${v.name}</b>`).join('')}</div></div>
+        <button data-act="bridge" class="bp-switchrow">劇情接手機<i></i></button>
+        <p class="bp-sheet-note">正文裡你們分開之後，他會自己傳 LINE 或發脆，過幾分鐘手機才響。</p>
+        <button data-act="his">偷看他的手機</button>
+      </section>
+      <section class="bp-setgrp"><h4>通知</h4>
+        <button data-act="push" class="bp-pushbtn">開啟通知</button>
+        <p class="bp-sheet-note bp-pushnote">酒館關著、手機鎖著，他傳 LINE 也會跳通知。</p>
+        <div class="bp-setrow bp-pushrow"><span>訊息照什麼時間寫</span><div class="bp-seg" data-seg="pmode">${[['story', '照劇情'], ['real', '照現實']].map(([v, n]) => `<b data-act="pmode" data-v="${v}">${n}</b>`).join('')}</div></div>
+        <p class="bp-sheet-note bp-pushrow">照劇情：照故事裡的時間寫，你們在劇情裡待在一起時改照現實。照現實：照妳收到的那一刻寫。</p>
+        <div class="bp-setrow bp-pushrow"><span>他一天最多傳</span><div class="bp-seg" data-seg="pmax">${[1, 2, 3, 5].map((n) => `<b data-act="pmax" data-v="${n}">${n} 次</b>`).join('')}</div></div>
+        <div class="bp-setrow bp-pushrow"><span>不吵妳的時段</span><div class="bp-seg" data-seg="pquiet">${[[23, 7], [1, 9], [3, 11]].map(([f, t]) => `<b data-act="pquiet" data-v="${f}-${t}">${f}–${t} 點</b>`).join('')}</div></div>
+      </section>
+      <section class="bp-setgrp"><h4>畫面</h4>
+        <div class="bp-setrow"><span>護眼模式</span><div class="bp-seg" data-seg="eye">${[['off', '關'], ['on', '開'], ['auto', '晚上自動']].map(([k, n]) => `<b data-act="eye" data-v="${k}">${n}</b>`).join('')}</div></div>
+        <p class="bp-sheet-note">暗一點、偏暖色。晚上自動＝晚上七點到早上七點。</p>
+        <button data-act="wall">換桌布</button>
+        <button data-act="wall-reset">用回預設桌布</button>
+        <button data-act="photos-reset">清掉小工具照片</button>
+      </section>
+      <details class="bp-setgrp"><summary>放到手機桌面</summary>
+        <p class="bp-sheet-note">桌面多一個「Brume」圖示，點了直接打開上次那個角色的手機。換了圖示照片要再按一次「放到手機桌面」（舊的先刪掉）。從 Brume 打開時會先蓋一張開機畫面，照片和字都能換。</p>
+        <button data-act="homeicon">放到手機桌面</button>
+        <button data-act="appicon">換桌面圖示的照片</button>
+        <div class="bp-setrow"><span>開機畫面的大字</span><input class="bp-splash-in" data-splash="title" maxlength="20" placeholder="Brume"></div>
+        <div class="bp-setrow"><span>開機畫面的小字</span><input class="bp-splash-in" data-splash="line" maxlength="40" placeholder="霧語"></div>
+        <button data-act="splashbg">換開機畫面的照片</button>
+        <button data-act="splashprev">看一下開機畫面</button>
+        <button data-act="splashreset">開機畫面用回預設</button>
+      </details>
+      <details class="bp-setgrp"><summary>進階</summary>
+        <button data-act="lite" class="bp-switchrow">省 token 模式<i></i></button>
+        <p class="bp-sheet-note">開著只送角色卡、用到的世界書和最後幾則正文，省很多；關掉他看得最完整，但跟正文一樣貴。傳照片一律走完整的。</p>
+        <button data-act="mig-yes" class="bp-migbtn" hidden>把之前的紀錄搬進這個聊天</button>
+        <button data-act="cardoff" class="bp-danger">這張卡不用小手機</button>
+        <p class="bp-sheet-note">古風、奇幻這類沒有手機的故事用。要再打開：輸入框左邊的魔杖選單 → 霧語。</p>
+        <button data-act="dbg">複製除錯紀錄（給格看）</button>
+      </details>
       <button class="bp-cancel" data-act="close">完成</button>
       <div class="bp-ver">霧語 Brume Phone v${VERSION}</div>
     </div>
@@ -552,6 +569,9 @@ function build() {
         openApp(notes); return;
       }
       if (open.dataset.open === 'calendar') { openApp(calendar); return; }
+      if (open.dataset.open === 'find') { openApp(find); return; }
+      if (open.dataset.open === 'weather') { openApp(weatherApp); return; }
+      if (open.dataset.open === 'parcel') { openApp(parcels); return; }
       if (open.dataset.open === 'threads') { openApp(threads); return; }
       if (open.dataset.open === 'album') { openApp(album); return; }
       if (open.dataset.open === 'ig') { openApp(ig); return; }
@@ -597,6 +617,9 @@ function build() {
   const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => calDots() });
   const notes = createNotes({ screen: appScreen, say });
   const calendar = createCalendar({ screen: appScreen, say });
+  const find = createFind({ screen: appScreen });
+  const weatherApp = createWeather({ screen: appScreen });
+  const parcels = createParcels({ screen: appScreen, say, onChange: () => refreshNotices() });
   const threads = createThreads({ screen: appScreen, say });
   const ig = createIG({ screen: appScreen, say });
   const album = createAlbum({ screen: appScreen, say, onShare: async (img, text) => { await line.share({ text: text || '', img }); openApp(line); line.openRoom(); }, onIG: (img, hint, id) => ig.postPhoto(img, hint, id) });
@@ -615,11 +638,11 @@ function build() {
   let bannerApp = 'line';
   banner.addEventListener('click', () => {
     banner.classList.remove('bp-show'); api.open(); lock.classList.add('bp-gone'); phone.classList.remove('bp-locked');
-    if (bannerApp === 'calendar') openApp(calendar); else if (bannerApp === 'notes') openApp(notes); else openLineRoom();
+    if (bannerApp === 'calendar') openApp(calendar); else if (bannerApp === 'notes') openApp(notes); else if (bannerApp === 'parcel') openApp(parcels); else openLineRoom();
   });
   function showBanner(n) {
     bannerApp = n.app || 'line';
-    banner.querySelector('b').textContent = n.app === 'threads' ? `脆・${n.who}` : n.app === 'calendar' ? `行事曆・${n.who}` : n.app === 'notes' ? `便條・${n.who}` : n.who;
+    banner.querySelector('b').textContent = n.app === 'threads' ? `脆・${n.who}` : n.app === 'calendar' ? `行事曆・${n.who}` : n.app === 'notes' ? `便條・${n.who}` : n.app === 'parcel' ? `包裹・${n.who}` : n.who;
     banner.querySelector('span').textContent = n.text;
     banner.classList.add('bp-show');
     const vv = window.visualViewport; const vw = vv ? vv.width : innerWidth;
@@ -632,6 +655,7 @@ function build() {
   async function refreshNotices() {
     const list = await line.unseen();
     setBadge('line', list.length);
+    setBadge('parcel', await parcels.unopened());
     document.getElementById('bp-launcher')?.setAttribute('data-n', list.length ? String(Math.min(list.length, 99)) : '');
     const hhmm = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
     overlay.querySelector('.bp-notifs').innerHTML = list.slice(-3).reverse().map((m) => `<div class="bp-notif" data-act="notif">
@@ -692,12 +716,21 @@ function build() {
     const has = new Set(evs.filter((x) => x.date.startsWith(pre)).map((x) => +x.date.slice(8)));
     overlay.querySelectorAll('.bp-cal-grid span:not(.bp-dow)').forEach((sp) => sp.classList.toggle('bp-ev', has.has(+sp.textContent)));
   }
-  data.onChange((kind) => { if (kind === 'cal') calDots(); });
+  data.onChange((kind) => { if (kind === 'cal') calDots(); if (kind === 'weather') lockWeather(); });
   calDots();
+
+  // 鎖定畫面的天氣：故事裡那座城市的（天氣 App 同一份）；還沒報過就收起來，不放假的
+  async function lockWeather() {
+    const el = overlay.querySelector('.bp-weather'); if (!el) return;
+    const c = currentChar(); const wx = c ? await data.weather.get(c.key) : null;
+    el.hidden = !wx;
+    if (wx) el.innerHTML = `<b>${skyIcon(wx.sky)} ${wx.temp != null ? `${wx.temp}°` : ''}</b><br>${String(wx.sky).replace(/</g, '&lt;')}<br>${String(wx.city).replace(/</g, '&lt;')}`;
+  }
+  lockWeather();
 
   // 換角色時：日曆小點、正文同步都跟著換
   const st = ctx();
-  st?.eventSource?.on?.(st.eventTypes?.CHAT_CHANGED || st.event_types?.CHAT_CHANGED || 'chat_id_changed', () => { calDots(); syncMain(); loadDesk(); });
+  st?.eventSource?.on?.(st.eventTypes?.CHAT_CHANGED || st.event_types?.CHAT_CHANGED || 'chat_id_changed', () => { calDots(); lockWeather(); syncMain(); loadDesk(); });
   syncMain();
   const music = createMusic({ screen: appScreen, ytHost: overlay.querySelector('.bp-yt'), say });
 

@@ -72,3 +72,26 @@ export const storyDay = {
   set: (key, d) => store.set(`storyday:${key}`, d).catch(() => {}),
 };
 export const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+// 他現在在哪、那裡的天氣：劇情的 <phone> 每次報一行，尋找和天氣 App、鎖定畫面讀這個
+// where：{ place, line, day, ts }；weather：{ city, sky, temp, day, ts }
+const one = (kind) => ({
+  get: async (key) => (await store.get(`${kind}:${key}`).catch(() => null)) || null,
+  async set(key, v) { await store.set(`${kind}:${key}`, v).catch(() => {}); for (const f of listeners) f(kind, key); },
+});
+export const where = one('where');
+export const weather = one('weather');
+
+// 包裹（他叫的外送、寄的東西）：{ id, item, note, ts, eta, opened }。eta 之前是配送中
+export const parcels = {
+  all: (key) => list('parcels', key),
+  async add(key, p) {
+    const a = await list('parcels', key);
+    if (a.some((x) => x.item === p.item && Math.abs(x.ts - Date.now()) < 36e5)) return null; // 重新生成同一段劇情不重複寄
+    const x = { id: uid(), ts: Date.now(), opened: false, ...p }; a.unshift(x);
+    await save('parcels', key, a.slice(0, 40));
+    return x;
+  },
+  async update(key, id, patch) { const a = await list('parcels', key); const x = a.find((y) => y.id === id); if (x) Object.assign(x, patch); await save('parcels', key, a); },
+  async remove(key, id) { await save('parcels', key, (await list('parcels', key)).filter((x) => x.id !== id)); },
+};

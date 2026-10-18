@@ -15,6 +15,7 @@ export const STAGES = [
 const UNLOCK = {
   proactive: 'flirt', // 他主動傳訊息（離開時、閒著時）
   cards: 'flirt', // 收藏字卡
+  find: 'dating', // 尋找：看他現在在哪（10/18 加的；還沒交往就看得到人在哪太怪）
   his: 'meet', // 偷看他的手機：隨時都可以（10/14 露比改的，原本要交往）
   sleep: 'dating', // 陪睡模式
   milestones: 'dating', // 里程碑
