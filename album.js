@@ -29,7 +29,8 @@ const IC = {
 export function createAlbum({ screen, say, onShare, onIG }) {
   let ch = null; let items = []; let people = { cast: {}, look: { him: '', me: '' } }; let editing = null; // editing：證件照正在改的那個人
   let selecting = false; let sel = new Set(); // 「選取」模式（仿 iPhone 圖庫）：點格子打勾，下面刪除或存到手機
-  let view = 'grid'; let openId = null; // view：grid 相本｜one 單張｜snap 拍快照｜ids 生圖設定｜person 改某個人的證件照 let picked = new Set(); let busy = false; let note = ''; let shownImgs = [];
+  // view：grid 圖庫｜one 單張｜snap 拍快照｜ids 生圖設定｜person 改某個人的證件照
+  let view = 'grid'; let openId = null; let picked = new Set(); let busy = false; let note = ''; let shownImgs = [];
   const mine = () => !!screen.querySelector('.bp-al');
   const save = () => ch && store.set('album:' + ch.key, items).catch(() => {});
 
