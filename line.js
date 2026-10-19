@@ -1191,10 +1191,15 @@ export function createLine({ screen, say, onUnread, onData, onParcel }) {
       ? `【備用的短訊】${who.user} 已經一整天沒打開手機找 ${who.name} 了。寫 4 句他這種時候會傳的 LINE（想她、問她在幹嘛、叫她記得吃飯喝水這類），不綁特定時間和劇情場景，任何時候收到都不突兀。一句一行，4 行，不要寫時間。`
       : `【這次是他先傳的】這則會在現實的 ${when.getMonth() + 1}/${when.getDate()}（週${WEEK[when.getDay()]}）${pad(when.getHours())}:${pad(when.getMinutes())} 送到她手機，她這段時間沒在找他。照那個時間點，${who.name} 在現實生活裡很自然會傳的話：早上就早安、吃飯時間問吃了沒、晚上問到家了沒，想到她、分享自己在做什麼。寫 1～2 則，一行一則，不要寫時間。不要重複之前說過的話；她還沒回的不要寫成一來一往。`;
     const msgs = pending.length ? [...t.msgs, ...pending.map((l, i) => ({ id: `p${i}`, me: false, text: l.text, ts: Date.now() + i, now: true }))] : t.msgs;
+    // 真的天氣（設定填了城市才有）：他先傳的那則可以帶到，早上「會下雨記得帶傘」這種（10/19 比比）
+    const wxRaw = kind === 'nudge' ? null : await realwx.get().catch(() => null);
+    const weather = wxRaw ? { real: true, city: wxRaw.place, sky: wxRaw.sky, temp: wxRaw.temp } : null;
+    const hour = when.getHours();
+    const wxHint = weather ? `\n她那邊現在真的天氣在上面。${hour >= 5 && hour < 11 ? '早上這則可以順口帶一句：會下雨叫她帶傘、冷叫她多穿、天氣好就講一句好天氣。' : '天氣有值得提的（下雨、很冷、很熱）才帶一句，普通就不用。'}` : '';
     let raw;
     try {
       raw = await generate(buildPrompt(who, msgs, {
-        mode: 'now', at: kind === 'nudge' ? 0 : at, stage: cur, proactive: instr, memory,
+        mode: 'now', at: kind === 'nudge' ? 0 : at, stage: cur, proactive: instr + wxHint, memory, weather,
         notes: stage.unlocked(cur, 'notes') ? notes.filter((n) => !n.done).slice(0, 8) : [],
         cal: cal.filter((e) => e.date >= today).slice(0, 8),
       }));
