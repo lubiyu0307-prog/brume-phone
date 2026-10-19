@@ -671,13 +671,15 @@ export function createLine({ screen, say, onUnread, onData, onParcel }) {
     if (!ch) return;
     const who = ch; const t = thread;
     const mem = await data.memory.all(who.key);
-    const recent = t.msgs.filter((m) => !m.err && storySees(m, t)).slice(-40).map((m) => `${m.me ? who.user : who.name}：${msgText(m)}`).join('\n');
+    // 現實時間聊的也整理進記憶書（10/19 比比：現實 LINE 的他沒辦法養成——以前這裡只看劇情看得到的那些）。
+    // 記憶書兩種模式都看得到，所以她在現實裡講的喜好、近況，劇情裡的他也會記得；不想讓劇情知道的就在記憶書裡刪掉
+    const recent = t.msgs.filter((m) => !m.err).slice(-40).map((m) => `${m.me ? who.user : who.name}${m.now && !t.nowSync ? '（現實時間）' : ''}：${msgText(m)}`).join('\n');
     if (!recent) { if (manual) say('還沒有對話可以整理'); return; }
     if (manual) say('整理中⋯');
     try {
       const raw = await generate([
         '[Brume Phone · 記憶書]',
-        `現在不是在寫劇情正文。請從下面這段 LINE 對話裡，挑出 ${who.name} 應該長久記住的事：${who.user} 說過的喜好、近況、約定、發生的事。`,
+        `現在不是在寫劇情正文。請從下面這段 LINE 對話裡，挑出 ${who.name} 應該長久記住的事：${who.user} 說過的喜好、近況、約定、發生的事。標「現實時間」的是她在現實裡跟他聊的，一樣要記，而且更重要：那是真的她。`,
         mem.length ? `已經記過的（不要重複）：\n${mem.map((m) => '- ' + m.text).join('\n')}` : '',
         '', recent, '',
         '每條一行，格式：記憶內容｜關鍵字1,關鍵字2。記憶 20 字內、用第三人稱寫；關鍵字是之後聊到時會出現的詞。最多 3 條。沒有值得記的就只輸出「無」。不要編號、不要其他文字。',
