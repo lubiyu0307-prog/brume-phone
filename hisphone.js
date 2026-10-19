@@ -3,7 +3,7 @@
 // 他的小動作藏在各處：妳的備註名、有沒有被釘選、打了沒傳的草稿、跟朋友聊到妳、藏起來的照片⋯
 
 import * as store from './store.js';
-import { currentChar, generate, imageInfo, canDraw, worldRoster, dropImage } from './st.js';
+import { currentChar, generate, imagine, imageInfo, canDraw, worldRoster, dropImage } from './st.js';
 import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit, isSavedImage, savedImagePrompt, shotHand } from './cast.js';
 import { imagineAndPick, chooseEngine } from './pick.js';
 import { promptEditor } from './promptedit.js';
@@ -61,6 +61,7 @@ const APPS = [
 
 export function createHisPhone({ host, say, onExit }) {
   let drawing = false; let rewriting = false;
+  let batch = null; // 「生成全部」進行中：{ done, total, stop }（比比 10/19 要的：一按下去全部生完）
   let ch = null; let hp = null; let view = 'lock'; let sub = null; let typed = ''; let fails = 0;
   let delArmed = null; // 刪照片要按兩次：第一次按的是哪一張
   const busy = new Set();
@@ -305,7 +306,7 @@ export function createHisPhone({ host, say, onExit }) {
     const shown = all.filter((x) => !x.p.hidden); const hidden = all.filter((x) => x.p.hidden);
     return `<div class="bp-hp-pgrid">${shown.map((x) => photoTile(x.p, x.i)).join('')}</div>
       ${hidden.length ? `<h4>已隱藏 <small>${hidden.length}</small></h4><div class="bp-hp-pgrid">${hidden.map((x) => photoTile(x.p, x.i)).join('')}</div>` : ''}
-      ${hp.album.length ? `<div class="bp-hp-pacts"><button data-hp="realbum" ${rewriting ? 'disabled' : ''}>${rewriting ? '重寫中⋯' : '重寫全部照片描述'}</button></div>` : ''}`;
+      ${hp.album.length ? `<div class="bp-hp-pacts">${canDraw() && (batch || hp.album.some((p) => !p.img)) ? `<button data-hp="genall">${batch ? `生成中⋯ ${batch.done}/${batch.total}（按一下停）` : `生成全部照片（${hp.album.filter((p) => !p.img).length} 張）`}</button>` : ''}<button data-hp="realbum" ${rewriting ? 'disabled' : ''}>${rewriting ? '重寫中⋯' : '重寫全部照片描述'}</button></div>` : ''}`;
   }
   function albumOne(i) {
     const p = hp.album[i];
@@ -404,29 +405,16 @@ export function createHisPhone({ host, say, onExit }) {
     if (a !== 'pdel') delArmed = null;
     if (a === 'ungen' && hp.album[sub]) { delete hp.album[sub].img; save(); paint(); }
     if (a === 'gen' && hp.album[sub] && !drawing) await genPhoto(sub);
+    if (a === 'genall' && view === 'album') { if (batch) { batch.stop = true; say('這張生完就停'); } else await genAll(); }
   });
 
-  async function genPhoto(i) {
-      const p = hp.album[i]; const who = ch; if (!p || drawing) return;
-      const engine = await chooseEngine(host); if (!engine) return; // 兩家都有才會問；取消就不生
-      drawing = true; paint();
-      try {
-        const people = await loadCast(who.charKey);
-        await ensureAutoStyle(people, who.charKey);
+  /** 一張照片要怎麼畫：回 { prompt, refs }。寫照片時一起寫好 shot 的照 shot 畫，舊照片（只有 desc）用下面的猜法 */
+  function photoRequest(p, people, who) {
         // 寫照片時一起寫好的畫面描述：照 shot 和 in 畫，不用猜
-        if (p.shot && isSavedImage(p.shot)) {
-          const url = await imagineAndPick(host, savedImagePrompt(p.shot), { refs: [], aspect: '1:1', engine });
-          if (url) { p.img = url; if (who.key === ch?.key) save(); } else say(imageInfo.why ? `沒有出圖：${imageInfo.why}` : '沒有出圖');
-          drawing = false; if (view === 'album' && sub === i) paint();
-          return;
-        }
+        if (p.shot && isSavedImage(p.shot)) return { prompt: savedImagePrompt(p.shot), refs: [] };
         if (p.shot) {
           const ids = shotIds(people, who, p.in);
-          const prompt = finalPrompt(people, who, p.shot, ids, ids.includes(HIM) ? {} : { by: HIM, hand: shotHand(p.shot) });
-          const url = await imagineAndPick(host, prompt, { refs: refsFor(people, who, '', ids), aspect: '1:1', engine });
-          if (url) { p.img = url; if (who.key === ch?.key) save(); } else say(imageInfo.why ? `沒有出圖：${imageInfo.why}` : '沒有出圖');
-          drawing = false; if (view === 'album' && sub === i) paint();
-          return;
+          return { prompt: finalPrompt(people, who, p.shot, ids, ids.includes(HIM) ? {} : { by: HIM, hand: shotHand(p.shot) }), refs: refsFor(people, who, '', ids) };
         }
         // 下面是舊照片（沒有 shot）的猜法
         // 截圖、插畫、存下來的圖片不是他拍的照片：照那張圖本身畫，不放人、不放手、不帶證件照
@@ -450,12 +438,50 @@ export function createHisPhone({ host, say, onExit }) {
         const prompt = shot
           ? `${p.desc}. Show only the saved image itself, flat, filling the whole frame edge to edge. No phone, no screen bezel, no people, no hands.`
           : finalPrompt(people, who, `${p.desc}, photo taken on his phone, candid`, ids, hand ? { by: HIM } : {});
-        const url = await imagineAndPick(host, prompt, { refs: shot ? [] : refsFor(people, who, p.desc, always), aspect: '1:1' });
+        return { prompt, refs: shot ? [] : refsFor(people, who, p.desc, always) };
+  }
+
+  async function genPhoto(i) {
+      const p = hp.album[i]; const who = ch; if (!p || drawing || batch) return;
+      const engine = await chooseEngine(host); if (!engine) return; // 兩家都有才會問；取消就不生
+      drawing = true; paint();
+      try {
+        const people = await loadCast(who.charKey);
+        await ensureAutoStyle(people, who.charKey);
+        const { prompt, refs } = photoRequest(p, people, who);
+        const url = await imagineAndPick(host, prompt, { refs, aspect: '1:1', engine });
         if (url) { p.img = url; if (who.key === ch?.key) save(); }
         else say(imageInfo.why ? `沒有出圖：${imageInfo.why}` : '沒有出圖');
       } catch (err) { say(`沒有出圖：${err.message || err}`); }
       drawing = false; if (view === 'album' && sub === i) paint();
     }
+
+  // 一按下去把相簿裡還沒有圖的全部生完（先看得到的、再已隱藏的），一張一張來、每張只生一張不挑；
+  // 問一次用哪家就好。進行中再按一下＝這張生完就停。失敗的跳過不卡住，最後說幾張沒成
+  async function genAll() {
+    const who = ch; if (!who || drawing || batch) return;
+    const todo = hp.album.map((p, i) => ({ p, i })).filter((x) => !x.p.img).sort((a, b) => (a.p.hidden ? 1 : 0) - (b.p.hidden ? 1 : 0) || b.p.ts - a.p.ts);
+    if (!todo.length) { say('每張都有圖了'); return; }
+    const engine = await chooseEngine(host); if (!engine) return;
+    batch = { done: 0, total: todo.length, stop: false }; paint();
+    let fail = 0;
+    try {
+      const people = await loadCast(who.charKey);
+      await ensureAutoStyle(people, who.charKey);
+      for (const { p } of todo) {
+        if (batch.stop || who.key !== ch?.key) break;
+        try {
+          const { prompt, refs } = photoRequest(p, people, who);
+          const url = await imagine(prompt, { refs, aspect: '1:1', engine });
+          if (url) { p.img = url; save(); } else fail++;
+        } catch { fail++; }
+        batch.done++; if (view === 'album') paint();
+      }
+    } catch (err) { say(`生成全部中斷：${err.message || err}`); }
+    const stopped = batch.stop; const done = batch.done;
+    batch = null; if (view === 'album') paint();
+    say(stopped ? `停了，生了 ${done} 張${fail ? `、${fail} 張沒成` : ''}` : fail ? `生完了，${fail} 張沒出圖（點開那張再試，或換另一家）` : `${done} 張全部生好了`);
+  }
 
   // 長按照片（格子或點開的大圖）→ 改描述、重新出圖
   promptEditor(host, {
