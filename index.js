@@ -20,7 +20,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.22.0';
+const VERSION = '0.22.1';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -287,6 +287,16 @@ function build() {
     requestAnimationFrame(() => requestAnimationFrame(fit));
     clearTimeout(fitTimer); fitTimer = setTimeout(fit, 350);
   };
+  // 有時候鍵盤收了、或酒館自己捲了一下，卻沒收到 resize（iOS 偶爾吞掉），手機就停在半截（10/19 比比：「有時候會這樣」）。
+  // 開著的時候每秒對一次看得到的範圍，跟上次擺的不一樣就重擺
+  let lastSig = '';
+  setInterval(() => {
+    if (!overlay.classList.contains('bp-open')) return;
+    const vv = window.visualViewport;
+    const sig = SHELL ? `${innerWidth}x${innerHeight}` : vv ? `${Math.round(vv.width)}x${Math.round(vv.height)}@${Math.round(vv.pageTop != null ? vv.pageTop - scrollY : vv.offsetTop)}` : `${innerWidth}x${innerHeight}`;
+    const applied = `${parseInt(overlay.style.getPropertyValue('--bp-w')) || 0}x${parseInt(overlay.style.getPropertyValue('--bp-h')) || 0}`;
+    if (sig !== lastSig || !sig.startsWith(applied)) { lastSig = sig; if (!sig.startsWith(applied)) dbg('watchdog', `${applied}->${sig}`); fit(); }
+  }, 1000);
   let vpChanged = 0; // 畫面剛動過的時間：這段時間內點到外框不算「點外面」
   const seen = (tag, f) => (e) => { vpChanged = Date.now(); if (overlay.classList.contains('bp-open')) { dbg(tag); setTimeout(() => dbg(tag + '+400'), 400); } f(e); };
   addEventListener('resize', seen('resize', refit));
