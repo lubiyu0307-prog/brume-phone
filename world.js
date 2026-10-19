@@ -4,6 +4,7 @@ import { currentChar } from './st.js';
 import * as data from './data.js';
 import * as stage from './stage.js';
 import * as realwx from './realwx.js';
+import * as routine from './routine.js';
 import { giftEmoji } from './line.js';
 
 const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -84,22 +85,24 @@ export function createFind({ screen }) {
 
   // 卡片（兩個模式共用）：Find My 的樣子
   function card(ch, w, log, real) {
-    if (!w) return `<div class="bp-find-card"><b>${esc(ch.name)}</b><p class="bp-ap-hint">${real ? '現實時間他還沒傳過位置。他在 LINE 的現實模式傳位置給妳之後，就會釘在這裡。' : '還不知道他在哪。下一段劇情之後就會更新。'}</p></div>`;
+    if (!w) return `<div class="bp-find-card"><b>${esc(ch.name)}</b><p class="bp-ap-hint">${real ? '還在照角色卡整理他平常的作息，等一下再開一次就看得到他在哪。' : '還不知道他在哪。下一段劇情之後就會更新。'}</p></div>`;
     const h = hash(w.place);
     const kind = kindOf(w.place, ch.user);
-    const withHer = kind === 'her' || /一起|妳|她/.test(w.line || '');
-    const km = withHer ? 0 : (0.3 + (h % 76) / 10).toFixed(1);
+    // 「離妳幾公里」是假數字，抱著她在沙發上也會算出 6.7 km（10/19 比比抓到）。改成看得懂的狀態
+    const text = `${w.place} ${w.line || ''}`;
+    const withHer = kind === 'her' || (ch.user && text.includes(ch.user)) || /一起|妳|她|抱|陪|身邊|旁邊|兩人|牽/.test(text);
+    const state = withHer ? '跟妳在一起' : kind === 'home' ? '在家' : kind === 'work' ? '上班中' : kind === 'transit' ? '在路上' : kind === 'food' ? '在外面吃東西' : kind === 'park' ? '在外面走走' : '在外面';
     const hour = new Date().getHours();
     const batt = Math.max(8, 100 - ((hour * 6 + (h % 23)) % 78));
     const today = real ? dayOf(Date.now()) : w.day;
-    const trail = log.filter((x) => (real ? dayOf(x.ts) : x.day) === today);
+    const trail = log.filter((x) => (real ? dayOf(x.ts) : x.day) === today && x.ts <= Date.now());
     const trailHtml = trail.length > 1 ? `<div class="bp-find-trail"><small>今天</small>${trail.map((x, i) => `<span>${i ? '<i>›</i>' : ''}${esc(x.place)}${real ? `<em>${hm(x.ts)}</em>` : ''}</span>`).join('')}</div>` : '';
     return `<div class="bp-find-card">
       <b>${esc(ch.name)}</b>
       <span>${KIND_ICON[kind]} ${esc(w.place)}</span>${w.line ? `<p>${esc(w.line)}</p>` : ''}
-      <div class="bp-find-stats"><i>${withHer ? '在妳身邊' : `離妳 ${km} km`}</i><i>🔋 ${batt}%</i><i>${ago(w.ts)}更新</i></div>
+      <div class="bp-find-stats"><i>${state}</i><i>🔋 ${batt}%</i><i>${w.auto ? '照他的作息' : `${ago(w.ts)}更新`}</i></div>
       ${trailHtml}
-      <small>${real ? '現實時間' : `劇情裡${w.day ? ` ${+w.day.slice(5, 7)}/${+w.day.slice(8)}` : ''}`}</small>
+      <small>${real ? (w.auto ? '現實時間 · 照他平常的作息算的，他在 LINE 傳位置會以那個為準' : '現實時間 · 他傳的位置') : `劇情裡${w.day ? ` ${+w.day.slice(5, 7)}/${+w.day.slice(8)}` : ''}`}</small>
     </div>`;
   }
 
@@ -156,7 +159,8 @@ export function createFind({ screen }) {
     const el = box.querySelector('.bp-find-leaflet');
     const L = window.L;
     map?.remove(); map = L.map(el, { zoomControl: false, attributionControl: true }).setView([base.lat, base.lon], 14);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 19, attribution: '© OpenStreetMap © CARTO' }).addTo(map);
+    // CARTO 的圖磚 10/19 起要金鑰，改用 OpenStreetMap 本家（免費、不用鑰匙，流量小用沒問題）
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
     const places = [...new Map(log.map((x) => [x.place, x])).values()];
     if (w && !places.some((x) => x.place === w.place)) places.push(w);
     const pts = [];
@@ -166,7 +170,7 @@ export function createFind({ screen }) {
       L.marker(ll, { icon: L.divIcon({ className: 'bp-find-lmi', html: `<i>${KIND_ICON[kind]}</i><small>${esc(x.place)}</small>`, iconSize: [0, 0] }) }).addTo(map);
     }
     const today = dayOf(Date.now());
-    const trail = log.filter((x) => dayOf(x.ts) === today).map((x) => pts.find((p) => p.place === x.place)?.ll).filter(Boolean);
+    const trail = log.filter((x) => dayOf(x.ts) === today && x.ts <= Date.now()).map((x) => pts.find((p) => p.place === x.place)?.ll).filter(Boolean);
     if (trail.length > 1) L.polyline(trail, { color: '#c98b5a', weight: 2.5, dashArray: '5 6' }).addTo(map);
     const cur = w ? pts.find((p) => p.place === w.place) : null;
     const av = ch.avatar ? `<img src="${esc(ch.avatar)}" alt="">` : `<span>${esc(ch.name.slice(0, 1))}</span>`;
@@ -184,8 +188,11 @@ export function createFind({ screen }) {
       return;
     }
     const mode = findMode.get(); const real = mode === 'real';
-    const [w, all] = await Promise.all([real ? data.whereNow.get(ch.key) : data.where.get(ch.key), data.whereLog.all(ch.key)]);
-    const log = all.filter((x) => (x.kind === 'real') === real);
+    const [w, all, r] = await Promise.all([real ? routine.whereNow(ch) : data.where.get(ch.key), data.whereLog.all(ch.key), real ? routine.routineOf(ch) : null]);
+    // 現實：作息表今天的每一段當成足跡（還沒到的那幾段只當地標），他在 LINE 傳的也算進去
+    const log = real
+      ? [...routine.todayItems(r).map((x) => ({ place: x.place, line: x.doing, day: data.today(), ts: x.ts, kind: 'real' })), ...all.filter((x) => x.kind === 'real')].sort((a, b) => a.ts - b.ts)
+      : all.filter((x) => x.kind !== 'real');
     map?.remove(); map = null;
     screen.innerHTML = `<div class="bp-ap bp-ap-find">${headFind(mode)}
       ${real ? '<div class="bp-find-map bp-find-real"></div>' : storyMap(ch, w, log)}

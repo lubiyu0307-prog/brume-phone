@@ -8,6 +8,7 @@ import * as stage from './stage.js';
 import { findUrls, readLink, linkForPrompt } from './link.js';
 import { HIM, ME, loadCast } from './cast.js';
 import * as realwx from './realwx.js';
+import * as routine from './routine.js';
 
 const OLD_STORE = 'brume-phone:line:'; // v0.2.0 存在 localStorage，第一次打開時搬進 IndexedDB
 
@@ -164,6 +165,7 @@ function buildPrompt(ch, msgs, x = {}) {
     x.weather ? (x.weather.real
       ? `她那邊現在真的天氣：${x.weather.city} ${x.weather.sky}${x.weather.temp != null ? ` ${x.weather.temp}°` : ''}。可以自然帶到（下雨要她帶傘、冷要她多穿），不用每次都講`
       : `故事裡現在的天氣：${x.weather.city} ${x.weather.sky}${x.weather.temp != null ? ` ${x.weather.temp}°` : ''}`) : '',
+    x.where ? `你現在人在：${x.where.place}${x.where.line ? `，${x.where.line}` : ''}（${x.where.auto ? '照你平常的作息' : '你剛剛傳給她的位置'}；她手機的「尋找」看得到你在哪，講到人在哪、在幹嘛要跟這個一致）` : '',
     x.sleep ? `\n【陪睡模式】${ch.user} 躺在床上準備睡了，要你陪她入睡。講話輕、短、慢，像在耳邊說；不問問題、不開新話題、不要讓她更清醒。她說晚安就溫柔收尾。` : '',
     x.memory?.length ? `\n${ch.name} 記得的事：\n${x.memory.map((m) => '- ' + (m.kind ? `（${m.kind === 'now' ? '現實' : '劇情'}）` : '') + m.text).join('\n')}` : '',
     x.notes?.length ? `\n她冰箱上的便條（你貼過的也在裡面）：\n${x.notes.map((n) => `- ${n.text}${n.date ? `（${n.date}）` : ''}${n.done ? '（已完成）' : ''}`).join('\n')}` : '',
@@ -782,7 +784,8 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
       const weather = wxRaw ? { real: t.mode === 'now', city: t.mode === 'now' ? wxRaw.place : wxRaw.city, sky: wxRaw.sky, temp: wxRaw.temp } : null;
       const cal = calAll.filter((e) => data.calKind(e) === calKind);
       const cur = await stage.get(who.key);
-      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), storyDay: sday, notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => (x.desc ? `${x.tag}（${x.desc}）` : x.tag)))], photos: roundPhotos.length, photosSeen: !!image, weather, couple: couple ? `${new Date(couple.ts).getMonth() + 1}/${new Date(couple.ts).getDate()} 換的` : '', pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
+      const where = t.mode === 'now' ? await routine.whereNow(who).catch(() => null) : null;
+      const extra = { where, mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), storyDay: sday, notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => (x.desc ? `${x.tag}（${x.desc}）` : x.tag)))], photos: roundPhotos.length, photosSeen: !!image, weather, couple: couple ? `${new Date(couple.ts).getMonth() + 1}/${new Date(couple.ts).getDate()} 換的` : '', pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
       out = parseReply(await generate(buildPrompt(who, t.msgs, extra), image), who);
       // 他偶爾會連括號裡的描述一起抄，只取標籤；同一個標籤有好幾張就隨機挑一張
       const stkTag = out.sticker ? String(out.sticker).replace(/[（(].*$/, '').trim() : '';
@@ -1247,7 +1250,7 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
     let raw;
     try {
       raw = await generate(buildPrompt(who, msgs, {
-        mode: 'now', at: kind === 'nudge' ? 0 : at, stage: cur, proactive: instr + wxHint, memory, weather,
+        mode: 'now', at: kind === 'nudge' ? 0 : at, stage: cur, proactive: instr + wxHint, memory, weather, where: kind === 'nudge' ? null : await routine.whereNow(who).catch(() => null),
         notes: stage.unlocked(cur, 'notes') ? notes.filter((n) => !n.done).slice(0, 8) : [],
         cal: cal.filter((e) => e.date >= today).slice(0, 8),
       }));
