@@ -156,7 +156,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <label>解析度</label>
         <div class="bp-al-seg">${[['1K', '1K・省錢'], ['2K', '2K・清楚']].map(([v, n]) => `<b data-al="imgres" data-v="${v}" class="${imageResPref.get() === v ? 'on' : ''}">${n}</b>`).join('')}</div>
         <p class="bp-al-hint">Gemini：1K 比較便宜，近景、自拍、限動在手機上看差不多；2K 全身照、遠景的臉比較不會糊。GPT：1K＝低畫質（帶證件照一張約 0.02 美金，不到一塊台幣），2K＝高畫質（約 0.25 美金，八塊左右）；臉像不像靠的是證件照不是畫質，低畫質的臉常常反而比較自然。</p>
-        <label>AI Studio 金鑰（酒館那邊叫不到 Gemini 生圖時，手機直接用這把；跟電話的聲音共用）</label>
+        <label>AI Studio 金鑰（酒館那邊叫不到 Gemini 生圖時，手機直接用這把）</label>
         <input class="bp-al-gkey" type="password" autocomplete="off" placeholder="${(() => { try { return localStorage.getItem('brume-phone:gemini-key') ? '已經貼好了（重貼會換掉）' : '貼上 AI Studio 金鑰'; } catch { return '貼上 AI Studio 金鑰'; } })()}">
         <label>OpenAI 金鑰（用 GPT 生圖，可以不貼）</label>
         <input class="bp-al-okey" type="password" autocomplete="off" placeholder="${openaiKey.get() ? '已經貼好了（重貼會換掉，清空存檔就拿掉）' : '貼上 OpenAI 金鑰（sk- 開頭）'}">

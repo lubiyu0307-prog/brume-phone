@@ -327,7 +327,8 @@ async function refRequest(prompt, refs) {
 
 async function viaKey(prompt, refs = [], aspect = '1:1') {
   const key = geminiKeyGet(); const prev = imageInfo.why;
-  if (!key) { imageInfo.why = (imageInfo.why ? imageInfo.why + '；' : '') + '手機裡也沒有貼 AI Studio 金鑰（電話的「他的聲音」或相本證件照頁可以貼）'; return ''; }
+  // 酒館那條已經是「被擋」就不用再講金鑰的事（貼了也一樣擋）；真的是叫不到才提醒（10/19 比比：不要說電話的事）
+  if (!key) { if (!/擋/.test(imageInfo.why)) imageInfo.why = (imageInfo.why ? imageInfo.why + '；' : '') + '手機裡也沒有貼 AI Studio 金鑰（圖庫右上角的生圖設定可以貼）'; return ''; }
   const req = await refRequest(prompt, refs);
   const parts = [...req.images.map((url) => ({ inline_data: { mime_type: url.slice(5, url.indexOf(';')), data: url.slice(url.indexOf(',') + 1) } })), { text: req.text }];
   const safety = ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT'].map((category) => ({ category, threshold: 'BLOCK_NONE' }));
