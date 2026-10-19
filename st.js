@@ -93,7 +93,9 @@ export function canSeeImages() {
 }
 
 // 直接打酒館的 chat-completions（不經過擴充的事件），只在聊天接 Vertex／AI Studio 時用；拿不到字回空字串
-async function quickAsk(c, system, prompt) {
+// image 是 dataURL：直接塞成 image_url 區塊，酒館後端會轉成 Gemini 的 inline_data——
+// 不經過酒館前端那張「這個模型看得到圖嗎」的名單（10/19 比比：Send inline media 開著，Gemini 4 還是看不到照片）
+async function quickAsk(c, system, prompt, image) {
   const o = c.chatCompletionSettings || {};
   const src = o.chat_completion_source;
   const model = src === 'vertexai' ? o.vertexai_model : src === 'makersuite' ? o.google_model : '';
@@ -102,7 +104,7 @@ async function quickAsk(c, system, prompt) {
     const r = await fetch('/api/backends/chat-completions/generate', {
       method: 'POST', headers: c.getRequestHeaders(),
       body: JSON.stringify({
-        messages: [{ role: 'system', content: system }, { role: 'user', content: prompt }],
+        messages: [{ role: 'system', content: system }, { role: 'user', content: image ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: image } }] : prompt }],
         model, chat_completion_source: src, stream: false, max_tokens: 3000, temperature: o.temp_openai ?? 1,
         reasoning_effort: 'low', include_reasoning: false,
         vertexai_auth_mode: o.vertexai_auth_mode, vertexai_region: o.vertexai_region, vertexai_express_project_id: o.vertexai_express_project_id,
@@ -121,6 +123,14 @@ async function quickAsk(c, system, prompt) {
 export async function generate(prompt, image) {
   const c = ctx();
   if (!c) throw new Error('找不到酒館');
+  const o = c.chatCompletionSettings || {};
+  const google = c.mainApi === 'openai' && (o.chat_completion_source === 'makersuite' || o.chat_completion_source === 'vertexai');
+  // 有照片又接 Google：直接問，照片一定送得到（酒館自己那條路會照模型名單決定要不要附圖，新模型常被漏掉）。問不到再退回酒館
+  if (image && google) {
+    const system = await liteContext(c, prompt);
+    const fast = await quickAsk(c, system, prompt, image);
+    if (fast) return stripBlocks(fast);
+  }
   if (lite.get() && !image && c.generateRaw) {
     const system = await liteContext(c, prompt);
     // 聊天接 Google 時直接問模型：走酒館的 generateRaw 會經過模板、變數那些擴充，再照正文的思考設定想很久，
