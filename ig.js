@@ -356,8 +356,10 @@ export function createIG({ screen, say }) {
       if (a === 'redo' && p) await rewritePost(p);
       return;
     }
+    // 限動列上的配角頭像：先看限動，不是跳證件照表單（10/19 比比：配角帳號那麼多不可能一個一個放，而且這樣看不到限動）。
+    // 要改配角的證件照，從貼文的帳號名或個人頁點
     const cs = e.target.closest('[data-cast]');
-    if (cs && !e.target.closest('.bp-ig-storyv')) { castSheet(cs.dataset.cast); return; }
+    if (cs && !e.target.closest('.bp-ig-storyv') && !e.target.closest('[data-story]')) { castSheet(cs.dataset.cast); return; }
     const lk = e.target.closest('[data-like]');
     if (lk) { const p = find(lk.dataset.like); p.liked = !p.liked; save(); view === 'post' ? renderPost() : view === 'profile' ? renderProfile() : renderFeed(); return; }
     const pr = e.target.closest('[data-prof]');
