@@ -172,6 +172,12 @@
   display: flex; flex-direction: column;
 }
 .bp-appscreen.bp-show { transform: none; }
+/* App 裡的回桌面橫槓（iPhone 那條）：只有 App 開著才出現，鍵盤彈出來時收掉免得壓到輸入框 */
+.bp-app-home { position: absolute; left: 0; right: 0; bottom: 0; z-index: 10; height: calc(16px + var(--bp-sab, env(safe-area-inset-bottom))); display: none; place-items: center; cursor: pointer; }
+.bp-phone.bp-app-open .bp-app-home { display: grid; }
+#bp-overlay.bp-kb .bp-app-home { display: none; }
+.bp-app-home i { width: 120px; height: 5px; border-radius: 3px; background: rgba(0, 0, 0, .35); mix-blend-mode: multiply; }
+.bp-appscreen:has(.bp-mu) ~ .bp-app-home i { background: rgba(255, 255, 255, .7); mix-blend-mode: normal; }
 .bp-app-wait { flex: 1; display: flex; align-items: center; justify-content: center; gap: 6px; }
 .bp-app-wait i { width: 7px; height: 7px; border-radius: 50%; background: currentColor; opacity: .25; animation: bp-wait 1s infinite ease-in-out; }
 .bp-app-wait i:nth-child(2) { animation-delay: .15s; }

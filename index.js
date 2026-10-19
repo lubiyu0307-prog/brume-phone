@@ -10,7 +10,8 @@ import { createIG } from './ig.js';
 import { createGames } from './games.js';
 import { createCall } from './call.js';
 import { createLife, settings as lifeSet, LEVELS } from './life.js';
-import { createFind, createWeather, createParcels, skyIcon } from './world.js';
+import { createFind, createParcels, skyIcon } from './world.js';
+import * as realwx from './realwx.js';
 import * as push from './push.js';
 import * as stage from './stage.js';
 import { currentChar, ctx, lite, DATA_PREFIXES, uploadImage, dropImage, phoneOff } from './st.js';
@@ -19,7 +20,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.21.11';
+const VERSION = '0.22.0';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -93,7 +94,6 @@ const PAGES = [
     { w: 'w2', kind: 'photo', slot: 'p3' },
     { w: 'w4', kind: 'photo', slot: 'p4' },
     { app: 'find', name: '尋找' },
-    { app: 'weather', name: '天氣' },
     { app: 'parcel', name: '包裹' },
     { app: 'settings', name: '設定' },
   ],
@@ -188,6 +188,7 @@ function build() {
       </div>
     </div>
     <div class="bp-appscreen"></div>
+    <div class="bp-app-home" title="回到桌面"><i></i></div>
     <div class="bp-his"></div>
     <div class="bp-yt"></div>
     <div class="bp-close" title="收起手機">${ICON.x}</div>
@@ -201,6 +202,8 @@ function build() {
         <button data-act="bridge" class="bp-switchrow">劇情接手機<i></i></button>
         <p class="bp-sheet-note">正文裡你們分開之後，他會自己傳 LINE 或發脆，過幾分鐘手機才響。</p>
         <button data-act="his">偷看他的手機</button>
+        <div class="bp-setrow"><span>妳現實住的城市</span><input class="bp-city-in" maxlength="30" placeholder="台北"></div>
+        <p class="bp-sheet-note">LINE 在現實時間的時候，鎖定畫面顯示那裡真的天氣，他也看得到；劇情時間顯示故事裡的天氣。</p>
       </section>
       <section class="bp-setgrp"><h4>通知</h4>
         <button data-act="push" class="bp-pushbtn">開啟通知</button>
@@ -260,7 +263,8 @@ function build() {
     overlay.style.setProperty('--bp-w', `${W}px`); overlay.style.setProperty('--bp-h', `${H}px`);
     // 直接在酒館裡開（沒有門面）時：鍵盤彈出來蓋住了底部安全區，輸入框下面那截 env(safe-area-inset-bottom) 就不該留
     // （10/19 比比：從酒館開的 LINE 輸入框下面多一截白的，從門面開的沒有）
-    if (!SHELL) { fullH = Math.max(fullH, H); if (H < fullH - 120) overlay.style.setProperty('--bp-sab', '0px'); else overlay.style.removeProperty('--bp-sab'); }
+    fullH = Math.max(fullH, H); const kb = H < fullH - 120; overlay.classList.toggle('bp-kb', kb);
+    if (!SHELL) { if (kb) overlay.style.setProperty('--bp-sab', '0px'); else overlay.style.removeProperty('--bp-sab'); }
     overlay.style.left = `${X}px`; overlay.style.top = `${Y}px`;
     overlay.style.setProperty('--bp-left', `${X}px`); overlay.style.setProperty('--bp-top', `${Y}px`);
     if (!overlay.classList.contains('bp-open')) return; // 沒打開時量不到
@@ -390,9 +394,17 @@ function build() {
     sheet.querySelector('[data-act="bridge"] i').classList.toggle('on', lifeSet.get().bridge);
     sheet.querySelector('.bp-migbtn').hidden = !(await hasOldData());
     sheet.querySelectorAll('[data-act="eye"]').forEach((b) => b.classList.toggle('on', b.dataset.v === (state.eye || 'off')));
+    const cityIn = sheet.querySelector('.bp-city-in'); if (cityIn && document.activeElement !== cityIn) cityIn.value = realwx.city.get();
     showPush();
     const sp = splashConf(); sheet.querySelectorAll('.bp-splash-in').forEach((i) => { i.value = sp[i.dataset.splash] || ''; });
   }
+  sheet.addEventListener('change', async (e) => {
+    const i = e.target.closest('.bp-city-in'); if (!i) return;
+    realwx.city.set(i.value); lockWeather();
+    if (!i.value.trim()) { say('城市清掉了，鎖定畫面改回故事裡的天氣'); return; }
+    try { const w = await realwx.get({ force: true }); say(`${w.place} 現在 ${w.sky} ${w.temp}°`); } catch (err) { say(err.message || '天氣讀不到'); }
+    lockWeather();
+  });
   sheet.addEventListener('change', (e) => { const i = e.target.closest('.bp-splash-in'); if (i) { setSplash({ [i.dataset.splash]: i.value.trim() }); say('開機畫面改好了'); } });
 
   // 通知：設定頁一打開就先檢查好（iPhone 只在按下去那一刻讓網頁跳出允許通知的視窗，等檢查就來不及）
@@ -574,7 +586,6 @@ function build() {
       }
       if (open.dataset.open === 'calendar') { openApp(calendar); return; }
       if (open.dataset.open === 'find') { openApp(find); return; }
-      if (open.dataset.open === 'weather') { openApp(weatherApp); return; }
       if (open.dataset.open === 'parcel') { openApp(parcels); return; }
       if (open.dataset.open === 'threads') { openApp(threads); return; }
       if (open.dataset.open === 'album') { openApp(album); return; }
@@ -586,6 +597,7 @@ function build() {
       say('這個 App 還在做 ☁︎');
       return;
     }
+    if (e.target.closest('.bp-app-home')) { closeApp(); return; } // App 裡的那條橫槓：回桌面，不是收手機（10/19 比比：不然都要重新進手機）
     if (e.target.closest('.bp-homebar')) close('homebar'); else if (e.target.closest('.bp-close')) close('x');
   });
 
@@ -618,11 +630,10 @@ function build() {
   const openApp = (app) => { music?.leave(); appScreen.innerHTML = '<div class="bp-app-wait"><i></i><i></i><i></i></div>'; app.open(); appScreen.classList.add('bp-show'); phone.classList.add('bp-app-open'); };
   const closeApp = () => { if (callApp?.inCall) callApp.hang(); appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); music?.leave(); refreshNotices?.(); };
   appScreen.addEventListener('bp-home', closeApp);
-  const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => calDots(), onParcel: (who, p) => life.sendParcel?.(who, p) }); // life 在下面才建，叫到的時候已經有了
+  const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => { calDots(); lockWeather(); }, onParcel: (who, p) => life.sendParcel?.(who, p) }); // life 在下面才建，叫到的時候已經有了
   const notes = createNotes({ screen: appScreen, say });
   const calendar = createCalendar({ screen: appScreen, say });
   const find = createFind({ screen: appScreen });
-  const weatherApp = createWeather({ screen: appScreen });
   const parcels = createParcels({ screen: appScreen, say, onChange: () => refreshNotices() });
   const threads = createThreads({ screen: appScreen, say });
   const ig = createIG({ screen: appScreen, say });
@@ -723,12 +734,25 @@ function build() {
   data.onChange((kind) => { if (kind === 'cal') calDots(); if (kind === 'weather') lockWeather(); });
   calDots();
 
-  // 鎖定畫面的天氣：故事裡那座城市的（天氣 App 同一份）；還沒報過就收起來，不放假的
+  // 鎖定畫面的天氣（10/19 比比：不另外開 App）：LINE 在現實時間就是真的天氣（設定填城市），劇情時間就是故事裡那座城市的（正文 <phone> 報的）
+  let wxSeq = 0;
   async function lockWeather() {
     const el = overlay.querySelector('.bp-weather'); if (!el) return;
-    const c = currentChar(); const wx = c ? await data.weather.get(c.key) : null;
-    el.hidden = !wx;
-    if (wx) el.innerHTML = `<b>${skyIcon(wx.sky)} ${wx.temp != null ? `${wx.temp}°` : ''}</b><br>${String(wx.sky).replace(/</g, '&lt;')}<br>${String(wx.city).replace(/</g, '&lt;')}`;
+    const seq = ++wxSeq;
+    const esc = (s) => String(s ?? '').replace(/</g, '&lt;');
+    const c = currentChar();
+    const mode = c ? await line.mode().catch(() => 'story') : 'story';
+    let wx = null; let tag = '';
+    if (mode === 'now') {
+      wx = await realwx.get().catch(() => null);
+      tag = wx ? `現實・${esc(wx.place)}` : (realwx.city.get() ? '天氣讀不到' : '設定裡填妳的城市');
+    } else {
+      wx = c ? await data.weather.get(c.key) : null;
+      tag = wx ? `故事・${esc(wx.city)}` : '';
+    }
+    if (seq !== wxSeq) return; // 後面又叫了一次，以那次為準
+    el.hidden = !wx && mode !== 'now';
+    el.innerHTML = wx ? `<b>${skyIcon(wx.sky)} ${wx.temp != null ? `${wx.temp}°` : ''}</b><br>${esc(wx.sky)}<br>${tag}` : `<b>☁︎</b><br>${tag}`;
   }
   lockWeather();
 
@@ -774,7 +798,7 @@ function build() {
   });
 
   const api = {
-    open() { rememberChar(); store.refresh(); loadDesk(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); tint(true); fit(); dbg('open'); },
+    open() { rememberChar(); store.refresh(); loadDesk(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lockWeather(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); tint(true); fit(); dbg('open'); },
     close,
     refreshPrompt: () => life.refreshPrompt(),
   };

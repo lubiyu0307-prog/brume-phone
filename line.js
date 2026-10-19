@@ -7,6 +7,7 @@ import * as data from './data.js';
 import * as stage from './stage.js';
 import { findUrls, readLink, linkForPrompt } from './link.js';
 import { HIM, ME, loadCast } from './cast.js';
+import * as realwx from './realwx.js';
 
 const OLD_STORE = 'brume-phone:line:'; // v0.2.0 存在 localStorage，第一次打開時搬進 IndexedDB
 
@@ -156,6 +157,9 @@ function buildPrompt(ch, msgs, x = {}) {
     `現在不是在寫劇情正文。${ch.name} 正在用手機的 LINE 跟 ${ch.user} 傳訊息。`,
     timeLine,
     x.stage ? `你們現在的關係：${stage.name(x.stage)}（${stage.tone(x.stage)}）。說話的親密程度照這個來` : '',
+    x.weather ? (x.weather.real
+      ? `她那邊現在真的天氣：${x.weather.city} ${x.weather.sky}${x.weather.temp != null ? ` ${x.weather.temp}°` : ''}。可以自然帶到（下雨要她帶傘、冷要她多穿），不用每次都講`
+      : `故事裡現在的天氣：${x.weather.city} ${x.weather.sky}${x.weather.temp != null ? ` ${x.weather.temp}°` : ''}`) : '',
     x.sleep ? `\n【陪睡模式】${ch.user} 躺在床上準備睡了，要你陪她入睡。講話輕、短、慢，像在耳邊說；不問問題、不開新話題、不要讓她更清醒。她說晚安就溫柔收尾。` : '',
     x.memory?.length ? `\n${ch.name} 記得的事：\n${x.memory.map((m) => '- ' + m.text).join('\n')}` : '',
     x.notes?.length ? `\n她冰箱上的便條（你貼過的也在裡面）：\n${x.notes.map((n) => `- ${n.text}${n.date ? `（${n.date}）` : ''}${n.done ? '（已完成）' : ''}`).join('\n')}` : '',
@@ -757,9 +761,12 @@ export function createLine({ screen, say, onUnread, onData, onParcel }) {
       const sday = await data.storyDay.get(who.key);
       const today = calKind === 'real' ? data.today() : (sday || data.today());
       const [notes, calAll, memory, stks] = await Promise.all([data.notes.all(who.key), data.cal.all(who.key), data.memory.all(who.key), data.stickers.for(who.charKey)]);
+      // 天氣：現實時間給真的（設定填的城市），劇情時間給故事裡的（正文報的）
+      const wxRaw = t.mode === 'now' ? await realwx.get().catch(() => null) : await data.weather.get(who.key);
+      const weather = wxRaw ? { real: t.mode === 'now', city: t.mode === 'now' ? wxRaw.place : wxRaw.city, sky: wxRaw.sky, temp: wxRaw.temp } : null;
       const cal = calAll.filter((e) => data.calKind(e) === calKind);
       const cur = await stage.get(who.key);
-      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), storyDay: sday, notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => (x.desc ? `${x.tag}（${x.desc}）` : x.tag)))], photos: roundPhotos.length, photosSeen: !!image, couple: couple ? `${new Date(couple.ts).getMonth() + 1}/${new Date(couple.ts).getDate()} 換的` : '', pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
+      const extra = { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, notesOn: stage.unlocked(cur, 'notes'), sleep: t.sleep && stage.unlocked(cur, 'sleep'), storyDay: sday, notes: notes.filter((n) => !n.done).slice(0, 12), cal: cal.filter((e) => e.date >= today).slice(0, 12), memory, stickerTags: [...new Set(stks.map((x) => (x.desc ? `${x.tag}（${x.desc}）` : x.tag)))], photos: roundPhotos.length, photosSeen: !!image, weather, couple: couple ? `${new Date(couple.ts).getMonth() + 1}/${new Date(couple.ts).getDate()} 換的` : '', pin: (() => { const pm = t.pin && t.msgs.find((m) => m.id === t.pin); return pm && !pm.unsent ? msgText(pm).slice(0, 80) : ''; })() };
       out = parseReply(await generate(buildPrompt(who, t.msgs, extra), image), who);
       // 他偶爾會連括號裡的描述一起抄，只取標籤；同一個標籤有好幾張就隨機挑一張
       const stkTag = out.sticker ? String(out.sticker).replace(/[（(].*$/, '').trim() : '';
@@ -986,7 +993,7 @@ export function createLine({ screen, say, onUnread, onData, onParcel }) {
       say(thread.sync ? '打開了，正文會知道 LINE 聊了什麼' : '關掉了，正文不會看到 LINE');
     }
     if (a === 'mode') {
-      thread.mode = thread.mode === 'now' ? 'story' : 'now'; save(); renderRoom();
+      thread.mode = thread.mode === 'now' ? 'story' : 'now'; save(); renderRoom(); onData?.(); // 鎖定畫面的天氣跟著換
       say(thread.mode === 'now' ? '換成現實時間，他知道現在幾點' : '換回劇情時間，跟著正文走');
     }
     if (a === 'nowsync') {
@@ -1273,6 +1280,8 @@ export function createLine({ screen, say, onUnread, onData, onParcel }) {
     // 從別的 App（相本）傳一則給他：先換到目前這個角色的紀錄，再照一般送出走
     async share(msg) { if (await useCurrent()) send(msg); },
     himFirst, compose, deliverBg, bgCounts, deliver, unseen, lastActive, unansweredRun,
+    /** 目前這個角色的 LINE 在現實時間還是劇情時間（鎖定畫面的天氣照這個挑） */
+    async mode() { const who = await useCurrent(); return who && thread?.mode === 'now' ? 'now' : 'story'; },
     forget() { ch = null; thread = null; }, // 換聊天或資料搬家之後，下次重讀
     get busy() { return !!busy; },
   };
