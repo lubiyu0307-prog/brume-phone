@@ -1241,6 +1241,9 @@
 .bp-al-selbar button { border: 0; background: none; font: inherit; font-size: 16px; color: #0a84ff; padding: 6px 8px; cursor: pointer; }
 .bp-al-selbar button.danger { color: #e5443a; }
 .bp-al-selbar button:disabled { color: #b5ada0; }
+.bp-pick-wait .bp-pick-in b { display: block; margin-bottom: 4px; }
+.bp-pick-wait .bp-app-wait { flex: none; margin: 14px auto 0; }
+.bp-pick-wait .bp-pick-in { text-align: center; }
 .bp-al-sec { margin: 14px 16px 4px; font-size: 12px; letter-spacing: .12em; color: #8a8378; font-weight: 600; }
 .bp-al-sec + .bp-al-hint { margin-top: 2px; }
 .bp-eng .bp-pe-btns { margin-bottom: 4px; }

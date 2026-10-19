@@ -9,6 +9,19 @@ import { imagine, imageInfo, imageCountPref, imageModelPref, imageEnginePref, sh
  * 玩家按「生成」時問用哪家畫：兩家都有才問（只有一家直接回那家）。回傳 'gemini'｜'gpt'，取消回傳 null。
  * 按了哪家就記成預設，之後背景自動生的也用那家
  */
+/** 只生一張：畫面上蓋一層「生圖中⋯」，不然玩家不知道有沒有按到（10/19 比比）。生完就收掉 */
+export async function imagineWithWait(screen, prompt, opts = {}) {
+  const box = document.createElement('div');
+  box.className = 'bp-pick bp-pick-wait';
+  box.innerHTML = `<div class="bp-pick-in"><b>生圖中⋯</b><small>${opts.engine === 'gpt' || imageEnginePref.get() === 'gpt' ? 'GPT 大概十到二十秒' : 'Gemini 大概十幾秒'}</small><div class="bp-app-wait"><i></i><i></i><i></i></div></div>`;
+  screen.appendChild(box);
+  let done = false;
+  // 畫面在生圖途中被重畫（innerHTML 換掉）時把它放回去
+  const keep = setInterval(() => { if (done) clearInterval(keep); else if (!box.isConnected) screen.appendChild(box); }, 400);
+  try { return await imagine(prompt, opts); }
+  finally { done = true; clearInterval(keep); box.remove(); }
+}
+
 export function chooseEngine(screen) {
   if (!shouldAskEngine()) return Promise.resolve(imageEnginePref.get());
   return new Promise((resolve) => {
@@ -31,7 +44,7 @@ export function chooseEngine(screen) {
 
 export async function imagineAndPick(screen, prompt, opts = {}) {
   const n = imageCountPref.get();
-  if (n <= 1) return imagine(prompt, opts);
+  if (n <= 1) return imagineWithWait(screen, prompt, opts);
   const ar = { '4:3': '4 / 3', '9:16': '9 / 16' }[opts.aspect] || '1 / 1';
   const box = document.createElement('div');
   box.className = 'bp-pick';
