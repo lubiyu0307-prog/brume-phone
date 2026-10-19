@@ -1330,6 +1330,31 @@
 .bp-find-pin.off { filter: grayscale(1); opacity: .5; }
 .bp-find-pin.off u { display: none; }
 @keyframes bp-find-pulse { from { transform: scale(.6); opacity: 1; } to { transform: scale(1.6); opacity: 0; } }
+.bp-find-seg { display: grid; grid-template-columns: 1fr 1fr; margin: 0 14px 8px; background: rgba(0, 0, 0, .06); border-radius: 10px; padding: 3px; }
+.bp-find-seg b { text-align: center; font-size: 13px; font-weight: 500; padding: 6px 0; border-radius: 8px; cursor: pointer; }
+.bp-find-seg b.on { background: #fff; font-weight: 600; box-shadow: 0 1px 3px rgba(0, 0, 0, .1); }
+.bp-find-map svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.bp-find-map svg text { font-family: -apple-system, "PingFang TC", sans-serif; }
+.bp-find-lm { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 1px; pointer-events: none; }
+.bp-find-lm i { position: static; box-sizing: border-box; font-style: normal; font-size: 15px; width: 26px; height: 26px; border-radius: 50%; background: #fff; display: grid; place-items: center; box-shadow: 0 2px 6px rgba(0, 0, 0, .12); }
+.bp-find-lm small { font-size: 10.5px; color: #4b463f; background: rgba(255, 255, 255, .85); padding: 1px 5px; border-radius: 6px; white-space: nowrap; max-width: 92px; overflow: hidden; text-overflow: ellipsis; }
+.bp-find-lm.cur i { visibility: hidden; }
+.bp-find-lm.cur small { margin-top: 30px; }
+.bp-find-map .bp-find-pin { transform: translate(-50%, -50%); margin: 0; }
+.bp-find-mapnote { margin: 0; padding: 60px 24px; text-align: center; font-size: 13px; color: #8a8378; line-height: 1.7; }
+.bp-find-leaflet { position: absolute; inset: 0; }
+.bp-find-leaflet .leaflet-control-attribution { font-size: 9px; opacity: .6; }
+.bp-find-lmi { display: grid; justify-items: center; gap: 1px; transform: translate(-50%, -50%); white-space: nowrap; }
+.bp-find-lmi i { font-style: normal; font-size: 15px; width: 26px; height: 26px; border-radius: 50%; background: #fff; display: grid; place-items: center; box-shadow: 0 2px 6px rgba(0, 0, 0, .12); }
+.bp-find-lmi small { font-size: 10.5px; color: #4b463f; background: rgba(255, 255, 255, .85); padding: 1px 5px; border-radius: 6px; }
+.bp-find-pinw .bp-find-pin { position: relative; left: 0; top: 0; margin: -26px 0 0 -26px; transform: none; }
+.bp-find-stats { display: flex; gap: 14px; margin-top: 10px; font-size: 12.5px; color: #6b655c; }
+.bp-find-stats i { font-style: normal; }
+.bp-find-trail { margin-top: 10px; font-size: 12.5px; color: #4b463f; line-height: 1.8; }
+.bp-find-trail small { display: block; font-size: 11px; color: #a39b8f; }
+.bp-find-trail span { white-space: nowrap; }
+.bp-find-trail span i { font-style: normal; color: #c98b5a; margin: 0 4px; }
+.bp-find-trail span em { font-style: normal; font-size: 10.5px; color: #a39b8f; margin-left: 2px; }
 .bp-find-card { background: #fff; border-radius: 22px 22px 0 0; padding: 16px 20px 26px; box-shadow: 0 -4px 18px rgba(0, 0, 0, .06); }
 .bp-find-card b { display: block; font-size: 18px; }
 .bp-find-card span { display: block; margin-top: 6px; font-size: 15px; color: #4b463f; }

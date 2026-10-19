@@ -109,7 +109,10 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
       if (sd) { storyToday = `${sd[1]}-${sd[2].padStart(2, '0')}-${sd[3].padStart(2, '0')}`; await data.storyDay.set(ch.key, storyToday); mode = null; continue; }
       // 位置、天氣：一行一筆，直接存（尋找、天氣 App 讀）
       const loc = l.match(/^位置\s*[｜|:：]\s*([^｜|]{1,20})(?:\s*[｜|]\s*(.{1,40}))?$/);
-      if (loc) { if (!META.test(l)) await data.where.set(ch.key, { place: loc[1].trim(), line: (loc[2] || '').trim(), day: storyToday, ts: Date.now() }); mode = null; continue; }
+      if (loc) {
+        if (!META.test(l)) { const w = { place: loc[1].trim(), line: (loc[2] || '').trim(), day: storyToday, ts: Date.now() }; await data.where.set(ch.key, w); await data.whereLog.add(ch.key, { ...w, kind: 'story' }); }
+        mode = null; continue;
+      }
       const wx = l.match(/^天氣\s*[｜|:：]\s*([^｜|]{1,12})\s*[｜|]\s*([^｜|]{1,10})(?:\s*[｜|]\s*(-?\d{1,2}))?/);
       if (wx) { if (!META.test(l)) await data.weather.set(ch.key, { city: wx[1].trim(), sky: wx[2].trim(), temp: wx[3] != null ? +wx[3] : null, day: storyToday, ts: Date.now() }); mode = null; continue; }
       const m = l.match(/^(LINE|脆|Threads|關係|行事曆|便條|便利貼|包裹)\s*[｜|:：]\s*(.*)$/i);

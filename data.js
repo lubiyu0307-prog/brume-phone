@@ -82,6 +82,20 @@ const one = (kind) => ({
 });
 export const where = one('where');
 export const weather = one('weather');
+// 現實時間他在哪（LINE 現實模式裡他傳的位置），跟劇情的 where 分開
+export const whereNow = one('wherenow');
+// 他去過的地方（尋找 App 的地標與足跡）：{ place, line, day, ts, kind: 'story'|'real' }，最多 150 筆。
+// 同一個地方連著報就合併（重新生成同一段劇情不會多一筆）
+export const whereLog = {
+  all: (key) => list('wherelog', key),
+  async add(key, w) {
+    const a = await list('wherelog', key);
+    const last = a[a.length - 1];
+    if (last && last.place === w.place && last.kind === w.kind) Object.assign(last, w);
+    else a.push({ ...w });
+    await save('wherelog', key, a.slice(-150));
+  },
+};
 
 // 包裹（他叫的外送、寄的東西）：{ id, item, note, ts, eta, opened }。eta 之前是配送中
 export const parcels = {

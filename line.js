@@ -815,7 +815,14 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
     if (out.stickerObj) extras.push({ sticker: { tag: out.stickerObj.tag, img: out.stickerObj.img, ...(out.stickerObj.desc ? { desc: out.stickerObj.desc } : {}) } });
     if (out.alarm) extras.push({ alarm: out.alarm });
     for (const g of out.gifts.slice(0, 1)) extras.push({ gift: g });
-    for (const l of out.locs.slice(0, 1)) extras.push({ loc: l });
+    for (const l of out.locs.slice(0, 1)) {
+      extras.push({ loc: l });
+      // 尋找 App：現實模式傳的算現實的位置，劇情模式傳的就是劇情的位置（跟正文 <phone> 報的同一份）
+      const real = t.mode === 'now';
+      const w = { place: l.place, line: l.note || '', day: real ? data.today() : ((await data.storyDay.get(who.key)) || data.today()), ts: Date.now() };
+      if (real) await data.whereNow.set(who.key, w); else await data.where.set(who.key, w);
+      await data.whereLog.add(who.key, { ...w, kind: real ? 'real' : 'story' });
+    }
     for (const mo of out.moments) extras.push({ moment: mo });
     for (const n of out.notes) { await data.notes.add(who.key, { ...n, by: 'him' }); extras.push({ notice: `📌 ${who.name}在便條上寫了：${n.text}`, goto: 'notes' }); }
     for (const c of out.cals) { await data.cal.add(who.key, { ...c, by: 'him', kind: t.mode === 'now' ? 'real' : 'story' }); extras.push({ notice: `📅 ${who.name}記上行事曆：${c.date.slice(5).replace('-', '/')} ${c.title}`, goto: 'calendar' }); }

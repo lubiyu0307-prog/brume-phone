@@ -42,6 +42,12 @@ async function geoOpenMeteo(name) {
 async function geocode(name) {
   return geoLocal(name) || (await geoNominatim(name).catch(() => null)) || (await geoOpenMeteo(name).catch(() => null));
 }
+/** 尋找 App 的現實地圖要城市的經緯度：先看天氣查過的快取，沒有再查一次 */
+export async function coords(name) {
+  if (!name) return null;
+  if (cache && cache.city === name && cache.lat != null) return { name: cache.place || name, lat: cache.lat, lon: cache.lon };
+  return geocode(name);
+}
 
 async function refresh(name) {
   // 同一個城市的經緯度查過就留著，三十分鐘一次只打天氣那支
