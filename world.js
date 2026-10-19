@@ -45,6 +45,8 @@ const kindOf = (place, userName) => {
   if (userName && place.includes(userName) && /家|房|住/.test(place)) return 'her';
   return (KIND.find(([, re]) => re.test(place)) || ['other'])[0];
 };
+// 連著同一個地方只留第一筆（足跡用）
+const collapse = (list) => list.filter((x, i) => !i || x.place !== list[i - 1].place);
 const KIND_ICON = { her: '🏠', home: '🏡', work: '💼', transit: '🚉', food: '☕️', park: '🌳', other: '📍' };
 const ROADS = ['中正路', '民生路', '和平街', '自由路', '光復路', '河堤路', '學府路', '青田街', '文化路', '仁愛路', '信義街', '博愛路', '復興路', '中華路', '大同街', '育英路'];
 
@@ -95,7 +97,7 @@ export function createFind({ screen }) {
     const hour = new Date().getHours();
     const batt = Math.max(8, 100 - ((hour * 6 + (h % 23)) % 78));
     const today = real ? dayOf(Date.now()) : w.day;
-    const trail = log.filter((x) => (real ? dayOf(x.ts) : x.day) === today && x.ts <= Date.now());
+    const trail = collapse(log.filter((x) => (real ? dayOf(x.ts) : x.day) === today && x.ts <= Date.now()));
     const trailHtml = trail.length > 1 ? `<div class="bp-find-trail"><small>今天</small>${trail.map((x, i) => `<span>${i ? '<i>›</i>' : ''}${esc(x.place)}${real ? `<em>${hm(x.ts)}</em>` : ''}</span>`).join('')}</div>` : '';
     return `<div class="bp-find-card">
       <b>${esc(ch.name)}</b>
@@ -114,7 +116,7 @@ export function createFind({ screen }) {
     const pts = places.map((x) => ({ ...x, kind: kindOf(x.place, ch.user), ...city.pos(x.place) }));
     const cur = w ? pts.find((x) => x.place === w.place) : null;
     const today = w?.day;
-    const trail = today ? log.filter((x) => x.day === today).map((x) => pts.find((p) => p.place === x.place)).filter(Boolean) : [];
+    const trail = today ? collapse(log.filter((x) => x.day === today)).map((x) => pts.find((p) => p.place === x.place)).filter(Boolean) : [];
     const road = (r) => `<line x1="${r.x1}" y1="${r.y1}" x2="${r.x2}" y2="${r.y2}" stroke="#fbfaf6" stroke-width="${r.w}" stroke-linecap="round"/>`;
     const label = (r) => (r.y1 === r.y2
       ? `<text x="4" y="${r.y1 - 1.6}" font-size="2.6" fill="#9a9488">${esc(r.name)}</text>`
@@ -159,8 +161,8 @@ export function createFind({ screen }) {
     const el = box.querySelector('.bp-find-leaflet');
     const L = window.L;
     map?.remove(); map = L.map(el, { zoomControl: false, attributionControl: true }).setView([base.lat, base.lon], 14);
-    // CARTO 的圖磚 10/19 起要金鑰，改用 OpenStreetMap 本家（免費、不用鑰匙，流量小用沒問題）
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap' }).addTo(map);
+    // 圖磚：CARTO 10/19 起要金鑰、OSM 本家把酒館這種來源擋 403（tile usage policy），改用 Esri 的街道圖（免費、不用鑰匙、台灣有中文路名）
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', { maxZoom: 19, attribution: '© Esri, OpenStreetMap contributors' }).addTo(map);
     const places = [...new Map(log.map((x) => [x.place, x])).values()];
     if (w && !places.some((x) => x.place === w.place)) places.push(w);
     const pts = [];
@@ -170,7 +172,7 @@ export function createFind({ screen }) {
       L.marker(ll, { icon: L.divIcon({ className: 'bp-find-lmi', html: `<i>${KIND_ICON[kind]}</i><small>${esc(x.place)}</small>`, iconSize: [0, 0] }) }).addTo(map);
     }
     const today = dayOf(Date.now());
-    const trail = log.filter((x) => dayOf(x.ts) === today && x.ts <= Date.now()).map((x) => pts.find((p) => p.place === x.place)?.ll).filter(Boolean);
+    const trail = collapse(log.filter((x) => dayOf(x.ts) === today && x.ts <= Date.now())).map((x) => pts.find((p) => p.place === x.place)?.ll).filter(Boolean);
     if (trail.length > 1) L.polyline(trail, { color: '#c98b5a', weight: 2.5, dashArray: '5 6' }).addTo(map);
     const cur = w ? pts.find((p) => p.place === w.place) : null;
     const av = ch.avatar ? `<img src="${esc(ch.avatar)}" alt="">` : `<span>${esc(ch.name.slice(0, 1))}</span>`;
