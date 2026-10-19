@@ -277,12 +277,8 @@ export const imageModelPref = {
   get() { try { return localStorage.getItem(PREF) === 'pro' ? 'pro' : 'flash'; } catch { return 'flash'; } },
   set(v) { try { localStorage.setItem(PREF, v === 'pro' ? 'pro' : 'flash'); } catch { /* 存不了就照預設 */ } },
 };
-// 一次生幾張讓玩家挑（1、2、4），每台裝置各自記
-const COUNT = 'brume-phone:imgcount';
-export const imageCountPref = {
-  get() { try { const n = +localStorage.getItem(COUNT); return [2, 4].includes(n) ? n : 1; } catch { return 1; } },
-  set(n) { try { localStorage.setItem(COUNT, String([2, 4].includes(+n) ? +n : 1)); } catch { /* 存不了就照預設 */ } },
-};
+// 一次生幾張：10/19 比比決定一律一張（挑圖那套 pick.js 留著，n 永遠是 1 就不會進去）
+export const imageCountPref = { get: () => 1, set() { /* 不再讓玩家選 */ } };
 
 /** 刪掉存在酒館伺服器上、沒用到的圖（挑圖時沒選中的） */
 export async function dropImage(url) {
