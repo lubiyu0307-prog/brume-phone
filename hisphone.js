@@ -5,7 +5,7 @@
 import * as store from './store.js';
 import { currentChar, generate, imageInfo, canDraw, worldRoster, dropImage } from './st.js';
 import { HIM, ME, loadCast, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit, isSavedImage, savedImagePrompt, shotHand } from './cast.js';
-import { imagineAndPick } from './pick.js';
+import { imagineAndPick, chooseEngine } from './pick.js';
 import { promptEditor } from './promptedit.js';
 import { verify } from './music.js';
 import * as stage from './stage.js';
@@ -408,13 +408,14 @@ export function createHisPhone({ host, say, onExit }) {
 
   async function genPhoto(i) {
       const p = hp.album[i]; const who = ch; if (!p || drawing) return;
+      const engine = await chooseEngine(host); if (!engine) return; // 兩家都有才會問；取消就不生
       drawing = true; paint();
       try {
         const people = await loadCast(who.charKey);
         await ensureAutoStyle(people, who.charKey);
         // 寫照片時一起寫好的畫面描述：照 shot 和 in 畫，不用猜
         if (p.shot && isSavedImage(p.shot)) {
-          const url = await imagineAndPick(host, savedImagePrompt(p.shot), { refs: [], aspect: '1:1' });
+          const url = await imagineAndPick(host, savedImagePrompt(p.shot), { refs: [], aspect: '1:1', engine });
           if (url) { p.img = url; if (who.key === ch?.key) save(); } else say(imageInfo.why ? `沒有出圖：${imageInfo.why}` : '沒有出圖');
           drawing = false; if (view === 'album' && sub === i) paint();
           return;
@@ -422,7 +423,7 @@ export function createHisPhone({ host, say, onExit }) {
         if (p.shot) {
           const ids = shotIds(people, who, p.in);
           const prompt = finalPrompt(people, who, p.shot, ids, ids.includes(HIM) ? {} : { by: HIM, hand: shotHand(p.shot) });
-          const url = await imagineAndPick(host, prompt, { refs: refsFor(people, who, '', ids), aspect: '1:1' });
+          const url = await imagineAndPick(host, prompt, { refs: refsFor(people, who, '', ids), aspect: '1:1', engine });
           if (url) { p.img = url; if (who.key === ch?.key) save(); } else say(imageInfo.why ? `沒有出圖：${imageInfo.why}` : '沒有出圖');
           drawing = false; if (view === 'album' && sub === i) paint();
           return;

@@ -2,8 +2,8 @@
 // 「證件照」分頁放他、妳、配角的參考照片和長相，每張快照都帶著，同一個人才不會每張長得不一樣。
 
 import * as store from './store.js';
-import { ctx, currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref, imageResPref, saveToPhone, openaiKey } from './st.js';
-import { imagineAndPick } from './pick.js';
+import { ctx, currentChar, generate, recentChat, imageInfo, imageModelPref, imageCountPref, imageResPref, imageEnginePref, engines, shouldAskEngine, saveToPhone, openaiKey } from './st.js';
+import { imagineAndPick, chooseEngine } from './pick.js';
 import { P, promptLang } from './prompts.js';
 import { promptEditor } from './promptedit.js';
 import { HIM, ME, loadCast, saveCast, person, setPerson, sideNames, refsFor, idsFor, finalPrompt, ensureAutoStyle, splitLook } from './cast.js';
@@ -138,12 +138,15 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <label>生圖指令的語言</label>
         <div class="bp-al-seg">${[['zh', '中文'], ['en', 'English']].map(([v, n]) => `<b data-al="lang" data-v="${v}" class="${promptLang.get() === v ? 'on' : ''}">${n}</b>`).join('')}</div>
         <p class="bp-al-hint">送去生圖的指令、新快照的 prompt、複製出來的內容都會用這個語言。後台指令都寫在小手機資料夾的 prompts.js，想自己調可以改那裡。</p>
-        <label>生圖模型</label>
+        <label>生圖用哪家</label>
+        <div class="bp-al-seg">${[['gemini', 'Gemini'], ['gpt', 'GPT']].map(([v, n]) => `<b data-al="imgengine" data-v="${v}" class="${imageEnginePref.get() === v ? 'on' : ''}${(v === 'gemini' ? engines().gemini : engines().gpt) ? '' : ' off'}">${n}${(v === 'gemini' ? engines().gemini : engines().gpt) ? '' : '・沒金鑰'}</b>`).join('')}</div>
+        <p class="bp-al-hint">背景自動生的照片用這家。自己按「生成」時，兩家都有金鑰才會問妳用哪家，只有一家就直接用；選的那家沒畫出來會換另一家畫，照片角落會標。Gemini 親密的畫面比較肯畫，GPT 穿著衣服的日常、有文字的畫面比較穩。</p>
+        <label>Gemini 的模型</label>
         <div class="bp-al-seg">${[['flash', 'Flash・快'], ['pro', 'Pro・細']].map(([v, n]) => `<b data-al="imgmodel" data-v="${v}" class="${imageModelPref.get() === v ? 'on' : ''}">${n}</b>`).join('')}</div>
-        <p class="bp-al-hint">Flash 一張十幾秒；Pro 二十秒上下，光影和細節比較細，費用也比較高。選的那個叫不到時，會自動換另一個。</p>
+        <p class="bp-al-hint">Flash 一張十幾秒；Pro 二十秒上下，光影和細節比較細，費用也比較高。選的那個叫不到時，會自動換另一個。GPT 只有一個模型（gpt-image-2），這格不影響它。</p>
         <label>解析度</label>
         <div class="bp-al-seg">${[['1K', '1K・省錢'], ['2K', '2K・清楚']].map(([v, n]) => `<b data-al="imgres" data-v="${v}" class="${imageResPref.get() === v ? 'on' : ''}">${n}</b>`).join('')}</div>
-        <p class="bp-al-hint">1K 比較便宜，近景、自拍、限動在手機上看差不多；2K 全身照、遠景的臉比較不會糊。</p>
+        <p class="bp-al-hint">Gemini：1K 比較便宜，近景、自拍、限動在手機上看差不多；2K 全身照、遠景的臉比較不會糊。GPT：1K＝低畫質（帶證件照一張約 0.02 美金，不到一塊台幣），2K＝高畫質（約 0.25 美金，八塊左右）；臉像不像靠的是證件照不是畫質，低畫質的臉常常反而比較自然。</p>
         <label>一次生幾張</label>
         <div class="bp-al-seg three">${[1, 2, 4].map((v) => `<b data-al="imgcount" data-v="${v}" class="${imageCountPref.get() === v ? 'on' : ''}">${v} 張</b>`).join('')}</div>
         <p class="bp-al-hint">生好排成格子讓妳挑最像的那張，沒選的會自動刪掉。張數越多越好挑，費用也是幾倍。</p>
@@ -151,7 +154,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <input class="bp-al-gkey" type="password" autocomplete="off" placeholder="${(() => { try { return localStorage.getItem('brume-phone:gemini-key') ? '已經貼好了（重貼會換掉）' : '貼上 AI Studio 金鑰'; } catch { return '貼上 AI Studio 金鑰'; } })()}">
         <label>OpenAI 金鑰（用 GPT 生圖，可以不貼）</label>
         <input class="bp-al-okey" type="password" autocomplete="off" placeholder="${openaiKey.get() ? '已經貼好了（重貼會換掉，清空存檔就拿掉）' : '貼上 OpenAI 金鑰（sk- 開頭）'}">
-        <p class="bp-al-hint">正文用 OpenAI 玩的，沒貼也會借酒館的 OpenAI 金鑰用 GPT 生圖，但那條只送得了文字、看不到證件照，臉會每張不一樣；貼了這把才會帶證件照一起生。GPT 扣的是 OpenAI 的錢，不是 Vertex 抵免額；它比較嚴，親密的畫面常常不給畫。金鑰只存在這台。</p>
+        <p class="bp-al-hint">怎麼拿：到 platform.openai.com 登入（跟 ChatGPT 訂閱是兩回事，要另外付錢）→ Billing 儲值，最低 5 美金，把 Auto-reload 關掉、Limits 填每月上限，用完就停不會多扣 → API keys 建一把，權限選 Restricted、只把 Images 開成 Request，別的留 None。這樣就算金鑰外流，別人也只能拿它生圖、只能燒到妳設的上限，隨時回去按 Revoke 就作廢。<br>費用：低畫質一張約 0.02 美金、高畫質約 0.25；被擋的那張也會扣一點點（讀證件照的錢）。<br>它不給畫的：裸露、床上的畫面，審查已經調到最低還是會擋，這種交給 Gemini。<br>正文用 OpenAI 玩的，沒貼也會借酒館的 OpenAI 金鑰生圖，但那條只送得了文字、看不到證件照，臉會每張不一樣；貼了這把才會帶證件照一起生。金鑰只存在這台。</p>
       </div></div>`;
   }
 
@@ -218,8 +221,8 @@ export function createAlbum({ screen, say, onShare, onIG }) {
       const p = { id: uid(), source: 'snap', ts: Date.now(), desc: String(r.desc || '一張照片'), in: ok.in, by: ok.by, prompt: ok.prompt, scene: scenes.join('\n\n').slice(0, 1200) };
       if (p.prompt) await ensureAutoStyle(people, who.charKey);
       // 快照用橫的 4:3，像真的相機拍的（跟 GPT 對照時比正方形自然）
-      p.img = p.prompt ? await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' }) : '';
-      note = drawnNote(p.img) || (p.img ? '' : '沒有出圖：正文要接 Google 或 OpenAI，或在證件照頁貼 AI Studio／OpenAI 金鑰。也可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。');
+      p.img = p.prompt ? await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3', engine: ok.engine }) : '';
+      note = drawnNote(p.img) || (p.img ? imageInfo.switched : '沒有出圖：正文要接 Google 或 OpenAI，或在證件照頁貼 AI Studio／OpenAI 金鑰。也可以複製 prompt 拿去外面生，再按「傳生好的圖進來」。');
       if (who.key === ch?.key) { items.push(p); save(); }
       picked = new Set(); openId = p.id; view = 'one';
     } catch (e) { say(`拍照失敗：${e.message || e}`); }
@@ -268,8 +271,10 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         <div class="bp-cf-row"><span>鏡頭</span>${chip('shot', '', '照描述', true)}${P.SHOTS.map((x) => chip('shot', x, x, false)).join('')}</div>
         <div class="bp-cf-row"><span>入鏡</span>${names.map((n) => chip('in', n, n, inSet.has(n))).join('')}</div>
         <div class="bp-cf-row"><span>誰拍的</span>${chip('by', 'me', `${who.user}拍`, by === 'me')}${chip('by', 'him', `${who.name}拍`, by === 'him')}${chip('by', 'other', '別人拍', by === 'other')}</div>
-        <p>不對就改上面那段或點選項，人物長相和照片風格會自動接上。</p>
-        <div class="bp-pe-btns"><button data-cf="no">取消</button><button data-cf="ok" class="ok">生成照片</button></div></div>`;
+        <p>不對就改上面那段或點選項，人物長相和照片風格會自動接上。${shouldAskEngine() ? 'Gemini 親密的畫面比較肯畫；GPT 穿著衣服的日常比較穩、裸露的會擋。' : ''}</p>
+        <div class="bp-pe-btns"><button data-cf="no">取消</button>${shouldAskEngine()
+          ? `<button data-cf="ok" data-v="gemini" class="${imageEnginePref.get() === 'gemini' ? 'ok' : ''}">用 Gemini 拍</button><button data-cf="ok" data-v="gpt" class="${imageEnginePref.get() === 'gpt' ? 'ok' : ''}">用 GPT 拍</button>`
+          : '<button data-cf="ok" class="ok">生成照片</button>'}</div></div>`;
       screen.appendChild(box);
       const ta = box.querySelector('textarea');
       const done = (v) => { box.remove(); resolve(v); };
@@ -289,7 +294,9 @@ export function createAlbum({ screen, say, onShare, onIG }) {
           let text = ta.value.trim();
           if (!text) { say('描述不能是空的'); return; }
           if (shot && !text.includes(shot)) text = `${shot}${P.PERIOD}${text}`;
-          done({ prompt: text, in: names.filter((n) => inSet.has(n)), by });
+          const engine = v === 'gpt' || v === 'gemini' ? v : imageEnginePref.get();
+          if (v === 'gpt' || v === 'gemini') imageEnginePref.set(v); // 按了哪家就記成預設
+          done({ prompt: text, in: names.filter((n) => inSet.has(n)), by, engine });
           return;
         }
         draw();
@@ -330,6 +337,12 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (a === 'imgcount') { imageCountPref.set(e.target.closest('[data-v]').dataset.v); say(`之後一次生 ${imageCountPref.get()} 張`); renderIds(); return; }
     if (a === 'okeyjump') { const k = screen.querySelector('.bp-al-okey'); k?.scrollIntoView({ behavior: 'smooth', block: 'center' }); setTimeout(() => k?.focus(), 400); return; }
     if (a === 'imgres') { imageResPref.set(e.target.closest('[data-v]').dataset.v); say(`之後用 ${imageResPref.get()} 生圖`); renderIds(); return; }
+    if (a === 'imgengine') {
+      const v = e.target.closest('[data-v]').dataset.v; const h = engines();
+      if (v === 'gpt' && !h.gpt) { say('還沒貼 OpenAI 金鑰，往下貼一把'); const k = screen.querySelector('.bp-al-okey'); k?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+      if (v === 'gemini' && !h.gemini) { say('正文沒接 Google，也還沒貼 AI Studio 金鑰'); return; }
+      imageEnginePref.set(v); say(v === 'gpt' ? '之後用 GPT 生圖' : '之後用 Gemini 生圖'); renderIds(); return;
+    }
     if (a === 'imgmodel') { imageModelPref.set(e.target.closest('[data-v]').dataset.v); say(imageModelPref.get() === 'pro' ? '之後用 Pro 生圖' : '之後用 Flash 生圖'); renderIds(); return; }
     if (a === 'idpic') { const f = screen.querySelector('.bp-al-file'); f.dataset.for = 'idpic'; f.click(); }
     if (a === 'idok' && editing) {
@@ -402,10 +415,11 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     openId = p.id; view = 'one';
     // 先等畫面重畫完再叫挑圖：renderOne 是非同步的，晚一步寫 innerHTML 會把挑圖的格子蓋掉（10/14 卡在「生圖中⋯」）
     note = '生圖中⋯'; await renderOne();
+    const engine = await chooseEngine(screen); if (!engine) { note = ''; if (mine()) renderOne(); return; } // 兩家都有才會問；取消就不重生
     await ensureAutoStyle(people, ch.charKey);
-    const url = await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3' });
+    const url = await imagineAndPick(screen, snapPrompt(p), { refs: snapRefs(p), aspect: '4:3', engine });
     if (url) { p.img = url; save(); }
-    note = drawnNote(url) || (url ? '' : '沒有出圖：正文要接 Google 或 OpenAI，或在證件照頁貼 AI Studio／OpenAI 金鑰。');
+    note = drawnNote(url) || (url ? imageInfo.switched : '沒有出圖：正文要接 Google 或 OpenAI，或在證件照頁貼 AI Studio／OpenAI 金鑰。');
     if (mine()) renderOne();
   }
 

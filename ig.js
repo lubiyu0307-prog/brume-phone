@@ -5,7 +5,7 @@
 
 import * as store from './store.js';
 import { currentChar, generate, imagine, canSeeImages, imageInfo, canDraw, worldRoster } from './st.js';
-import { imagineAndPick } from './pick.js';
+import { imagineAndPick, chooseEngine } from './pick.js';
 import { P } from './prompts.js';
 import { promptEditor } from './promptedit.js';
 import { HIM, ME, loadCast, saveCast as storeCast, person, setPerson, refsFor, idsFor, finalPrompt, ensureAutoStyle, shotRules, shotIds, shotInAfterEdit, isSavedImage, savedImagePrompt, shotHand } from './cast.js';
@@ -251,10 +251,14 @@ export function createIG({ screen, say }) {
   // 限動是直的（9:16），貼文是方的
   // pick：玩家自己按的才讓她挑（一次生幾張照證件照頁的設定）；自動生圖在背景跑，只生一張
   const draw = async (p, who, aspect = '1:1', pick = false) => {
+    // 玩家自己按的：兩家都有金鑰先問用哪家（只有一家不問）；背景自動生的照證件照頁的預設
+    const engine = pick ? await chooseEngine(screen) : '';
+    if (pick && !engine) return '';
     await ensureAutoStyle(people, who.charKey); const { prompt, refs } = photoPrompt(p, who, aspect === '9:16');
     const full = prompt;
-    const url = pick ? await imagineAndPick(screen, full, { refs, aspect }) : await imagine(full, { refs, aspect });
+    const url = pick ? await imagineAndPick(screen, full, { refs, aspect, engine }) : await imagine(full, { refs, aspect });
     if (!url && imageInfo.why) say(`沒有出圖：${imageInfo.why}`);
+    else if (url && imageInfo.switched) say(imageInfo.switched);
     return url;
   };
 

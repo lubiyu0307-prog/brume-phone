@@ -14,13 +14,13 @@ import { createFind, createParcels, skyIcon } from './world.js';
 import * as realwx from './realwx.js';
 import * as push from './push.js';
 import * as stage from './stage.js';
-import { currentChar, ctx, lite, DATA_PREFIXES, uploadImage, dropImage, phoneOff } from './st.js';
+import { currentChar, ctx, lite, DATA_PREFIXES, uploadImage, dropImage, phoneOff, engines, imageEnginePref } from './st.js';
 import * as store from './store.js';
 import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.22.5';
+const VERSION = '0.23.0';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -418,6 +418,9 @@ function build() {
     else if (cc) rows.push({ ok: true, t: '網路搜尋：只有接 Google（AI Studio／Vertex）才有，其他來源跳過' });
     if (push.deviceOn()) ok('這台的通知開著');
     else { const p = await push.precheck().catch(() => null); p?.ready ? bad('通知還沒開：下面「開啟通知」按一下，酒館關著他傳 LINE 也會響') : bad(`通知：${p?.why || '還不能開'}`); }
+    const eng = engines();
+    if (!eng.gemini && !eng.gpt) bad('生圖：兩家都還沒接。正文接 Google，或到相本 → 證件照頁貼 AI Studio 或 OpenAI 金鑰');
+    else ok(`生圖：${[eng.gemini ? 'Gemini' : '', eng.gpt ? 'GPT（gpt-image-2）' : ''].filter(Boolean).join('＋')}，預設 ${imageEnginePref.get() === 'gpt' ? 'GPT' : 'Gemini'}${eng.gemini && eng.gpt ? '，自己按生成時會問用哪家' : ''}`);
     const city = realwx.city.get();
     city ? ok(`現實的城市：${city}`) : bad('現實的城市沒填：現實時間的鎖定畫面不會有天氣（下面「你們」裡填）');
     try {

@@ -1224,6 +1224,8 @@
 .bp-pick-in button { margin-top: 4px; padding: 8px 18px; border: 1px solid rgba(255, 255, 255, .4); border-radius: 18px; background: none; color: #fff; font: inherit; font-size: 13px; cursor: pointer; }
 @keyframes bp-pick-wait { 50% { background: rgba(255, 255, 255, .16); } }
 .bp-al-seg.three { grid-template-columns: repeat(3, 1fr); }
+.bp-al-seg b.off { color: #b5ada0; }
+.bp-eng .bp-pe-btns { margin-bottom: 4px; }
 .bp-pick { background: rgba(0, 0, 0, .94); }
 .bp-pick-view { position: absolute; inset: 0; background: #000; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 16px; }
 .bp-pick-view[hidden] { display: none; }

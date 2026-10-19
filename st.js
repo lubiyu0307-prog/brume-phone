@@ -154,13 +154,13 @@ export async function generate(prompt, image) {
 /**
  * 生一張圖，回傳圖片網址；都失敗回空字串。
  *   一、Gemini：借酒館存的 Vertex／AI Studio 設定，叫不到再用玩家貼在手機裡的 AI Studio 金鑰
- *   二、GPT（gpt-image-1）：用 OpenAI 玩酒館的玩家，文字和圖都走 GPT 就好（10/16 比比）。
- *       手機裡貼了 OpenAI 金鑰 → 帶證件照一起生（臉才對得上）；沒貼 → 借酒館存的 OpenAI 金鑰，只能看文字
- *   正文接 OpenAI 的先試 GPT，其他人先試 Gemini
+ *   二、GPT（gpt-image-2）：手機裡貼了 OpenAI 金鑰 → 帶證件照一起生（臉才對得上）；沒貼 → 借酒館存的 OpenAI 金鑰，只能看文字
+ *   用哪家：opts.engine（玩家按的那個按鈕）＞證件照頁的「生圖用哪家」。兩家都有的玩家按鈕時會被問；只有一家就不問（10/19 比比定的）
+ *   選的那家沒畫出來（GPT 被擋最常見）就換另一家畫，imageInfo.switched 寫明是換過的，畫面上要講
  * 酒館擴充的 /imagine 不用：看不到證件照，畫出來是另一張臉
  */
 /** 上一張圖是誰畫的、Gemini 為什麼沒畫（相本、IG 顯示給玩家看） */
-export const imageInfo = { by: '', why: '', model: '' };
+export const imageInfo = { by: '', why: '', model: '', switched: '' };
 
 /** 手機現在畫得出圖嗎：聊天接 Google，或貼了 AI Studio 金鑰 */
 export function canDraw() {
@@ -168,19 +168,54 @@ export function canDraw() {
   return src === 'vertexai' || src === 'makersuite' || src === 'openai' || !!geminiKeyGet() || !!openaiKey.get();
 }
 
-export async function imagine(prompt, { refs = [], aspect = '1:1' } = {}) {
+export async function imagine(prompt, { refs = [], aspect = '1:1', engine = '' } = {}) {
   refs = refs.filter((r) => r?.url);
-  imageInfo.by = ''; imageInfo.why = ''; imageInfo.model = '';
-  const gptFirst = ctx()?.chatCompletionSettings?.chat_completion_source === 'openai';
-  if (gptFirst) { const o = await viaOpenAI(prompt, refs, aspect); if (o) { imageInfo.by = 'gpt'; return o; } }
-  const g = (await viaGemini(prompt, refs, aspect)) || (await viaKey(prompt, refs, aspect));
-  if (g) { imageInfo.by = 'gemini'; return g; }
-  if (!gptFirst && openaiKey.get()) { const o = await viaOpenAI(prompt, refs, aspect); if (o) { imageInfo.by = 'gpt'; return o; } }
+  imageInfo.by = ''; imageInfo.why = ''; imageInfo.model = ''; imageInfo.switched = '';
+  const have = engines();
+  const want = (engine === 'gpt' || engine === 'gemini') ? engine : imageEnginePref.get();
+  const gpt = async () => { const o = await viaOpenAI(prompt, refs, aspect); if (o) { imageInfo.by = 'gpt'; } return o; };
+  const gem = async () => { const g = (await viaGemini(prompt, refs, aspect)) || (await viaKey(prompt, refs, aspect)); if (g) { imageInfo.by = 'gemini'; } return g; };
+  const first = want === 'gpt' ? gpt : gem; const second = want === 'gpt' ? gem : gpt;
+  const firstName = want === 'gpt' ? 'GPT' : 'Gemini'; const secondName = want === 'gpt' ? 'Gemini' : 'GPT';
+  const u = await first(); if (u) return u;
+  const firstWhy = imageInfo.why;
+  // 另一家根本沒設定就不用白跑一趟
+  if (!(want === 'gpt' ? have.gemini : have.gpt)) { imageInfo.why = `${firstName}：${firstWhy}`; return ''; }
+  imageInfo.why = '';
+  const v = await second();
+  if (v) {
+    imageInfo.switched = `${firstName} 沒畫出來（${firstWhy}），這張換 ${secondName} 畫的`;
+    window.dispatchEvent(new CustomEvent('bp-hint', { detail: imageInfo.switched }));
+    return v;
+  }
+  imageInfo.why = `${firstName}：${firstWhy}；${secondName}：${imageInfo.why}`;
   return '';
 }
 
+/** 哪幾家畫得出圖：gemini＝正文接 Google 或貼了 AI Studio 金鑰；gpt＝貼了 OpenAI 金鑰或正文接 OpenAI */
+export function engines() {
+  const src = ctx()?.chatCompletionSettings?.chat_completion_source;
+  return { gemini: src === 'vertexai' || src === 'makersuite' || !!geminiKeyGet(), gpt: !!openaiKey.get() || src === 'openai' };
+}
+/** 玩家按按鈕生圖時要不要問用哪家：兩家都有才問（只有一家就直接用那家，10/19 比比定的） */
+export const shouldAskEngine = () => { const h = engines(); return h.gemini && h.gpt; };
+// 預設用哪家（自動在背景生的圖、沒被問的時候）。玩家在證件照頁選；按鈕上選了也會記成這個
+const ENGINE = 'brume-phone:imgengine';
+export const imageEnginePref = {
+  get() {
+    const h = engines();
+    let v = ''; try { v = localStorage.getItem(ENGINE) || ''; } catch { /* 讀不到就照下面判斷 */ }
+    if (v === 'gpt' && h.gpt) return 'gpt';
+    if (v === 'gemini' && h.gemini) return 'gemini';
+    return h.gemini ? 'gemini' : h.gpt ? 'gpt' : 'gemini';
+  },
+  set(v) { try { localStorage.setItem(ENGINE, v === 'gpt' ? 'gpt' : 'gemini'); } catch { /* 存不了就照預設 */ } },
+};
+
 // ---------- GPT 生圖 ----------
 const OAI_KEY = 'brume-phone:openai-key';
+// gpt-image-1 2026-10-23 下架，換 gpt-image-2（10/19 雲端格實測：帶兩張證件照臉鎖得住，moderation low 之下穿衣服的日常過、裸露的在讀 prompt 那關就擋）
+const OAI_MODEL = 'gpt-image-2';
 /** 玩家貼在手機裡的 OpenAI 金鑰（只存在這台的瀏覽器） */
 export const openaiKey = {
   get() { try { return localStorage.getItem(OAI_KEY) || ''; } catch { return ''; } },
@@ -191,7 +226,8 @@ const oaiWhy = (prev, msg) => { imageInfo.why = (prev ? prev + '；' : '') + msg
 
 async function viaOpenAI(prompt, refs = [], aspect = '1:1') {
   const prev = imageInfo.why;
-  const size = oaiSize(aspect); const quality = imageResPref.get() === '2K' ? 'high' : 'medium';
+  // 1K＝low（一張約 0.02 美金）、2K＝high（約 0.25）。比比 10/19 同一組參考圖兩種都試過：低畫質的臉反而比較像她，高畫質把臉修太整齊
+  const size = oaiSize(aspect); const quality = imageResPref.get() === '2K' ? 'high' : 'low';
   const key = openaiKey.get();
   try {
     let b64 = '';
@@ -201,15 +237,15 @@ async function viaOpenAI(prompt, refs = [], aspect = '1:1') {
       let r;
       if (req.images.length) {
         const fd = new FormData();
-        fd.append('model', 'gpt-image-1'); fd.append('prompt', req.text); fd.append('size', size); fd.append('quality', quality); fd.append('moderation', 'low');
+        fd.append('model', OAI_MODEL); fd.append('prompt', req.text); fd.append('size', size); fd.append('quality', quality); fd.append('moderation', 'low');
         for (const [i, url] of req.images.entries()) fd.append('image[]', await (await fetch(url)).blob(), `ref${i}.png`);
         r = await fetch('https://api.openai.com/v1/images/edits', { method: 'POST', headers: { Authorization: `Bearer ${key}` }, body: fd });
       } else {
-        r = await fetch('https://api.openai.com/v1/images/generations', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: 'gpt-image-1', prompt: req.text, size, quality, moderation: 'low', n: 1 }) });
+        r = await fetch('https://api.openai.com/v1/images/generations', { method: 'POST', headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: OAI_MODEL, prompt: req.text, size, quality, moderation: 'low', n: 1 }) });
       }
       if (!r.ok) {
         const t = await r.text().catch(() => '');
-        oaiWhy(prev, /moderation|safety|content_policy/i.test(t) ? 'GPT 把這張擋下來了（它比較嚴，親密的畫面常常不給畫）' : `GPT 回 ${r.status}${r.status === 401 ? '（OpenAI 金鑰不對）' : r.status === 429 ? '（額度用完或太頻繁）' : ''}`);
+        oaiWhy(prev, /moderation|safety|content_policy/i.test(t) ? 'GPT 不給這張（審查已經調到最低，裸露、床上的畫面它還是擋）' : `GPT 回 ${r.status}${r.status === 401 ? '（OpenAI 金鑰不對）' : r.status === 429 ? '（額度用完或太頻繁）' : ''}`);
         return '';
       }
       b64 = (await r.json())?.data?.[0]?.b64_json || '';
@@ -218,10 +254,10 @@ async function viaOpenAI(prompt, refs = [], aspect = '1:1') {
       const c = ctx();
       if (c?.chatCompletionSettings?.chat_completion_source !== 'openai') return '';
       const req = await refRequest(prompt, []);
-      const r = await fetch('/api/openai/generate-image', { method: 'POST', headers: c.getRequestHeaders(), body: JSON.stringify({ model: 'gpt-image-1', prompt: req.text, size, quality, moderation: 'low', n: 1 }) });
+      const r = await fetch('/api/openai/generate-image', { method: 'POST', headers: c.getRequestHeaders(), body: JSON.stringify({ model: OAI_MODEL, prompt: req.text, size, quality, moderation: 'low', n: 1 }) });
       if (!r.ok) {
         const t = await r.text().catch(() => '');
-        oaiWhy(prev, /moderation|safety|content_policy/i.test(t) ? 'GPT 把這張擋下來了（它比較嚴，親密的畫面常常不給畫）' : `酒館的 OpenAI 回 ${r.status}${r.status === 400 ? '（酒館裡沒有存 OpenAI 金鑰）' : ''}`);
+        oaiWhy(prev, /moderation|safety|content_policy/i.test(t) ? 'GPT 不給這張（審查已經調到最低，裸露、床上的畫面它還是擋）' : `酒館的 OpenAI 回 ${r.status}${r.status === 400 ? '（酒館裡沒有存 OpenAI 金鑰）' : ''}`);
         return '';
       }
       b64 = (await r.json())?.data?.[0]?.b64_json || '';
@@ -229,7 +265,7 @@ async function viaOpenAI(prompt, refs = [], aspect = '1:1') {
       if (b64 && refs.length) window.dispatchEvent(new CustomEvent('bp-hint', { detail: 'GPT 這張沒看到證件照，臉可能不像。到相本 → 證件照頁貼一次 OpenAI 金鑰，之後就會帶照片一起畫。' }));
     }
     if (!b64) { oaiWhy(prev, 'GPT 沒有回圖'); return ''; }
-    imageInfo.model = 'gpt-image-1';
+    imageInfo.model = OAI_MODEL;
     return await saveImage(b64, 'png');
   } catch (e) { oaiWhy(prev, `GPT 連不上（${e.message || e}）`); return ''; }
 }

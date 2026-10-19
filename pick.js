@@ -3,7 +3,31 @@
 // 先出來的先顯示，玩家可以不等全部生完就挑；萬一還是退回別的模型，格子角落標出來。
 // 沒選中的圖從酒館伺服器刪掉，不然每次都留三張用不到的
 
-import { imagine, imageInfo, imageCountPref, imageModelPref, dropImage } from './st.js';
+import { imagine, imageInfo, imageCountPref, imageModelPref, imageEnginePref, shouldAskEngine, dropImage } from './st.js';
+
+/**
+ * 玩家按「生成」時問用哪家畫：兩家都有才問（只有一家直接回那家）。回傳 'gemini'｜'gpt'，取消回傳 null。
+ * 按了哪家就記成預設，之後背景自動生的也用那家
+ */
+export function chooseEngine(screen) {
+  if (!shouldAskEngine()) return Promise.resolve(imageEnginePref.get());
+  return new Promise((resolve) => {
+    const cur = imageEnginePref.get();
+    const box = document.createElement('div');
+    box.className = 'bp-pe bp-eng';
+    box.innerHTML = `<div class="bp-pe-bg" data-eng="no"></div><div class="bp-pe-card">
+      <b>用哪家畫</b>
+      <div class="bp-pe-btns"><button data-eng="gemini" class="${cur === 'gemini' ? 'ok' : ''}">Gemini</button><button data-eng="gpt" class="${cur === 'gpt' ? 'ok' : ''}">GPT</button></div>
+      <p>Gemini 親密的畫面比較肯畫；GPT 穿著衣服的日常、有文字的畫面比較穩，裸露的會擋。按了的那家會記成預設。</p></div>`;
+    screen.appendChild(box);
+    box.addEventListener('click', (e) => {
+      const k = e.target.closest('[data-eng]')?.dataset.eng; if (!k) return;
+      e.stopPropagation(); box.remove();
+      if (k === 'no') { resolve(null); return; }
+      imageEnginePref.set(k); resolve(k);
+    });
+  });
+}
 
 export async function imagineAndPick(screen, prompt, opts = {}) {
   const n = imageCountPref.get();
@@ -51,7 +75,8 @@ export async function imagineAndPick(screen, prompt, opts = {}) {
     const u = await imagine(prompt, opts);
     done++;
     if (u && chosen !== null) { dropImage(u); return; } // 已經挑好了，晚到的直接刪
-    const off = u && /gemini/.test(imageInfo.model) && !imageInfo.model.includes(imageModelPref.get()) ? (/pro/.test(imageInfo.model) ? 'Pro' : 'Flash') : '';
+    // 角落標：Gemini 退回另一個模型標 Pro／Flash；選的那家沒畫出來換另一家畫的，標那家的名字
+    const off = u && imageInfo.switched ? (imageInfo.by === 'gpt' ? 'GPT' : 'Gemini') : u && /gemini/.test(imageInfo.model) && !imageInfo.model.includes(imageModelPref.get()) ? (/pro/.test(imageInfo.model) ? 'Pro' : 'Flash') : '';
     if (u) { const i = urls.push(u) - 1; cells[i].innerHTML = `<img src="${u}" alt="">${off ? `<em>${off}</em>` : ''}`; cells[i].dataset.i = i; }
     note.textContent = done < n ? `生圖中⋯ ${done}/${n}${urls.length ? '（可以先挑）' : ''}` : urls.length ? '點一張用它' : `沒有出圖：${imageInfo.why || '這次失敗了'}`;
   };
