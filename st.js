@@ -107,6 +107,7 @@ async function quickAsk(c, system, prompt, image) {
         messages: [{ role: 'system', content: system }, { role: 'user', content: image ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: image } }] : prompt }],
         model, chat_completion_source: src, stream: false, max_tokens: 3000, temperature: o.temp_openai ?? 1,
         reasoning_effort: 'low', include_reasoning: false,
+        enable_web_search: !!o.enable_web_search, // 酒館「啟用網路搜尋」開著就帶給 Gemini（10/19 比比：現實模式的他要有現實資訊）
         vertexai_auth_mode: o.vertexai_auth_mode, vertexai_region: o.vertexai_region, vertexai_express_project_id: o.vertexai_express_project_id,
         reverse_proxy: o.reverse_proxy, proxy_password: o.proxy_password,
       }),
