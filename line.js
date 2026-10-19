@@ -231,7 +231,15 @@ function parseReply(raw, ch) {
   return { lines, quote, react, alarm, sticker, notes, cals, moments, time, pics, gifts, locs, parcels };
 }
 
-export function createLine({ screen, say, onUnread, onData, onParcel }) {
+// 照片為什麼送不到他那裡：講清楚去哪裡改
+function photoWhy() {
+  const c = ctx(); const s = c?.chatCompletionSettings || {};
+  if (c?.mainApi && c.mainApi !== 'openai') return '照片沒送到他那裡：酒館的 API 要是 Chat Completion 才送得到照片';
+  if ((s.media_inlining ?? s.image_inlining) === false) return '照片沒送到他那裡：酒館 AI 回應設定 →「Send inline media」打勾，再傳一次';
+  return '照片沒送到他那裡：設定裡按「體檢」看看哪裡沒開';
+}
+
+export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
   let ch = null;
   let thread = null;
   let bg = null;
@@ -453,6 +461,7 @@ export function createLine({ screen, say, onUnread, onData, onParcel }) {
         ${m.me ? btn('unsend', 'undo', '收回') : ''}
         ${m.text || m.gift || m.loc ? btn('pin', 'pin', thread.pin === id ? '取消公告' : '設為公告') : ''}
         ${m.text && stage.unlocked(curStage, 'cards') ? btn('keep', 'save', '收藏') : ''}
+        ${m.text ? btn('memo', 'save', '記進記憶書') : ''}
         ${btn('del', 'del', '刪除')}
       </div>`, 'bp-sheet-mode');
   }
@@ -705,7 +714,7 @@ export function createLine({ screen, say, onUnread, onData, onParcel }) {
   // ---------- 送出、回覆 ----------
   // 她貼的連結：送出當下就請伺服器去讀，讀好了泡泡底下長出預覽卡；他回之前會等讀完
   const linkJobs = new Map();
-  let roundPhotos = []; let warnedImages = false;
+  let roundPhotos = [];
   let couple = null; // 情侶頭貼 { his, mine, ts }
   function readLinks(m, t, key) {
     const urls = findUrls(m.text);
@@ -754,7 +763,7 @@ export function createLine({ screen, say, onUnread, onData, onParcel }) {
       for (let i = t.msgs.length - 1; i >= 0 && t.msgs[i].me; i--) if (t.msgs[i].img) roundPhotos.unshift(t.msgs[i]);
       roundPhotos = roundPhotos.slice(-4);
       const seeing = roundPhotos.length > 0 && canSeeImages();
-      if (roundPhotos.length && !seeing && !warnedImages) { warnedImages = true; say('酒館沒開「Send inline images」，他看不到照片'); }
+      if (roundPhotos.length && !seeing) say(photoWhy()); // 10/19 比比：不用等他回「轉圈圈沒跑出來」才知道
       const image = seeing ? await collage(roundPhotos.map((m) => m.img)) : null;
       // 行事曆分兩本：現實時間聊天看現實那本，劇情聊天看劇情那本（「今天」也各自算）
       const calKind = t.mode === 'now' ? 'real' : 'story';
@@ -882,6 +891,13 @@ export function createLine({ screen, say, onUnread, onData, onParcel }) {
       if (a === 'pin') { if (thread.pin === id) delete thread.pin; else thread.pin = id; save(); unpop(); pinBar(); say(thread.pin ? '設為公告了' : '公告拿掉了'); }
       if (a === 'del') { thread.msgs = thread.msgs.filter((x) => x.id !== id); save(); unpop(); refreshLog(); }
       if (a === 'keep') askSheet('收藏成字卡', m.text, 'dokeep', id, '可以刪到只剩想留下的那一段。', 4);
+      if (a === 'memo') { // 10/19 比比：不用等它每三十則自己挑
+        unpop(); const txt = String(m.text).trim().slice(0, 60);
+        await data.memory.add(ch.key, txt);
+        if (loreOn()) { const r = await writeLore(`${ch.user} 和 ${ch.name} 在 LINE 上：${txt}`, [ch.name]).catch(() => ({ ok: false })); if (!r.ok) say('記進記憶書了（世界書沒寫進去）'); else say('記進記憶書了，世界書也有'); }
+        else say('記進記憶書了');
+        syncMain();
+      }
       return;
     }
     const stk = e.target.closest('[data-stksend]');
@@ -1213,6 +1229,21 @@ export function createLine({ screen, say, onUnread, onData, onParcel }) {
     return out;
   }
 
+  // 她拆開了他寄的包裹：他接著問一兩句（合不合用、好不好吃），照目前的模式寫（10/19 比比）
+  async function parcelOpened(p) {
+    const who = await useCurrent(); if (!who || busy || !p?.item) return;
+    const t = thread; const cur = curStage;
+    const instr = `【她剛拆開你寄的包裹】東西是「${p.item}」${p.note ? `，你附的小卡寫「${p.note}」` : ''}。她現在拆開了，你傳 1～2 則給她：問她收到的樣子、合不合用、好不好吃，或撒嬌要她回報一下。一則一行，不要把小卡上的話再講一次。`;
+    let raw;
+    try { raw = await generate(buildPrompt(who, t.msgs, { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, proactive: instr })); } catch { return; }
+    const lines = raw.split('\n').map((l) => parseReply(l.replace(/^\s*(\d{1,2}[:：]\d{2}\s*[｜|]|[-・*]|\d+[.、])\s*/, '').trim(), who).lines[0]).filter(Boolean).slice(0, 2);
+    if (!lines.length) return;
+    const now = Date.now(); const flag = t.mode === 'now' ? { now: true } : { story: true };
+    lines.forEach((text, i) => t.msgs.push({ id: uid(), me: false, text, ts: now + i, first: true, ...flag }));
+    await saveThread(who.key, t); if (showing() && view === 'room') refreshLog(); onUnread?.(unreadCount()); syncMain();
+    onHim?.(who, lines[lines.length - 1]);
+  }
+
   // 背景推播已經送出的：收進聊天室，時間用排定送出的時間；同一則不收兩次
   async function deliverBg(items) {
     const who = await useCurrent();
@@ -1284,7 +1315,7 @@ export function createLine({ screen, say, onUnread, onData, onParcel }) {
     refresh: render,
     // 從別的 App（相本）傳一則給他：先換到目前這個角色的紀錄，再照一般送出走
     async share(msg) { if (await useCurrent()) send(msg); },
-    himFirst, compose, deliverBg, bgCounts, deliver, unseen, lastActive, unansweredRun,
+    himFirst, compose, deliverBg, bgCounts, deliver, unseen, lastActive, unansweredRun, parcelOpened,
     /** 目前這個角色的 LINE 在現實時間還是劇情時間（鎖定畫面的天氣照這個挑） */
     async mode() { const who = await useCurrent(); return who && thread?.mode === 'now' ? 'now' : 'story'; },
     forget() { ch = null; thread = null; }, // 換聊天或資料搬家之後，下次重讀

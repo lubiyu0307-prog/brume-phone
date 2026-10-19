@@ -63,7 +63,7 @@ export function createWeather({ screen }) {
   return { open: render };
 }
 
-export function createParcels({ screen, say, onChange }) {
+export function createParcels({ screen, say, onChange, onOpen }) {
   let ch = null;
   async function render() {
     ch = currentChar();
@@ -89,7 +89,7 @@ export function createParcels({ screen, say, onChange }) {
     const p = (await data.parcels.all(ch.key)).find((x) => x.id === el.dataset.parcel);
     if (!p) return;
     if (p.eta > Date.now()) { say('還在路上，等一下'); return; }
-    if (!p.opened) { await data.parcels.update(ch.key, p.id, { opened: true }); say(`拆開了：${p.item}`); onChange?.(); render(); }
+    if (!p.opened) { await data.parcels.update(ch.key, p.id, { opened: true }); say(`拆開了：${p.item}`); onChange?.(); render(); onOpen?.(p); } // 拆開了他會接著問（10/19 比比：少一個回圈）
   });
   return {
     open: render,

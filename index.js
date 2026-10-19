@@ -20,7 +20,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.22.3';
+const VERSION = '0.22.4';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -673,11 +673,12 @@ function build() {
   const openApp = (app) => { music?.leave(); appScreen.innerHTML = '<div class="bp-app-wait"><i></i><i></i><i></i></div>'; app.open(); appScreen.classList.add('bp-show'); phone.classList.add('bp-app-open'); };
   const closeApp = () => { if (callApp?.inCall) callApp.hang(); appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); music?.leave(); refreshNotices?.(); };
   appScreen.addEventListener('bp-home', closeApp);
-  const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => { calDots(); lockWeather(); }, onParcel: (who, p) => life.sendParcel?.(who, p) }); // life 在下面才建，叫到的時候已經有了
+  const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => { calDots(); lockWeather(); }, onParcel: (who, p) => life.sendParcel?.(who, p),
+    onHim: (who, text) => { refreshNotices(); if (appScreen.querySelector('.bp-line-roomv')) return; overlay.classList.contains('bp-open') ? say(`${who.name}：${text}`) : showBanner({ who: who.name, text }); } }); // life 在下面才建，叫到的時候已經有了
   const notes = createNotes({ screen: appScreen, say });
   const calendar = createCalendar({ screen: appScreen, say });
   const find = createFind({ screen: appScreen });
-  const parcels = createParcels({ screen: appScreen, say, onChange: () => refreshNotices() });
+  const parcels = createParcels({ screen: appScreen, say, onChange: () => refreshNotices(), onOpen: (p) => line.parcelOpened(p) });
   const threads = createThreads({ screen: appScreen, say });
   const ig = createIG({ screen: appScreen, say });
   const album = createAlbum({ screen: appScreen, say, onShare: async (img, text) => { await line.share({ text: text || '', img }); openApp(line); line.openRoom(); }, onIG: (img, hint, id) => ig.postPhoto(img, hint, id) });
@@ -710,6 +711,21 @@ function build() {
     Object.assign(banner.style, { left: `${2 * want.left - r.left}px`, top: `${2 * want.top - r.top}px` });
     clearTimeout(bannerTimer); bannerTimer = setTimeout(() => banner.classList.remove('bp-show'), 5000);
   }
+  // 新版本提醒（10/19 比比：現在都要自己去按更新）：一小時查一次 GitHub 上的 manifest，比開著的新就在鎖定畫面放一則
+  let updNotice = '';
+  async function checkUpdate() {
+    const K = 'brume-phone:upd-at'; let at = 0; try { at = +localStorage.getItem(K) || 0; } catch { /* 無痕 */ }
+    if (Date.now() - at < 3600e3) return;
+    try { localStorage.setItem(K, String(Date.now())); } catch { /* 無痕 */ }
+    const newer = (a, b) => { const x = String(a).split('.').map(Number); const y = String(b).split('.').map(Number); for (let i = 0; i < 3; i++) { if ((x[i] || 0) > (y[i] || 0)) return true; if ((x[i] || 0) < (y[i] || 0)) return false; } return false; };
+    try {
+      const local = await fetch(new URL(`manifest.json?t=${Date.now()}`, import.meta.url)).then((r) => r.json());
+      if (newer(local.version, VERSION)) { updNotice = `檔案已經是 ${local.version}，重新整理酒館就是新版`; refreshNotices(); return; }
+      const remote = await fetch(`https://raw.githubusercontent.com/lubiyu0307-prog/brume-phone/main/manifest.json?t=${Date.now()}`).then((r) => r.json());
+      updNotice = newer(remote.version, VERSION) ? `有新版 ${remote.version}：酒館的擴充管理按更新，再重新整理` : '';
+      refreshNotices();
+    } catch { /* 查不到就算了 */ }
+  }
   async function refreshNotices() {
     const list = await line.unseen();
     setBadge('line', list.length);
@@ -718,7 +734,8 @@ function build() {
     const hhmm = (ts) => { const d = new Date(ts); return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
     overlay.querySelector('.bp-notifs').innerHTML = list.slice(-3).reverse().map((m) => `<div class="bp-notif" data-act="notif">
       <i>${ICON.line}</i><div><b>${m.who}</b><span>${String(m.text || (m.sticker ? '傳了貼圖' : m.gift ? '送妳一份禮物 🎁' : m.loc ? `傳了位置：${m.loc.place}` : m.img ? '傳了照片' : '')).replace(/</g, '&lt;')}</span></div><small>${hhmm(m.ts)}</small></div>`).join('')
-      + (list.length > 3 ? `<div class="bp-notif-more">還有 ${list.length - 3} 則</div>` : '');
+      + (list.length > 3 ? `<div class="bp-notif-more">還有 ${list.length - 3} 則</div>` : '')
+      + (updNotice ? `<div class="bp-notif bp-notif-upd"><i>${ICON.settings || ICON.line}</i><div><b>霧語</b><span>${updNotice}</span></div></div>` : '');
   }
   const life = createLife({
     line, say, onData: () => calDots(),
@@ -841,7 +858,7 @@ function build() {
   });
 
   const api = {
-    open() { rememberChar(); store.refresh(); loadDesk(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lockWeather(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); tint(true); fit(); dbg('open'); },
+    open() { rememberChar(); store.refresh(); loadDesk(); line.forget(); applyEye(); life.onPhoneOpen(); refreshNotices(); closeApp(); his.close(); calDots(); lockWeather(); checkUpdate(); lock.classList.remove('bp-gone'); phone.classList.add('bp-locked'); sheet.classList.remove('bp-show'); tick(); overlay.classList.add('bp-open'); tint(true); fit(); dbg('open'); },
     close,
     refreshPrompt: () => life.refreshPrompt(),
   };
