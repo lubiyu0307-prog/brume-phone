@@ -23,11 +23,14 @@ export function promptEditor(root, { match, get, run, say, replace }) {
     cancel(); timer = setTimeout(() => { timer = 0; fired = true; open(key); }, 500);
   });
   root.addEventListener('pointermove', (e) => { if (timer && start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) cancel(); });
-  root.addEventListener('pointerup', cancel);
-  root.addEventListener('pointercancel', cancel);
+  // 長按放開時瀏覽器「可能」會送一個 click，吃掉免得順便打開照片——但 iPhone 常常不送，
+  // 之前 fired 要等到下一次點擊才清掉，結果點到的是對話框的按鈕，第一下被吃掉，要按好幾次才有反應（10/19 比比）。
+  // 改成放開後 350ms 內的 click 才吃，而且對話框裡面的點擊不吃
+  const release = () => { cancel(); if (fired) setTimeout(() => { fired = false; }, 350); };
+  root.addEventListener('pointerup', release);
+  root.addEventListener('pointercancel', release);
   root.addEventListener('scroll', cancel, true);
-  // 長按放開時瀏覽器還會送一個 click，吃掉，免得順便打開照片
-  root.addEventListener('click', (e) => { if (fired) { fired = false; e.stopPropagation(); e.preventDefault(); } }, true);
+  root.addEventListener('click', (e) => { if (fired && !e.target.closest('.bp-pe')) { fired = false; e.stopPropagation(); e.preventDefault(); } }, true);
   // 電腦上按右鍵也可以
   root.addEventListener('contextmenu', (e) => { const key = match(e.target); if (key == null) return; e.preventDefault(); cancel(); open(key); });
 
