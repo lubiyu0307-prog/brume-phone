@@ -126,8 +126,8 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     }
     await landData(ch, cals, notes);
     const now = Date.now();
-    // 不是一說完就傳：過幾分鐘手機才響
-    if (lines.length) pending.push({ id: uid(), key: ch.key, type: 'line', lines: lines.slice(0, 4), at: now + (2 + Math.random() * 3) * 60000 });
+    // 不是一說完就傳：LINE 等一分鐘手機才響（原本兩到五分鐘，10/19 改短）
+    if (lines.length) pending.push({ id: uid(), key: ch.key, type: 'line', lines: lines.slice(0, 4), at: now + 60000 }); // 10/19 比比：壓一分鐘就好，玩家剛好把劇情讀完
     if (posts.length) pending.push({ id: uid(), key: ch.key, type: 'post', posts: posts.slice(0, 2), at: now + (6 + Math.random() * 10) * 60000 });
     // 包裹：先出現在包裹 App 裡「配送中」，二三十分鐘後送達才響
     for (const p of parcels.slice(0, 1)) {
@@ -319,7 +319,8 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
   c?.eventSource?.on?.(ev.CHARACTER_MESSAGE_RENDERED || 'character_message_rendered', (id) => onReceived(id)); // 串流時第一個事件可能還拿不到完整內容，再看一次
   c?.eventSource?.on?.(ev.CHAT_CHANGED || 'chat_id_changed', () => { bridgePrompt(); setTimeout(() => { pullBg(); maybeFirst('open'); }, 3000); });
   bridgePrompt();
-  setInterval(() => { deliverDue(); if (document.visibilityState === 'visible') { maybeFirst('tick'); planBg(); } }, 30000);
+  setInterval(deliverDue, 15000); // LINE 只壓一分鐘，查勤要跟得上
+  setInterval(() => { if (document.visibilityState === 'visible') { maybeFirst('tick'); planBg(); } }, 30000);
   setTimeout(() => { deliverDue(); maybeFirst('open'); }, 4000);
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') { deliverDue(); pullBg(); maybeFirst('open'); }
