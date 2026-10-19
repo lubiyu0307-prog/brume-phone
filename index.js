@@ -20,7 +20,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.25.5';
+const VERSION = '0.25.6';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -241,7 +241,7 @@ function build() {
         <button data-act="dbg">複製除錯紀錄（給格看）</button>
       </details>
       <button class="bp-cancel" data-act="close">完成</button>
-      <div class="bp-ver">霧語 Brume Phone v${VERSION}</div>
+      <div class="bp-ver">霧語 Brume Phone v${VERSION} · by Lubí</div>
     </div>
     <input type="file" accept="image/*" hidden>
   </div></div>`);
