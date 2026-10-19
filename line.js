@@ -2,7 +2,7 @@
 // 回覆走酒館自己的 generateQuietPrompt，所以模型看得到角色卡、世界書與正文。
 
 import * as store from './store.js';
-import { currentChar, generate, ctx, writeLore, canSeeImages, imagine, canDraw, lookAt } from './st.js';
+import { currentChar, generate, ctx, writeLore, updateLore, deleteLore, canSeeImages, imagine, canDraw, lookAt } from './st.js';
 import * as data from './data.js';
 import * as stage from './stage.js';
 import { findUrls, readLink, linkForPrompt } from './link.js';
@@ -45,6 +45,10 @@ const IC = {
 const ALARM_KEY = 'brume-phone:alarm-shortcut';
 const LORE_KEY = 'brume-phone:lore';
 const loreOn = () => { try { return localStorage.getItem(LORE_KEY) === '1'; } catch { return false; } };
+// 世界書條目的內容與關鍵字：內容標「現實」或「劇情」，關鍵字一定帶她的名字再加主題詞（10/19 比比）
+const loreText = (ch, m) => `${ch.user} 和 ${ch.name} 在 LINE 上（${m.kind === 'now' ? '現實' : '劇情'}）：${m.text}`;
+const loreKeys = (ch, keys = []) => [...new Set([ch.user, ...(keys || [])].map((k) => String(k || '').trim()).filter(Boolean))];
+const kindTag = (m) => (m.kind ? `<small>${m.kind === 'now' ? '現實' : '劇情'}</small>` : '');
 const alarmShortcut = () => { try { return localStorage.getItem(ALARM_KEY) || 'Brume 設鬧鐘'; } catch { return 'Brume 設鬧鐘'; } };
 const MS_MSGS = [50, 100, 300, 520, 1000, 1314, 2000, 3000, 5000, 10000];
 const MS_DAYS = [7, 30, 50, 100, 200, 365, 520, 730, 1000];
@@ -161,7 +165,7 @@ function buildPrompt(ch, msgs, x = {}) {
       ? `她那邊現在真的天氣：${x.weather.city} ${x.weather.sky}${x.weather.temp != null ? ` ${x.weather.temp}°` : ''}。可以自然帶到（下雨要她帶傘、冷要她多穿），不用每次都講`
       : `故事裡現在的天氣：${x.weather.city} ${x.weather.sky}${x.weather.temp != null ? ` ${x.weather.temp}°` : ''}`) : '',
     x.sleep ? `\n【陪睡模式】${ch.user} 躺在床上準備睡了，要你陪她入睡。講話輕、短、慢，像在耳邊說；不問問題、不開新話題、不要讓她更清醒。她說晚安就溫柔收尾。` : '',
-    x.memory?.length ? `\n${ch.name} 記得的事：\n${x.memory.map((m) => '- ' + m.text).join('\n')}` : '',
+    x.memory?.length ? `\n${ch.name} 記得的事：\n${x.memory.map((m) => '- ' + (m.kind ? `（${m.kind === 'now' ? '現實' : '劇情'}）` : '') + m.text).join('\n')}` : '',
     x.notes?.length ? `\n她冰箱上的便條（你貼過的也在裡面）：\n${x.notes.map((n) => `- ${n.text}${n.date ? `（${n.date}）` : ''}${n.done ? '（已完成）' : ''}`).join('\n')}` : '',
     x.couple ? `\n你們的 LINE 現在用情侶頭貼（${x.couple}）。` : (x.stage && stage.unlocked(x.stage, 'couple') ? `\n你們還沒有情侶頭貼。很偶爾、氣氛對的時候，你可以提議換一組（她在 LINE 主頁換）。` : ''),
     x.pin ? `\n聊天室公告（釘在最上面的）：${x.pin}` : '',
@@ -601,7 +605,7 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
         <button class="bp-line-wide" data-line="summarize">現在整理一次</button>
         <button class="bp-line-switch bp-line-lore" data-line="lore">同步寫進酒館的世界書<i class="${loreOn() ? 'on' : ''}"></i></button>
         <p class="bp-line-subhint">打開之後，新整理出來的記憶會寫成這個聊天綁的世界書條目（沒有就寫角色卡綁的那本），正文跟 Memory Books 的記憶放在一起。條目名稱會標「📱 霧語」。${loreOn() ? '<br><u data-line="loreall">把現在這些也寫進去</u>' : ''}</p>
-        ${mem.length ? mem.map((m) => `<div class="bp-line-mem"><span>${esc(m.text)}</span><i data-memedit="${m.id}">${IC.edit}</i><i data-memdel="${m.id}">${IC.del}</i></div>`).join('') : '<p class="bp-line-subhint">還沒有記憶。</p>'}
+        ${mem.length ? mem.map((m) => `<div class="bp-line-mem"><span>${kindTag(m)}${esc(m.text)}${m.lore ? ' <u title="世界書裡也有">📖</u>' : ''}</span><i data-memedit="${m.id}">${IC.edit}</i><i data-memdel="${m.id}">${IC.del}</i></div>`).join('') : '<p class="bp-line-subhint">還沒有記憶。</p>'}
       </div><div class="bp-line-pop"></div></div>`;
   }
 
@@ -695,15 +699,18 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
         `現在不是在寫劇情正文。請從下面這段 LINE 對話裡，挑出 ${who.name} 應該長久記住的事：${who.user} 說過的喜好、近況、約定、發生的事。標「現實時間」的是她在現實裡跟他聊的，一樣要記，而且更重要：那是真的她。`,
         mem.length ? `已經記過的（不要重複）：\n${mem.map((m) => '- ' + m.text).join('\n')}` : '',
         '', recent, '',
-        '每條一行，格式：記憶內容｜關鍵字1,關鍵字2。記憶 20 字內、用第三人稱寫；關鍵字是之後聊到時會出現的詞。最多 3 條。沒有值得記的就只輸出「無」。不要編號、不要其他文字。',
+        '每條一行，格式：記憶內容｜關鍵字1,關鍵字2｜現實或劇情。記憶 20 字內、用第三人稱寫；關鍵字是之後聊到時會出現的詞；最後一欄寫這件事是她在「現實」裡說的還是「劇情」裡的。最多 3 條。沒有值得記的就只輸出「無」。不要編號、不要其他文字。',
       ].filter(Boolean).join('\n'));
       const items = raw.split('\n').map((l) => l.replace(/^\s*[-*\d.、]+\s*/, '').trim()).filter((l) => l && l !== '無')
-        .map((l) => { const [text, keys = ''] = l.split(/[｜|]/); return { text: text.trim(), keys: keys.split(/[,，、]/).map((k) => k.trim()).filter(Boolean).slice(0, 5) }; })
+        .map((l) => { const [text, keys = '', kind = ''] = l.split(/[｜|]/); return { text: text.trim(), keys: keys.split(/[,，、]/).map((k) => k.trim()).filter(Boolean).slice(0, 5), kind: /現實/.test(kind) ? 'now' : 'story' }; })
         .filter((x) => x.text && x.text.length <= 60).slice(0, 3);
       const lines = items.map((x) => x.text);
       for (const x of items) {
-        await data.memory.add(who.key, x.text);
-        if (loreOn()) { const r = await writeLore(`${who.user} 和 ${who.name} 在 LINE 上：${x.text}`, x.keys.length ? x.keys : [who.name]); if (!r.ok && manual) say(`沒寫進世界書：${r.why}`); }
+        const m = await data.memory.add(who.key, x.text, { kind: x.kind, keys: x.keys });
+        if (loreOn()) {
+          const r = await writeLore(loreText(who, m), loreKeys(who, x.keys));
+          if (r.ok) await data.memory.update(who.key, m.id, { lore: { book: r.book, uid: r.uid } }); else if (manual) say(`沒寫進世界書：${r.why}`);
+        }
       }
       t.memAt = t.msgs.length; saveThread(who.key, t);
       if (manual) { say(lines.length ? `記下了 ${lines.length} 件事` : '這段沒有新的要記'); if (view === 'memory') renderMemory(); }
@@ -893,9 +900,11 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
       if (a === 'keep') askSheet('收藏成字卡', m.text, 'dokeep', id, '可以刪到只剩想留下的那一段。', 4);
       if (a === 'memo') { // 10/19 比比：不用等它每三十則自己挑
         unpop(); const txt = String(m.text).trim().slice(0, 60);
-        await data.memory.add(ch.key, txt);
-        if (loreOn()) { const r = await writeLore(`${ch.user} 和 ${ch.name} 在 LINE 上：${txt}`, [ch.name]).catch(() => ({ ok: false })); if (!r.ok) say('記進記憶書了（世界書沒寫進去）'); else say('記進記憶書了，世界書也有'); }
-        else say('記進記憶書了');
+        const mm = await data.memory.add(ch.key, txt, { kind: m.now ? 'now' : 'story', keys: [ch.name] });
+        if (loreOn()) {
+          const r = await writeLore(loreText(ch, mm), loreKeys(ch, [ch.name])).catch(() => ({ ok: false }));
+          if (r.ok) { await data.memory.update(ch.key, mm.id, { lore: { book: r.book, uid: r.uid } }); say('記進記憶書了，世界書也有'); } else say('記進記憶書了（世界書沒寫進去）');
+        } else say('記進記憶書了');
         syncMain();
       }
       return;
@@ -916,7 +925,11 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
     const memEdit = e.target.closest('[data-memedit]');
     if (memEdit) { const m = (await data.memory.all(ch.key)).find((x) => x.id === memEdit.dataset.memedit); if (m) askSheet('改這條記憶', m.text, 'domemedit', m.id); return; }
     const memDel = e.target.closest('[data-memdel]');
-    if (memDel) { await data.memory.remove(ch.key, memDel.dataset.memdel); syncMain(); renderMemory(); return; }
+    if (memDel) {
+      const m = (await data.memory.all(ch.key)).find((x) => x.id === memDel.dataset.memdel);
+      if (m?.lore) await deleteLore(m.lore.book, m.lore.uid).catch(() => false);
+      await data.memory.remove(ch.key, memDel.dataset.memdel); syncMain(); renderMemory(); return;
+    }
     const cardDel = e.target.closest('[data-carddel]');
     if (cardDel) { await data.cards.remove(ch.key, cardDel.dataset.carddel); renderCards(); return; }
     const gift = e.target.closest('[data-gift]');
@@ -1025,8 +1038,12 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
     if (a === 'lore') { try { localStorage.setItem(LORE_KEY, loreOn() ? '0' : '1'); } catch { /* 存不了 */ } renderMemory(); say(loreOn() ? '之後的記憶會寫進世界書' : '不寫進世界書了'); }
     if (a === 'loreall') {
       const mem = await data.memory.all(ch.key); let n = 0; let why = '';
-      for (const m of mem) { const r = await writeLore(`${ch.user} 和 ${ch.name} 在 LINE 上：${m.text}`, [ch.name]); if (r.ok) n++; else { why = r.why; break; } }
-      say(why ? `沒寫進去：${why}` : `寫了 ${n} 條進世界書`);
+      for (const m of mem) {
+        if (m.lore) continue; // 已經在世界書裡
+        const r = await writeLore(loreText(ch, m), loreKeys(ch, m.keys?.length ? m.keys : [ch.name]));
+        if (r.ok) { n++; await data.memory.update(ch.key, m.id, { lore: { book: r.book, uid: r.uid } }); } else { why = r.why; break; }
+      }
+      say(why ? `沒寫進去：${why}` : n ? `寫了 ${n} 條進世界書` : '都已經在世界書裡了'); renderMemory();
     }
     if (a === 'msclose') e.target.closest('.bp-line-ms')?.remove();
     if (a === 'stkadd') { const f = screen.querySelector('.bp-line-file'); f.dataset.for = 'sticker'; stickerOnly = !!e.target.closest('[data-only]'); f.click(); }
@@ -1040,7 +1057,9 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
     if (a === 'domemedit') {
       const text = screen.querySelector('.bp-line-edit textarea').value.trim();
       const id = e.target.closest('[data-id]').dataset.id;
-      if (text) await data.memory.update(ch.key, id, text); else await data.memory.remove(ch.key, id);
+      const m = (await data.memory.all(ch.key)).find((x) => x.id === id);
+      if (text) { await data.memory.update(ch.key, id, text); if (m?.lore) await updateLore(m.lore.book, m.lore.uid, loreText(ch, { ...m, text })).catch(() => false); }
+      else { if (m?.lore) await deleteLore(m.lore.book, m.lore.uid).catch(() => false); await data.memory.remove(ch.key, id); }
       syncMain(); renderMemory();
     }
     if (a === 'dostktag') {

@@ -493,7 +493,27 @@ export async function writeLore(text, keys = []) {
   };
   await c.saveWorldInfo(book, data, true);
   try { c.reloadWorldInfoEditor?.(book); } catch { /* 編輯器沒開就算了 */ }
-  return { ok: true, book };
+  return { ok: true, book, uid };
+}
+
+/** 記憶書改了、刪了，世界書那條跟著動（10/19 比比：以前是單向的）。條目已經被玩家刪掉就當沒事 */
+export async function updateLore(book, uid, text, keys) {
+  const c = ctx(); if (!c?.loadWorldInfo || !c?.saveWorldInfo || !book) return false;
+  const data = await c.loadWorldInfo(book).catch(() => null);
+  const e = data?.entries?.[uid]; if (!e) return false;
+  e.content = text; if (Array.isArray(keys) && keys.length) e.key = keys;
+  await c.saveWorldInfo(book, data, true);
+  try { c.reloadWorldInfoEditor?.(book); } catch { /* 編輯器沒開就算了 */ }
+  return true;
+}
+export async function deleteLore(book, uid) {
+  const c = ctx(); if (!c?.loadWorldInfo || !c?.saveWorldInfo || !book) return false;
+  const data = await c.loadWorldInfo(book).catch(() => null);
+  if (!data?.entries?.[uid]) return false;
+  delete data.entries[uid];
+  await c.saveWorldInfo(book, data, true);
+  try { c.reloadWorldInfoEditor?.(book); } catch { /* 編輯器沒開就算了 */ }
+  return true;
 }
 
 // 以前（0.9.2 以前）手機資料是照角色存的。這裡列出每一種資料的前綴，搬家時一起搬

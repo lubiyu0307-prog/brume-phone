@@ -452,6 +452,8 @@
 .bp-line-wide { width: 100%; padding: 11px; border: 0; border-radius: 12px; background: var(--line-green); color: #fff; font: inherit; font-weight: 600; cursor: pointer; margin-bottom: 12px; }
 .bp-line-mem { display: flex; align-items: center; gap: 6px; padding: 12px 2px; border-bottom: 1px solid #f0f0f0; font-size: 14px; color: #222; }
 .bp-line-mem span { flex: 1; line-height: 1.5; }
+.bp-line-mem small { display: inline-block; font-size: 10px; line-height: 1; padding: 2px 5px; border-radius: 6px; background: #ece7df; color: #6b645a; margin-right: 6px; vertical-align: 1px; }
+.bp-line-mem u { text-decoration: none; font-size: 11px; }
 .bp-line-mem i { color: #aaa; cursor: pointer; display: grid; place-items: center; width: 28px; height: 28px; }
 .bp-line-mem i svg { width: 17px; height: 17px; }
 .bp-line-card { position: relative; background: #fbf8f2; border-radius: 14px; padding: 18px 18px 14px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0, 0, 0, .06); }

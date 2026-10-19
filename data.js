@@ -41,8 +41,9 @@ export const cal = {
 // 記憶書：{ id, text, ts }
 export const memory = {
   all: (key) => list('memory', key),
-  async add(key, text) { const a = await list('memory', key); a.push({ id: uid(), ts: Date.now(), text }); await save('memory', key, a); },
-  async update(key, id, text) { const a = await list('memory', key); const m = a.find((x) => x.id === id); if (m) m.text = text; await save('memory', key, a); },
+  async add(key, text, extra = {}) { const a = await list('memory', key); const m = { id: uid(), ts: Date.now(), text, ...extra }; a.push(m); await save('memory', key, a); return m; },
+  // patch 可以是字串（只改內容）或物件（改 kind、lore 這些）
+  async update(key, id, patch) { const a = await list('memory', key); const m = a.find((x) => x.id === id); if (m) Object.assign(m, typeof patch === 'string' ? { text: patch } : patch); await save('memory', key, a); },
   async remove(key, id) { await save('memory', key, (await list('memory', key)).filter((x) => x.id !== id)); },
 };
 
