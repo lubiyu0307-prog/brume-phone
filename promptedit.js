@@ -10,8 +10,9 @@ const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
  * match(el)：按到的地方是哪張照片，回傳鍵，不是照片回 null
  * get(key)：回傳 { text, hasImg, img } 或 null（這張沒有描述可以改）；有 img 就多一顆「存到手機」
  * run(key, text, redraw)：存下改過的描述；redraw 為 true 時用新描述重新出圖
+ * replace(key)：（可以不給）多一顆「換一張圖」，讓玩家拿自己在外面生好的圖補上來
  */
-export function promptEditor(root, { match, get, run, say }) {
+export function promptEditor(root, { match, get, run, say, replace }) {
   let timer = 0; let start = null; let fired = false;
   const cancel = () => { clearTimeout(timer); timer = 0; };
 
@@ -41,6 +42,7 @@ export function promptEditor(root, { match, get, run, say }) {
       <textarea rows="7">${esc(cur.text)}</textarea>
       <p>改這段就能改照片內容。人物的長相和照片風格會自動接上，不用寫在這裡。</p>
       ${cur.img ? '<button class="bp-pe-save" data-pe="phone">存到手機</button>' : ''}
+      ${replace ? `<button class="bp-pe-save" data-pe="replace">${cur.img ? '換一張圖（用自己生好的）' : '用自己生好的圖'}</button>` : ''}
       <div class="bp-pe-btns"><button data-pe="close">取消</button><button data-pe="save">存下來</button><button data-pe="redraw" class="ok">${cur.hasImg === false ? '生成照片' : '重新出圖'}</button></div></div>`;
     root.appendChild(box);
     const ta = box.querySelector('textarea');
@@ -49,6 +51,7 @@ export function promptEditor(root, { match, get, run, say }) {
       e.stopPropagation();
       if (a === 'close') { box.remove(); return; }
       if (a === 'phone') { await saveToPhone([cur.img], say); return; }
+      if (a === 'replace') { box.remove(); await replace(key); return; }
       const text = ta.value.trim();
       if (!text) { say?.('描述不能是空的'); return; }
       box.remove();

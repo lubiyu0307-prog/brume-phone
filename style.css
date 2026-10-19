@@ -1225,6 +1225,24 @@
 @keyframes bp-pick-wait { 50% { background: rgba(255, 255, 255, .16); } }
 .bp-al-seg.three { grid-template-columns: repeat(3, 1fr); }
 .bp-al-seg b.off { color: #b5ada0; }
+.bp-al-top { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; padding: 2px 12px 8px 6px; }
+.bp-al-top > div b { display: block; font-size: 28px; font-weight: 700; line-height: 1.1; }
+.bp-al-top > div small { display: block; font-size: 13px; color: #8a8378; margin-top: 2px; }
+.bp-al-topbtns { display: flex; gap: 8px; align-items: center; }
+.bp-al-topbtns i { height: 36px; min-width: 36px; padding: 0 14px; border-radius: 18px; background: rgba(0, 0, 0, .07); display: grid; place-items: center; font-style: normal; font-size: 14px; font-weight: 600; color: #2b2824; cursor: pointer; }
+.bp-al-topbtns i.on { background: #2b2824; color: #fff; }
+.bp-al-topbtns i svg { width: 20px; height: 20px; }
+.bp-al-tile { position: relative; }
+.bp-al-tile em { position: absolute; right: 6px; bottom: 6px; width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid #fff; background: rgba(0, 0, 0, .25); box-shadow: 0 0 0 1px rgba(0, 0, 0, .2); }
+.bp-al-tile.sel em { background: #0a84ff; border-color: #fff; }
+.bp-al-tile.sel em::after { content: ''; position: absolute; left: 7px; top: 3px; width: 5px; height: 10px; border: solid #fff; border-width: 0 2px 2px 0; transform: rotate(45deg); }
+.bp-al-tile.sel img { opacity: .75; }
+.bp-al-selbar { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; padding: 10px 16px calc(12px + var(--bp-sab, env(safe-area-inset-bottom))); background: rgba(251, 250, 248, .92); backdrop-filter: blur(12px); border-top: 1px solid rgba(0, 0, 0, .06); }
+.bp-al-selbar button { border: 0; background: none; font: inherit; font-size: 16px; color: #0a84ff; padding: 6px 8px; cursor: pointer; }
+.bp-al-selbar button.danger { color: #e5443a; }
+.bp-al-selbar button:disabled { color: #b5ada0; }
+.bp-al-sec { margin: 14px 16px 4px; font-size: 12px; letter-spacing: .12em; color: #8a8378; font-weight: 600; }
+.bp-al-sec + .bp-al-hint { margin-top: 2px; }
 .bp-eng .bp-pe-btns { margin-bottom: 4px; }
 .bp-pick { background: rgba(0, 0, 0, .94); }
 .bp-pick-view { position: absolute; inset: 0; background: #000; display: flex; flex-direction: column; justify-content: center; gap: 12px; padding: 16px; }

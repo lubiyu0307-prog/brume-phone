@@ -262,7 +262,7 @@ async function viaOpenAI(prompt, refs = [], aspect = '1:1') {
       }
       b64 = (await r.json())?.data?.[0]?.b64_json || '';
       // 有證件照卻送不過去：提醒玩家貼金鑰（index.js 收到會跳提示，十分鐘一次）
-      if (b64 && refs.length) window.dispatchEvent(new CustomEvent('bp-hint', { detail: 'GPT 這張沒看到證件照，臉可能不像。到相本 → 證件照頁貼一次 OpenAI 金鑰，之後就會帶照片一起畫。' }));
+      if (b64 && refs.length) window.dispatchEvent(new CustomEvent('bp-hint', { detail: 'GPT 這張沒看到參考照片，臉可能不像。到圖庫右上角的生圖設定貼一次 OpenAI 金鑰，之後就會帶照片一起畫。' }));
     }
     if (!b64) { oaiWhy(prev, 'GPT 沒有回圖'); return ''; }
     imageInfo.model = OAI_MODEL;
