@@ -81,7 +81,7 @@ export function createAlbum({ screen, say, onShare, onIG }) {
         ${shown.length ? `<div class="bp-al-grid">${shown.map(tile).join('')}</div>` : '<p class="bp-al-empty">還沒有照片。<br>按右下角的相機，挑一段劇情拍下來。</p>'}
       </div>
       ${selecting
-        ? `<div class="bp-al-selbar"><button data-al="selsave" ${picked.some((p) => p.img) ? '' : 'disabled'}>存到手機</button><button data-al="seldel" class="danger" ${picked.some((p) => !String(p.id).startsWith('line-')) ? '' : 'disabled'}>刪除</button></div>`
+        ? `<div class="bp-al-selbar"><button data-al="selsave" ${picked.some((p) => p.img) ? '' : 'disabled'}>存到手機</button><button data-al="seldel" class="danger" ${picked.length ? '' : 'disabled'}>刪除</button></div>`
         : `<button class="bp-al-fab" data-al="snap">${IC.cam}</button>`}
     </div>`;
   }
@@ -340,11 +340,20 @@ export function createAlbum({ screen, say, onShare, onIG }) {
     if (a === 'select') { selecting = !selecting; sel = new Set(); render(); return; }
     if (a === 'selsave') { const all = [...items, ...(await chatPhotos())]; await saveToPhone(all.filter((p) => sel.has(p.id) && p.img).map((p) => p.img), say); return; }
     if (a === 'seldel') {
-      // LINE 裡的照片是聊天紀錄的一部分，這裡不刪（要刪去 LINE 刪那則）
-      const own = items.filter((p) => sel.has(p.id)); const skipped = [...sel].filter((id) => String(id).startsWith('line-')).length;
-      if (!own.length) { say('LINE 裡的照片要去 LINE 刪'); return; }
-      if (!window.confirm(`刪除 ${own.length} 張照片？${skipped ? `（LINE 裡的 ${skipped} 張不會刪）` : ''}`)) return;
-      items = items.filter((p) => !sel.has(p.id)); save(); selecting = false; sel = new Set(); render(); say(`刪了 ${own.length} 張`); return;
+      if (!sel.size) return;
+      if (!window.confirm(`刪除 ${sel.size} 張照片？`)) return;
+      // LINE 裡的照片：那則訊息的圖拿掉（只有圖沒有字的，整則拿掉），LINE 那邊會跟著重讀（10/19 比比：為什麼不能刪）
+      const lineIds = [...sel].filter((id) => String(id).startsWith('line-')).map((id) => id.slice(5));
+      if (lineIds.length) {
+        const t = await store.get('line:' + ch.key).catch(() => null);
+        if (t?.msgs) {
+          t.msgs = t.msgs.map((m) => { if (!lineIds.includes(m.id)) return m; if (!m.text) return null; const c = { ...m }; delete c.img; return c; }).filter(Boolean);
+          await store.set('line:' + ch.key, t).catch(() => {});
+          window.dispatchEvent(new CustomEvent('bp-line-reload', { detail: ch.key }));
+        }
+      }
+      const n = sel.size;
+      items = items.filter((p) => !sel.has(p.id)); save(); selecting = false; sel = new Set(); render(); say(`刪了 ${n} 張`); return;
     }
     if (a === 'grid') { view = 'grid'; render(); }
     if (a === 'snap') { selecting = false; sel = new Set(); view = 'snap'; renderSnap(); }

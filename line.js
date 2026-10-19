@@ -1155,6 +1155,12 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
     return who;
   }
   const showing = () => !!screen.querySelector('.bp-line') && screen.closest('.bp-show');
+  // 圖庫那邊刪了 LINE 裡的照片：重讀這個角色的紀錄，不然這裡記在記憶體的舊版本下一次存檔會把圖放回去
+  window.addEventListener('bp-line-reload', async (e) => {
+    if (!ch || e.detail !== ch.key) return;
+    thread = await loadThread(ch.key);
+    if (showing() && view === 'room') renderRoom();
+  });
 
   // 他先傳：kind = 'away'（她離開一陣子，補上這段時間他傳的）或 'idle'（她在但一陣子沒說話）
   async function himFirst(kind, gapMs = 0) {
