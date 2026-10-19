@@ -98,9 +98,12 @@ export function createIG({ screen, say }) {
   }
 
   // 重畫動態或個人頁時留在原本捲到的位置：長按生完圖整頁重畫會跳回第一張（10/19 比比）
-  const keepScroll = (draw) => { const top = screen.querySelector('.bp-ig-scroll')?.scrollTop || 0; draw(); const sc = screen.querySelector('.bp-ig-scroll'); if (sc && top) sc.scrollTop = top; };
-  function renderFeed() { keepScroll(renderFeed0); }
-  function renderProfile() { keepScroll(renderProfile0); }
+  // 每一頁各記自己捲到哪（一邊捲一邊記），點進貼文看留言再按上一頁也回到同一張
+  const tops = {};
+  screen.addEventListener('scroll', (e) => { if (mine() && e.target?.classList?.contains('bp-ig-scroll')) tops[view] = e.target.scrollTop; }, true);
+  const keepScroll = (name, draw) => { draw(); const sc = screen.querySelector('.bp-ig-scroll'); if (sc && tops[name]) sc.scrollTop = tops[name]; };
+  function renderFeed() { keepScroll('feed', renderFeed0); }
+  function renderProfile() { keepScroll('profile', renderProfile0); }
   function renderFeed0() {
     view = 'feed';
     const stories = d.stories.filter((s) => Date.now() - s.ts < 864e5);
