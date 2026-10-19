@@ -129,14 +129,21 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     // 不是一說完就傳：LINE 等一分鐘手機才響（原本兩到五分鐘，10/19 改短）
     if (lines.length) pending.push({ id: uid(), key: ch.key, type: 'line', lines: lines.slice(0, 4), at: now + 60000 }); // 10/19 比比：壓一分鐘就好，玩家剛好把劇情讀完
     if (posts.length) pending.push({ id: uid(), key: ch.key, type: 'post', posts: posts.slice(0, 2), at: now + (6 + Math.random() * 10) * 60000 });
-    // 包裹：先出現在包裹 App 裡「配送中」，二三十分鐘後送達才響
-    for (const p of parcels.slice(0, 1)) {
-      const eta = now + (20 + Math.random() * 20) * 60000;
-      const x = await data.parcels.add(ch.key, { ...p, eta });
-      if (x) { pending.push({ id: uid(), key: ch.key, type: 'parcel', parcel: x.id, item: x.item, at: eta }); onNotify?.({ app: 'parcel', who: ch.name, text: `幫妳寄了東西，配送中` }); }
-    }
+    for (const p of parcels.slice(0, 1)) await shipParcel(ch, p, now);
     savePending();
     if (rel && !stage.atLeast(await stage.get(ch.key), rel)) onStageHint?.(ch.key, rel);
+  }
+
+  // 包裹：先出現在包裹 App 裡「配送中」，二三十分鐘後送達才響。正文的 <phone> 與 LINE 的 [[PARCEL]] 都走這裡
+  // （10/19 比比：格那張卡劇情裡兩人都在一起，包裹永遠收不到——所以 LINE 裡他也能寄）
+  async function shipParcel(ch, p, now = Date.now()) {
+    const eta = now + (20 + Math.random() * 20) * 60000;
+    const x = await data.parcels.add(ch.key, { ...p, eta });
+    if (!x) return false;
+    pending.push({ id: uid(), key: ch.key, type: 'parcel', parcel: x.id, item: x.item, at: eta });
+    savePending();
+    onNotify?.({ app: 'parcel', who: ch.name, text: `幫妳寄了東西，配送中` });
+    return true;
   }
 
   // 「行事曆｜2026-10-20｜回診」「行事曆｜10/20｜回診」「行事曆｜他第一次說想要寶寶」都收
@@ -329,7 +336,7 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
 
   return {
     onPhoneOpen() { deliverDue(); pullBg(); maybeFirst('open'); },
-    planBg, pullBg,
+    planBg, pullBg, sendParcel: (ch, p) => shipParcel(ch, p),
     bgStatus: () => bgStatus,
     refreshPrompt: bridgePrompt,
   };

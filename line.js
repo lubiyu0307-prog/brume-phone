@@ -193,6 +193,7 @@ function buildPrompt(ch, msgs, x = {}) {
       : `日期用劇情裡的日子${x.storyDay ? `，劇情裡的今天是 ${x.storyDay}` : '，照劇情判斷是哪一天'}`}`,
     '- 想送她小禮物（她說累了、餓了、心情不好、值得慶祝，或你單純想寵她）：最後獨立一行寫 [[GIFT|品項|附一句話]]，品項像「一杯熱拿鐵」「電影票兩張」，一句話 20 字內。偶爾才送，送了不用在訊息裡再講一次',
     '- 想讓她知道你在哪（到了、在等她、路過想到她）：最後獨立一行寫 [[LOC|地點名稱|一句話]]，地點照劇情和你們的世界寫。很偶爾才用',
+    '- 幫她叫外送或寄東西到她那裡（她說餓了、生病、加班、心情不好，或你人不在她身邊想寵她）：最後獨立一行寫 [[PARCEL|東西|附的小卡]]，東西 12 字內，小卡 30 字內像你會寫的話。跟 GIFT 不一樣：GIFT 是 LINE 裡的小禮物卡，PARCEL 是真的會送到她家、過二三十分鐘她的包裹 App 才會響。偶爾才寄，一次一個，寄了可以在訊息裡順口提一句',
     '- 想讓她知道你正在做什麼（不是對她說話，像「他去洗澡了」那種旁白小字）：寫 [[MOMENT|一句話]]。很偶爾才用',
   ].filter((l) => l !== '').join('\n');
 }
@@ -212,6 +213,8 @@ function parseReply(raw, ch) {
   const gifts = []; const locs = [];
   text = text.replace(/\[\[GIFT\|([^|\]]+)(?:\|([^\]]*))?\]\]/gi, (_, it, n) => { gifts.push({ item: it.trim().slice(0, 24), ...(n?.trim() ? { note: n.trim().slice(0, 40) } : {}) }); return ''; });
   text = text.replace(/\[\[LOC\|([^|\]]+)(?:\|([^\]]*))?\]\]/gi, (_, pl, n) => { locs.push({ place: pl.trim().slice(0, 40), ...(n?.trim() ? { note: n.trim().slice(0, 40) } : {}) }); return ''; });
+  const parcels = [];
+  text = text.replace(/\[\[PARCEL\|([^|\]]+)(?:\|([^\]]*))?\]\]/gi, (_, it, n) => { parcels.push({ item: it.trim().slice(0, 24), note: (n || '').trim().slice(0, 60) }); return ''; });
   const pics = [];
   text = text.replace(/\[\[PIC\|([^\]]+)\]\]/gi, (_, t) => { pics.push(t.trim().slice(0, 60)); return ''; });
   text = text.replace(/\[\[[^\]]*\]\]/g, '');
@@ -221,10 +224,10 @@ function parseReply(raw, ch) {
     .map((l) => l.trim().replace(namePrefix, '').replace(/^[「『"]+|[」』"]+$/g, '').trim())
     .filter((l) => l && !/^[-*_]{3,}$/.test(l))
     .slice(0, 6);
-  return { lines, quote, react, alarm, sticker, notes, cals, moments, time, pics, gifts, locs };
+  return { lines, quote, react, alarm, sticker, notes, cals, moments, time, pics, gifts, locs, parcels };
 }
 
-export function createLine({ screen, say, onUnread, onData }) {
+export function createLine({ screen, say, onUnread, onData, onParcel }) {
   let ch = null;
   let thread = null;
   let bg = null;
@@ -791,6 +794,7 @@ export function createLine({ screen, say, onUnread, onData }) {
     for (const mo of out.moments) extras.push({ moment: mo });
     for (const n of out.notes) { await data.notes.add(who.key, { ...n, by: 'him' }); extras.push({ notice: `📌 ${who.name}在便條上寫了：${n.text}`, goto: 'notes' }); }
     for (const c of out.cals) { await data.cal.add(who.key, { ...c, by: 'him', kind: t.mode === 'now' ? 'real' : 'story' }); extras.push({ notice: `📅 ${who.name}記上行事曆：${c.date.slice(5).replace('-', '/')} ${c.title}`, goto: 'calendar' }); }
+    for (const p of out.parcels.slice(0, 1)) { if (await onParcel?.(who, p)) extras.push({ notice: `📦 ${who.name}幫妳寄了東西，配送中`, goto: 'parcel' }); }
     for (const x of extras) {
       if (x.sticker || x.alarm || x.gift || x.loc) { busy = 'typing'; if (view === 'room') refreshLog(); await sleep(700); }
       t.msgs.push({ id: uid(), me: false, text: '', ts: Date.now(), ...flag, ...x });

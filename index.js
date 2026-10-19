@@ -19,7 +19,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.21.6';
+const VERSION = '0.21.7';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -614,7 +614,7 @@ function build() {
   const openApp = (app) => { music?.leave(); appScreen.innerHTML = '<div class="bp-app-wait"><i></i><i></i><i></i></div>'; app.open(); appScreen.classList.add('bp-show'); phone.classList.add('bp-app-open'); };
   const closeApp = () => { if (callApp?.inCall) callApp.hang(); appScreen.classList.remove('bp-show'); phone.classList.remove('bp-app-open'); music?.leave(); refreshNotices?.(); };
   appScreen.addEventListener('bp-home', closeApp);
-  const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => calDots() });
+  const line = createLine({ screen: appScreen, say, onUnread: (n) => setBadge('line', n), onData: () => calDots(), onParcel: (who, p) => life.sendParcel?.(who, p) }); // life 在下面才建，叫到的時候已經有了
   const notes = createNotes({ screen: appScreen, say });
   const calendar = createCalendar({ screen: appScreen, say });
   const find = createFind({ screen: appScreen });
@@ -706,7 +706,7 @@ function build() {
   setTimeout(refreshNotices, 1500);
 
   // LINE 裡點「他貼了便條／記上行事曆」那行小字，直接跳到那個 App
-  appScreen.addEventListener('bp-openapp', (e) => { const app = { notes, calendar }[e.detail]; if (app) openApp(app); });
+  appScreen.addEventListener('bp-openapp', (e) => { const app = { notes, calendar, parcel: parcels }[e.detail]; if (app) openApp(app); });
 
   // 主畫面日曆小工具：有安排的日子底下點一個小點
   async function calDots() {
