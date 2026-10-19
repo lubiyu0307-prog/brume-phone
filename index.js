@@ -19,7 +19,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.21.10';
+const VERSION = '0.21.11';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -246,6 +246,7 @@ function build() {
   document.documentElement.appendChild(overlay);
   // 鋪滿看得到的範圍。外層如果有 transform（酒館的 <html>、Claude App 的預覽框都有），
   // fixed 的原點就不是螢幕左上角，所以放好之後量一次實際位置，差多少補多少
+  let fullH = 0; // 鍵盤沒彈的時候看得到的高度（取看過的最大值）
   const fit = () => {
     const vv = window.visualViewport;
     // 被 app.html 包著的時候，iframe 的大小就是看得到的範圍（鍵盤的事外面那頁已經處理掉了），
@@ -257,6 +258,9 @@ function build() {
     const X = SHELL ? 0 : Math.round(vv ? (vv.pageLeft != null ? vv.pageLeft - scrollX : vv.offsetLeft) : 0);
     const Y = SHELL ? 0 : Math.round(vv ? (vv.pageTop != null ? vv.pageTop - scrollY : vv.offsetTop) : 0);
     overlay.style.setProperty('--bp-w', `${W}px`); overlay.style.setProperty('--bp-h', `${H}px`);
+    // 直接在酒館裡開（沒有門面）時：鍵盤彈出來蓋住了底部安全區，輸入框下面那截 env(safe-area-inset-bottom) 就不該留
+    // （10/19 比比：從酒館開的 LINE 輸入框下面多一截白的，從門面開的沒有）
+    if (!SHELL) { fullH = Math.max(fullH, H); if (H < fullH - 120) overlay.style.setProperty('--bp-sab', '0px'); else overlay.style.removeProperty('--bp-sab'); }
     overlay.style.left = `${X}px`; overlay.style.top = `${Y}px`;
     overlay.style.setProperty('--bp-left', `${X}px`); overlay.style.setProperty('--bp-top', `${Y}px`);
     if (!overlay.classList.contains('bp-open')) return; // 沒打開時量不到
