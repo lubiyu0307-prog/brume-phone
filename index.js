@@ -20,7 +20,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.22.1';
+const VERSION = '0.22.2';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -195,6 +195,8 @@ function build() {
     <div class="bp-toast"></div>
     <div class="bp-sheet">
       <h3>設定</h3>
+      <button data-act="checkup" class="bp-checkbtn">體檢：看看哪裡還沒設好</button>
+      <div class="bp-checkup" hidden></div>
       <section class="bp-setgrp"><h4>你們</h4>
         <div class="bp-setrow"><span>你們的關係</span><div class="bp-seg" data-seg="stage">${stage.STAGES.map((x) => `<b data-act="stage" data-v="${x.id}">${x.name}</b>`).join('')}</div></div>
         <p class="bp-sheet-note">曖昧起他會主動找妳，交往有陪睡模式，同居有冰箱門。劇情裡關係往前一步，手機會問妳要不要改。</p>
@@ -396,6 +398,36 @@ function build() {
   setInterval(applyEye, 60000);
 
   const showLite = () => sheet.querySelector('[data-act="lite"] i').classList.toggle('on', lite.get());
+  // 體檢（10/19 比比：今天卡的三次全是酒館設定，玩家也會卡）：一鍵看酒館的開關、通知、城市、版本，哪個不對直接寫去哪裡改
+  async function checkup() {
+    const box = sheet.querySelector('.bp-checkup'); if (!box) return;
+    box.hidden = false; box.innerHTML = '<p>檢查中⋯</p>';
+    const rows = [];
+    const ok = (t) => rows.push({ ok: true, t }); const bad = (t) => rows.push({ ok: false, t });
+    const c = ctx(); const s = c?.chatCompletionSettings || {};
+    const ch = currentChar();
+    ch ? ok(`角色：${ch.name}`) : bad('還沒選角色：先在酒館選一張卡，手機的資料照角色分');
+    const cc = c?.mainApi === 'openai';
+    const src = s.chat_completion_source || '';
+    const google = cc && (src === 'makersuite' || src === 'vertexai');
+    cc ? ok(`API：Chat Completion（${src || '?'}）`) : bad('API 不是 Chat Completion：照片、網路搜尋都要它才有（酒館 API 連線那頁）');
+    const inl = s.media_inlining ?? s.image_inlining;
+    if (cc) inl === false ? bad('Send inline media 關著：他看不到妳傳的照片（AI 回應設定 → 打勾）') : ok('Send inline media 開著，照片送得到');
+    if (cc) s.request_images ? bad('「請求內嵌圖片」開著：酒館說它跟網路搜尋不能同時開，想讓他查東西就取消它') : ok('「請求內嵌圖片」沒開');
+    if (google) s.enable_web_search ? ok('網路搜尋開著，現實時間他查得到現實的事') : bad('網路搜尋沒開：現實時間他查不到洋流、活動這種現實的事（AI 回應設定 → 啟用網路搜尋）');
+    else if (cc) rows.push({ ok: true, t: '網路搜尋：只有接 Google（AI Studio／Vertex）才有，其他來源跳過' });
+    if (push.deviceOn()) ok('這台的通知開著');
+    else { const p = await push.precheck().catch(() => null); p?.ready ? bad('通知還沒開：下面「開啟通知」按一下，酒館關著他傳 LINE 也會響') : bad(`通知：${p?.why || '還不能開'}`); }
+    const city = realwx.city.get();
+    city ? ok(`現實的城市：${city}`) : bad('現實的城市沒填：現實時間的鎖定畫面不會有天氣（下面「你們」裡填）');
+    try {
+      const m = await fetch(new URL(`manifest.json?t=${Date.now()}`, import.meta.url)).then((r) => r.json());
+      const nv = String(m.version || ''); const newer = nv && nv.split('.').map(Number).some((x, i) => x !== (VERSION.split('.').map(Number)[i] || 0)) && nv !== VERSION;
+      newer ? bad(`檔案是 ${nv}，妳開著的是 ${VERSION}：重新整理一次酒館`) : ok(`版本 ${VERSION}`);
+    } catch { ok(`版本 ${VERSION}`); }
+    rows.push({ ok: true, t: lite.get() ? '省 token 模式開著（照片一律走完整的）' : '完整模式' });
+    box.innerHTML = `<ul>${rows.map((r) => `<li class="${r.ok ? 'ok' : 'bad'}">${r.ok ? '✓' : '！'} ${String(r.t).replace(/</g, '&lt;')}</li>`).join('')}</ul><p class="bp-sheet-note">${rows.every((r) => r.ok) ? '全部都好了。' : '「！」的那幾條照後面寫的去改，改完再按一次。'}</p>`;
+  }
   async function showSettings() {
     showLite();
     const c = currentChar(); const cur = c ? await stage.get(c.key) : 'meet';
@@ -556,6 +588,7 @@ function build() {
         sheet.classList.remove('bp-show'); his.open();
       }
       if (a === 'stage') { const c = currentChar(); if (!c) { say('先在酒館選一個角色'); return; } await stage.set(c.key, act.dataset.v); showSettings(); life.refreshPrompt(); syncMain(); say(`關係改成「${stage.name(act.dataset.v)}」了`); }
+      if (a === 'checkup') { await checkup(); }
       if (a === 'eye') { state.eye = act.dataset.v; save(state); applyEye(); showSettings(); }
       if (a === 'level') { lifeSet.set({ level: act.dataset.v }); showSettings(); }
       if (a === 'bridge') { lifeSet.set({ bridge: !lifeSet.get().bridge }); showSettings(); life.refreshPrompt(); }
