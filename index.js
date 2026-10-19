@@ -20,7 +20,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.23.2';
+const VERSION = '0.23.3';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -306,7 +306,18 @@ function build() {
   window.visualViewport?.addEventListener('resize', seen('vv-resize', refit));
   window.visualViewport?.addEventListener('scroll', seen('vv-scroll', fit));
   overlay.addEventListener('focusin', seen('focusin', refit));
-  overlay.addEventListener('focusout', seen('focusout', () => setTimeout(refit, 50)));
+  overlay.addEventListener('focusout', seen('focusout', (e) => {
+    setTimeout(refit, 50);
+    // iOS 點到輸入框會把 overflow:hidden 的外層（手機框、App 畫面）硬捲上去讓框露出來，鍵盤收了也不捲回來：
+    // 表頭跟返回鍵就留在看不到的上面（10/19 比比：證件照頁貼完金鑰「回不到上一頁」）。收鍵盤後把這種外層全部捲回 0，正常的捲動區（overflow auto／scroll）不動
+    setTimeout(() => {
+      for (let el = e.target; el && el !== overlay.parentElement; el = el.parentElement) {
+        if (!el.scrollTop) continue;
+        const ov = getComputedStyle(el).overflowY;
+        if (ov !== 'auto' && ov !== 'scroll') el.scrollTop = 0;
+      }
+    }, 80);
+  }));
   addEventListener('pagehide', () => dbg('pagehide'));
   document.addEventListener('visibilitychange', () => dbg('visibility', document.visibilityState));
 
