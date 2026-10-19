@@ -44,7 +44,7 @@ async function liteContext(c, prompt) {
   const scenario = f.scenario ?? sub(ch.scenario);
   const persona = f.persona || '';
   const lines = (c.chat || []).filter((m) => !m.is_system && m.mes)
-    .map((m) => `${m.is_user ? c.name1 : m.name}：${String(m.mes).replace(/<[^>]+>/g, '').slice(0, 400)}`);
+    .map((m) => `${m.is_user ? c.name1 : m.name}：${storyText(m.mes).slice(0, 400)}`); // 只給正文，阿酌那段不算劇情
   const recent = lines.slice(-6);
   // 世界書用比較多則來掃：配角最近幾則沒出場，他的條目還是要叫得到，不然模型會自己幫他編職業（10/15 老吳變成獸醫）
   const scan = lines.slice(-20);
@@ -499,10 +499,22 @@ export async function uploadImage(dataUrl) {
 }
 
 /** 正文最近幾則（給快照挑劇情用） */
+/**
+ * 只留正文：思維鏈（阿酌那段）、狀態欄這些標籤區塊都拿掉。
+ * 情能補酌的阿酌是「開頭到 </thinking>」——開頭的 <thinking> 常常是預填的、不在訊息裡，所以不能只靠成對標籤判斷
+ * （10/19 比比：快照把阿酌的盤點整段當劇情送去生圖了）
+ */
+export function storyText(mes) {
+  let t = String(mes || '');
+  t = t.replace(/^\s*(?:<think(?:ing)?>)?[\s\S]*?<\/think(?:ing)?>\s*/i, '');
+  t = stripBlocks(t);
+  return t.replace(/<[^>]+>/g, '').replace(/\n{3,}/g, '\n\n').trim();
+}
+
 export function recentChat(n = 12) {
   const c = ctx();
   return (c?.chat || []).map((m, i) => ({ i, m })).filter(({ m }) => !m.is_system && m.mes).slice(-n)
-    .map(({ i, m }) => ({ i, who: m.is_user ? (c.name1 || '我') : m.name, text: String(m.mes).replace(/<[^>]+>/g, '').replace(/\n{3,}/g, '\n\n').trim() }));
+    .map(({ i, m }) => ({ i, who: m.is_user ? (c.name1 || '我') : m.name, text: storyText(m.mes) })).filter((m) => m.text);
 }
 
 /**
