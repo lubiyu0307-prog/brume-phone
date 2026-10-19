@@ -97,7 +97,11 @@ export function createIG({ screen, say }) {
     if (view === 'feed' && !d.posts.some((p) => p.author.kind !== 'me') && !loading) refresh();
   }
 
-  function renderFeed() {
+  // 重畫動態或個人頁時留在原本捲到的位置：長按生完圖整頁重畫會跳回第一張（10/19 比比）
+  const keepScroll = (draw) => { const top = screen.querySelector('.bp-ig-scroll')?.scrollTop || 0; draw(); const sc = screen.querySelector('.bp-ig-scroll'); if (sc && top) sc.scrollTop = top; };
+  function renderFeed() { keepScroll(renderFeed0); }
+  function renderProfile() { keepScroll(renderProfile0); }
+  function renderFeed0() {
     view = 'feed';
     const stories = d.stories.filter((s) => Date.now() - s.ts < 864e5);
     const people = [...new Map(stories.map((s) => [s.author.handle, s])).values()];
@@ -114,7 +118,7 @@ export function createIG({ screen, say }) {
       </div>${tabs('feed')}</div>`;
   }
 
-  function renderProfile() {
+  function renderProfile0() {
     view = 'profile';
     const isMe = profileOf === 'me';
     const a = isMe ? meA() : himA(); const info = isMe ? d.me : d.him;
