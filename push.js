@@ -177,13 +177,33 @@ export function nextSlot(from, gap, dayCount) {
   return Math.round(at);
 }
 
-// 點通知打開酒館時：網址帶 bp-open=line，或酒館本來就開著、小幫手傳話過來
+// 推播站只認雜湊過的聊天代號，所以排訊息時在酒館的擴充設定裡記一筆「代號 → 哪張卡、哪個聊天」（手機電腦同一份），
+// 點通知進來才切得回傳訊息的那張卡（10/19 比比：格傳的通知點進去變成上次開手機的侯愷）
+export function rememberChat(ch) {
+  const c = ctx(); if (!c?.extensionSettings || !ch) return;
+  const root = (c.extensionSettings['brume-phone'] ||= {}); const map = (root.pushChats ||= {});
+  map[chatId(ch.key)] = { char: ch.charKey, chat: c.getCurrentChatId?.() || '', t: Date.now() };
+  const ks = Object.keys(map);
+  if (ks.length > 30) for (const k of ks.sort((a, b) => (map[a].t || 0) - (map[b].t || 0)).slice(0, ks.length - 30)) delete map[k];
+  c.saveSettingsDebounced?.();
+}
+export function lookupChat(hash) { const m = ctx()?.extensionSettings?.['brume-phone']?.pushChats; return (hash && m?.[hash]) || null; }
+let wanted = '';
+/** 從通知點進來時要去的聊天代號（開機畫面那段用，切完就清掉） */
+export const wantChat = () => wanted;
+export const clearWant = () => { wanted = ''; };
+
+// 點通知打開酒館時：網址帶 bp-open=line（＋bp-chat=誰傳的），或酒館本來就開著、小幫手傳話過來
 export function onOpenRequest(fn) {
   try {
     const u = new URL(location.href);
-    if (u.searchParams.get('bp-open')) { u.searchParams.delete('bp-open'); history.replaceState(null, '', u.href); setTimeout(() => fn('line'), 2500); }
+    if (u.searchParams.get('bp-open')) {
+      wanted = u.searchParams.get('bp-chat') || '';
+      u.searchParams.delete('bp-open'); u.searchParams.delete('bp-chat'); history.replaceState(null, '', u.href);
+      setTimeout(() => fn('line', wanted), 2500);
+    }
   } catch { /* 網址讀不到就算了 */ }
-  navigator.serviceWorker?.addEventListener?.('message', (e) => { if (e.data?.type === 'bp-open') fn(e.data.app || 'line'); });
+  navigator.serviceWorker?.addEventListener?.('message', (e) => { if (e.data?.type === 'bp-open') fn(e.data.app || 'line', e.data.chat || ''); });
   // 被 app.html 包著的時候，小幫手的話會先到外面那頁，再轉進來
-  addEventListener('message', (e) => { if (e.origin === location.origin && e.source === window.parent && e.data?.type === 'bp-open') fn(e.data.app || 'line'); });
+  addEventListener('message', (e) => { if (e.origin === location.origin && e.source === window.parent && e.data?.type === 'bp-open') fn(e.data.app || 'line', e.data.chat || ''); });
 }

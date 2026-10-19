@@ -21,10 +21,11 @@ self.addEventListener('notificationclick', (e) => {
   e.notification.close();
   const url = new URL(e.notification.data?.url || '/', self.location.origin);
   url.searchParams.set('bp-open', 'line');
+  const chat = String(e.notification.data?.chat || ''); if (chat) url.searchParams.set('bp-chat', chat); // 10/19 比比：點格的通知跳到侯愷——帶著是哪個聊天傳的
   e.waitUntil((async () => {
     const list = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
     const tab = list.find((c) => new URL(c.url).origin === self.location.origin);
-    if (tab) { tab.postMessage({ type: 'bp-open', app: 'line' }); return tab.focus(); }
+    if (tab) { tab.postMessage({ type: 'bp-open', app: 'line', chat }); return tab.focus(); }
     return self.clients.openWindow(url.href);
   })());
 });

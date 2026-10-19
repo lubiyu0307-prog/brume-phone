@@ -19,7 +19,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.21.4';
+const VERSION = '0.21.5';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -629,7 +629,7 @@ function build() {
   const his = createHisPhone({ host: overlay.querySelector('.bp-his'), say, onExit: () => say('還給他了，他沒發現') });
   const openLineRoom = () => { openApp(line); line.openRoom(); };
   setTimeout(() => push.syncIfEnabled(), 6000); // 每次打開酒館檢查一次訂閱還在不在、鑰匙對不對
-  push.onOpenRequest(() => { api.open(); life.pullBg?.().finally?.(() => openLineRoom()); });
+  push.onOpenRequest(async (_app, chat) => { if (chat) { await switchToChat(chat).catch(() => false); push.clearWant(); } api.open(); life.pullBg?.().finally?.(() => openLineRoom()); });
 
   // ---------- 手機響：紅點、鎖定畫面通知、網頁上方的橫幅 ----------
   const banner = $(`<div id="bp-banner"><i>${ICON.line}</i><div><b></b><span></span></div></div>`);
@@ -831,6 +831,18 @@ async function setAppIcon(f) {
 }
 
 // 記住上次開手機的是哪個角色（桌面的「霧語」圖示打開時直接回到他）
+// 點通知進來：切到傳訊息的那張卡、那個聊天，不是上次開手機的那張（10/19）。切不到（卡刪了、代號沒記到）回 false 走原本的路
+async function switchToChat(hash) {
+  const c = ctx(); const want = push.lookupChat(hash); if (!c || !want) return false;
+  const i = (c.characters || []).findIndex((x) => (x.avatar || x.name) === want.char);
+  if (i < 0) return false;
+  const wait = (go) => new Promise((res) => { c.eventSource?.once?.(c.eventTypes?.CHAT_CHANGED || 'chat_id_changed', res); setTimeout(res, 8000); Promise.resolve().then(go).catch(() => res()); });
+  if (String(c.characterId) !== String(i)) await wait(() => c.selectCharacterById?.(String(i)));
+  if (want.chat && typeof c.openCharacterChat === 'function' && (ctx()?.getCurrentChatId?.() || '') !== want.chat) await wait(() => c.openCharacterChat(want.chat));
+  dbg('switch-chat', want.char);
+  return true;
+}
+
 function rememberChar() {
   const c = ctx(); const ch = currentChar(); if (!c?.extensionSettings || !ch) return;
   const root = (c.extensionSettings['brume-phone'] ||= {});
@@ -935,7 +947,9 @@ function launchFromIcon(phone) {
   const shownAt = Date.now(); // 10/17 比比說照片只閃一秒：酒館載得快的時候，開機畫面至少留 2.5 秒再收
   const c = ctx(); if (!c?.eventSource) { hideSplash(); tellShell({ type: 'bp-ready' }); return; }
   const go = async () => {
-    const want = c.extensionSettings?.['brume-phone']?.lastChar;
+    // 從通知點進來的先切到傳訊息的那張卡；不是的話回上次開手機的那張
+    const switched = push.wantChat() ? await switchToChat(push.wantChat()).catch(() => false) : false;
+    const want = switched ? '' : c.extensionSettings?.['brume-phone']?.lastChar;
     const i = want ? (c.characters || []).findIndex((x) => (x.avatar || x.name) === want) : -1;
     if (i >= 0 && String(c.characterId) !== String(i)) {
       await new Promise((res) => { c.eventSource.once?.(c.eventTypes?.CHAT_CHANGED || 'chat_id_changed', res); setTimeout(res, 8000); c.selectCharacterById?.(String(i)); });

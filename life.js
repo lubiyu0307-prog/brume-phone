@@ -290,7 +290,7 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
       const counts = await line.bgCounts();
       const real = push.pushSet.get().mode === 'real';
       const plan = []; const pending = []; let prev = Math.max(now, last);
-      const put = (extra = {}) => (currentChar()?.key === ch.key && lastPlan === now ? push.queue.put(ch.key, plan, { title: ch.name, ...extra }) : null);
+      const put = (extra = {}) => (currentChar()?.key === ch.key && lastPlan === now ? (push.rememberChat(ch), push.queue.put(ch.key, plan, { title: ch.name, ...extra })) : null);
       for (let k = 0; k < 2; k++) {
         const at = push.nextSlot(prev, L.away, (t) => { const d = new Date(t).toDateString(); return (counts[d] || 0) + plan.filter((p) => new Date(p.at).toDateString() === d).length; });
         // 照劇情時混用：劇情裡兩人在一起寫不出來，就改照現實寫（那幾行帶 now）
