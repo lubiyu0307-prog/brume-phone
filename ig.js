@@ -375,7 +375,16 @@ export function createIG({ screen, say }) {
       if (screen.querySelector('.bp-ig-storyv') && story.list[story.i] === s) showStory();
       return;
     }
-    if (e.target.closest('.bp-ig-storyv')) { story.list[story.i].seen = true; story.i++; save(); if (story.i >= story.list.length) { screen.querySelector('.bp-ig-storyv')?.remove(); renderFeed(); } else showStory(); return; }
+    if (e.target.closest('.bp-ig-storyv')) {
+      story.list[story.i].seen = true; story.i++; save();
+      if (story.i < story.list.length) { showStory(); return; }
+      // 這個帳號的看完了：接著看限動列上的下一個帳號，全部看完才回動態（10/19 比比：跟真的 IG 一樣）
+      const fresh = d.stories.filter((s) => Date.now() - s.ts < 864e5);
+      const handles = [...new Set(fresh.map((s) => s.author.handle))];
+      const next = handles[handles.indexOf(story.list[0]?.author.handle) + 1];
+      if (next) { story = { list: fresh.filter((s) => s.author.handle === next), i: 0 }; showStory(); return; }
+      screen.querySelector('.bp-ig-storyv')?.remove(); renderFeed(); return;
+    }
     const a = e.target.closest('[data-ig]')?.dataset.ig;
     if (!a) return;
     if (a === 'home') screen.dispatchEvent(new CustomEvent('bp-home', { bubbles: true }));
