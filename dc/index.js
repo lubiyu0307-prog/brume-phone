@@ -10,7 +10,7 @@ import { createGames } from './games.js';
 import { createFind, createParcels, skyIcon } from './world.js';
 import * as realwx from './realwx.js';
 import * as stage from './stage.js';
-import { currentChar, uploadImage, dropImage, whenProfile, geminiKey, openaiKey, textModelPref, imageModelPref, imageResPref, engines, imageEnginePref } from './st.js';
+import { currentChar, uploadImage, dropImage, whenProfile, geminiKey, openaiKey, textModelPref, imageModelPref, imageResPref, engines, imageEnginePref, keyRoute } from './st.js';
 import * as store from './store.js';
 import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
@@ -159,7 +159,7 @@ function build() {
       </section>
       <section class="bp-setgrp"><h4>腦子</h4>
         <div class="bp-setrow"><span>Google 金鑰</span><input class="bp-key-in" data-key="gemini" placeholder="AIza… 或 AQ.…" autocomplete="off"></div>
-        <p class="bp-sheet-note">AI Studio（AIza 開頭）或 Vertex 快速模式（AQ. 開頭）都可以。脆、IG、小遊戲、他的手機這些要有人寫，生圖也用這把。只存在這台的瀏覽器裡。</p>
+        <p class="bp-sheet-note">AI Studio 的或 Vertex 快速模式的都可以，貼進去它自己認路。脆、IG、小遊戲、他的手機這些要有人寫，生圖也用這把。只存在這台的瀏覽器裡。</p>
         <div class="bp-setrow"><span>OpenAI 金鑰（選填）</span><input class="bp-key-in" data-key="openai" placeholder="sk-…" autocomplete="off"></div>
         <p class="bp-sheet-note">貼了可以用 GPT 生圖（gpt-image-2），兩家都有的時候按生成會問用哪家。</p>
         <div class="bp-setrow"><span>寫字用的模型</span><input class="bp-key-in" data-key="model" placeholder="自動挑（flash）" autocomplete="off"></div>
@@ -282,7 +282,7 @@ function build() {
     const sp = splashConf(); sheet.querySelectorAll('.bp-splash-in').forEach((i) => { i.value = sp[i.dataset.splash] || ''; });
     const box = sheet.querySelector('.bp-checkup');
     const eng = engines();
-    const rows = [store.online() ? `✓ 連著 ${store.auth.get()?.phone || ''} 這支手機` : '！ 沒連上', eng.gemini ? `✓ 有 Google 金鑰（${geminiKey.get().startsWith('AQ.') ? 'Vertex' : 'AI Studio'}），他寫得了字、畫得了圖` : '！ 還沒貼 Google 金鑰：下面「腦子」貼一把', eng.gpt ? '✓ 有 OpenAI 金鑰（GPT 生圖）' : '・ 沒有 OpenAI 金鑰（可以不用）', '✓ 版本 ' + VERSION];
+    const rows = [store.online() ? `✓ 連著 ${store.auth.get()?.phone || ''} 這支手機` : '！ 沒連上', eng.gemini ? `✓ 有 Google 金鑰${keyRoute() ? `（走 ${keyRoute()}）` : ''}，他寫得了字、畫得了圖` : '！ 還沒貼 Google 金鑰：下面「腦子」貼一把', eng.gpt ? '✓ 有 OpenAI 金鑰（GPT 生圖）' : '・ 沒有 OpenAI 金鑰（可以不用）', '✓ 版本 ' + VERSION];
     sheet.querySelectorAll('.bp-key-in').forEach((i) => { if (document.activeElement === i) return; i.value = i.dataset.key === 'gemini' ? geminiKey.get() : i.dataset.key === 'openai' ? openaiKey.get() : textModelPref.get(); });
     sheet.querySelectorAll('[data-act="res"]').forEach((b) => b.classList.toggle('on', b.dataset.v === imageResPref.get()));
     box.innerHTML = `<ul>${rows.map((t) => `<li class="${t.startsWith('✓') ? 'ok' : 'bad'}">${escT(t)}</li>`).join('')}</ul>`;

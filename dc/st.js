@@ -74,7 +74,7 @@ export function stripBlocks(text) {
 const KEY = 'brume-phone:gemini-key';
 export const geminiKey = {
   get() { try { return localStorage.getItem(KEY) || ''; } catch { return ''; } },
-  set(v) { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); keyModels = null; textModel = ''; } catch { /* 存不了 */ } },
+  set(v) { try { if (v) localStorage.setItem(KEY, v); else localStorage.removeItem(KEY); } catch { /* 存不了 */ } keyModels = null; textModel = ''; allModels = null; vertexMode = false; },
 };
 const geminiKeyGet = () => geminiKey.get();
 const TEXT_MODEL = 'wuyu:textmodel';
@@ -82,30 +82,37 @@ export const textModelPref = {
   get() { try { return localStorage.getItem(TEXT_MODEL) || ''; } catch { return ''; } },
   set(v) { try { if (v) localStorage.setItem(TEXT_MODEL, v); else localStorage.removeItem(TEXT_MODEL); } catch { /* 存不了 */ } textModel = ''; },
 };
-// 金鑰兩種都吃：AI Studio（AIza 開頭）問 generativelanguage；Vertex 快速模式（AQ. 開頭）問 aiplatform 的 publishers 路徑
-// （10/20 用比比的 Vertex 金鑰驗過：gemini-2.5-flash 文字、gemini-3.1-flash-image 生圖都回得來，瀏覽器跨網域也放行）
+// 金鑰兩種都吃：AI Studio 的問 generativelanguage；Vertex 快速模式的問 aiplatform 的 publishers 路徑。
+// 看開頭認不出來（10/20：反重力給的 Gemini API 金鑰也是 AQ. 開頭，卻走 AI Studio 那條），
+// 所以貼進來先問 AI Studio 列不列得出模型，列得出就走那條，列不出就當 Vertex（快速模式沒有列模型的 API，名單先寫死）
 const G = 'https://generativelanguage.googleapis.com/v1beta';
-const isVertex = (k) => String(k).startsWith('AQ.');
-const modelUrl = (key, model) => (isVertex(key) ? `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent` : `${G}/models/${model}:generateContent`);
-const VERTEX_MODELS = ['gemini-3.1-flash', 'gemini-2.5-flash', 'gemini-3.1-flash-image', 'gemini-3-pro-image']; // 快速模式沒有列模型的 API，先寫死
-let allModels = null;
-async function listModels(key) {
-  if (allModels) return allModels;
-  if (isVertex(key)) return (allModels = [...VERTEX_MODELS]);
-  try {
-    const r = await fetch(`${G}/models?pageSize=200`, { headers: { 'x-goog-api-key': key }, referrerPolicy: 'strict-origin-when-cross-origin' });
-    allModels = ((await r.json()).models || []).filter((m) => (m.supportedGenerationMethods || []).includes('generateContent')).map((m) => m.name.replace(/^models\//, ''));
-  } catch { allModels = []; }
-  return allModels;
+let vertexMode = false;
+const modelUrl = (key, model) => (vertexMode ? `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent` : `${G}/models/${model}:generateContent`);
+const VERTEX_MODELS = ['gemini-3.1-flash', 'gemini-2.5-flash', 'gemini-3.1-flash-image', 'gemini-3-pro-image'];
+let allModels = null; let listing = null;
+function listModels(key) {
+  if (allModels) return Promise.resolve(allModels);
+  if (listing) return listing;
+  listing = (async () => {
+    try {
+      const r = await fetch(`${G}/models?pageSize=200`, { headers: { 'x-goog-api-key': key }, referrerPolicy: 'strict-origin-when-cross-origin' });
+      const list = r.ok ? ((await r.json()).models || []).filter((m) => (m.supportedGenerationMethods || []).includes('generateContent')).map((m) => m.name.replace(/^models\//, '')) : [];
+      if (list.length) { vertexMode = false; allModels = list; } else { vertexMode = true; allModels = [...VERTEX_MODELS]; }
+    } catch { vertexMode = true; allModels = [...VERTEX_MODELS]; }
+    listing = null;
+    return allModels;
+  })();
+  return listing;
 }
+export const keyRoute = () => (allModels ? (vertexMode ? 'Vertex' : 'AI Studio') : '');
 let textModel = '';
 async function pickTextModel(key) {
   if (textModel) return textModel;
   const want = textModelPref.get(); if (want) return (textModel = want);
-  const list = (await listModels(key)).filter((n) => /^gemini-/.test(n) && !/image|tts|audio|embedding|live|robotics|computer/.test(n) && !/-exp|-preview-\d{2}-\d{2}/.test(n));
-  // flash 先（快、便宜），新版本排前面
+  const list = (await listModels(key)).filter((n) => /^gemini-/.test(n) && !/image|tts|audio|embedding|live|robotics|computer|omni/.test(n) && !/-exp|-preview/.test(n));
+  // 有 flash-latest 就用它（Google 自己指向最新的 flash）；沒有就 flash 優先、新版本排前面
   list.sort((a, b) => (/flash/.test(b) - /flash/.test(a)) || b.localeCompare(a, 'en', { numeric: true }));
-  textModel = list[0] || 'gemini-2.5-flash';
+  textModel = list.find((n) => n === 'gemini-flash-latest') || list[0] || 'gemini-2.5-flash';
   return textModel;
 }
 const SAFETY = ['HARM_CATEGORY_HARASSMENT', 'HARM_CATEGORY_HATE_SPEECH', 'HARM_CATEGORY_SEXUALLY_EXPLICIT', 'HARM_CATEGORY_DANGEROUS_CONTENT'].map((category) => ({ category, threshold: 'BLOCK_NONE' }));
@@ -219,7 +226,7 @@ const byPref = (list) => (imageModelPref.get() === 'pro' ? [...list].sort((a, b)
 let keyModels = null;
 async function imageModels(key) {
   if (keyModels) return keyModels;
-  const list = (await listModels(key)).filter((n) => /image/.test(n) && !/imagen/.test(n));
+  const list = (await listModels(key)).filter((n) => /image/.test(n) && !/imagen|preview|lite/.test(n));
   list.sort((a, b) => (/flash/.test(b) - /flash/.test(a)) || b.localeCompare(a, 'en', { numeric: true }));
   keyModels = list.length ? list.slice(0, 3) : ['gemini-2.5-flash-image'];
   return keyModels;
