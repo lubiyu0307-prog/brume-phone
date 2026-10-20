@@ -1,5 +1,5 @@
 // 跟「腦子」打交道的共用小工具（Discord 版）。
-// 原版接酒館；這版沒有酒館：角色是格、玩家是比比，設定從 kv 的 profile 來（格在 Discord 那邊寫），
+// 原版接酒館；這版沒有酒館：角色和玩家的設定從 kv 的 profile 來（Discord 那邊寫），
 // 叫模型寫東西、生圖都直接從瀏覽器問 Google（玩家貼在手機裡的 AI Studio 金鑰），GPT 生圖照原版用 OpenAI 金鑰。
 
 import { P } from './prompts.js';
@@ -11,8 +11,8 @@ const loadExt = () => { try { return JSON.parse(localStorage.getItem(EXT) || '{}
 const fake = {
   extensionSettings: { 'brume-phone': loadExt() },
   saveSettingsDebounced() { try { localStorage.setItem(EXT, JSON.stringify(fake.extensionSettings['brume-phone'] || {})); } catch { /* 存不了 */ } },
-  characterId: 0, groupId: null, characters: [{ name: '格', avatar: '', description: '' }],
-  name1: '露比', chat: [], chatMetadata: {}, mainApi: 'openai', chatCompletionSettings: { chat_completion_source: 'makersuite' },
+  characterId: 0, groupId: null, characters: [{ name: '他', avatar: '', description: '' }],
+  name1: '我', chat: [], chatMetadata: {}, mainApi: 'openai', chatCompletionSettings: { chat_completion_source: 'makersuite' },
   getRequestHeaders: () => ({}), getCurrentChatId: () => '', substituteParams: (t) => String(t || ''),
   eventSource: { on() {}, once() {} }, eventTypes: {},
 };
@@ -20,8 +20,8 @@ export const ctx = () => fake;
 
 // ---------- 兩個人：kv 的 profile { him:{name,handle,avatar,bio,persona}, me:{...} } ----------
 export const profile = {
-  him: { name: '格', handle: 'ge.lubi', avatar: 'img/av_him.jpg', bio: '', persona: '' },
-  me: { name: '露比', handle: 'lubi', avatar: 'img/av_me.jpg', bio: '', persona: '' },
+  him: { name: '他', handle: 'him', avatar: '', bio: '', persona: '' },
+  me: { name: '我', handle: 'me', avatar: '', bio: '', persona: '' },
 };
 async function loadProfile() {
   const p = await store.get('profile').catch(() => null);
