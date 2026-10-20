@@ -57,7 +57,7 @@ export function createCalendar({ screen, say }) {
   const now = new Date();
   let y = now.getFullYear(); let m = now.getMonth(); let sel = data.today();
   // 兩本：劇情（故事裡的日子，「今天」是劇情日期）和現實（真的日曆）
-  let tab = 'story'; let tday = data.today();
+  let tab = 'real'; let tday = data.today(); // Discord 版全現實（10/20 比比）
   async function goTab(t) {
     tab = t; ch = currentChar();
     tday = tab === 'story' && ch ? ((await data.storyDay.get(ch.key)) || data.today()) : data.today();
@@ -82,8 +82,7 @@ export function createCalendar({ screen, say }) {
     const upcoming = evs.filter((e) => e.date >= tday && e.date !== sel).slice(0, 8);
     screen.innerHTML = `<div class="bp-ap bp-ap-cal">${head('行事曆')}
       <div class="bp-ap-scroll">
-        <div class="bp-ap-tabs">${[['story', '劇情'], ['real', '現實']].map(([v, n]) => `<b data-caltab="${v}" class="${tab === v ? 'on' : ''}">${n}</b>`).join('')}</div>
-        <p class="bp-ap-hint">${tab === 'story' ? `故事裡的日子${tday !== data.today() ? `，劇情裡的今天是 ${tday.slice(0, 4)}/${+tday.slice(5, 7)}/${+tday.slice(8)}` : ''}。他在劇情裡記的都在這本。` : '真的日曆。在 LINE 用現實時間聊天時約好的事記在這本。'}</p>
+        <p class="bp-ap-hint">跟他約好的事他會記上來，妳也可以自己加。</p>
         <div class="bp-ap-month"><i data-mon="-1">‹</i><b>${y} 年 ${m + 1} 月</b><i data-mon="1">›</i></div>
         <div class="bp-ap-grid">${cells}</div>
         <h4>${sel.slice(5).replace('-', '/')}（${WEEK[new Date(sel).getDay()]}）</h4>

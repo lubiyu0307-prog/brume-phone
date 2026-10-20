@@ -33,7 +33,7 @@ function parseJSON(raw) {
   return JSON.parse(t.slice(i, t.lastIndexOf(close) + 1));
 }
 const KIND = { 本人: 'him', 配角: 'other', 路人: 'other' };
-const WORLD = '- 配角和路人的身分、語氣、話題都要符合這個故事的世界觀與年代';
+const WORLD = '- 配角和路人的身分、語氣、話題都要符合現實世界、現在的台灣（2026 年）';
 
 const IC = {
   heart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.3a4.3 4.3 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z"/></svg>',

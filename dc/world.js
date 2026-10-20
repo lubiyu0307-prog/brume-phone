@@ -27,7 +27,7 @@ export const skyIcon = (sky) => (SKY.find(([re]) => re.test(sky || '')) || [0, '
 //   卡片仿 Find My：離妳多遠、他手機電量、幾分鐘前更新——距離跟電量是照地名跟時間算出來的假數字，但每次開都一樣，不會跳來跳去
 const FIND_MODE = 'brume-phone:findmode';
 const findMode = {
-  get() { try { return localStorage.getItem(FIND_MODE) === 'real' ? 'real' : 'story'; } catch { return 'story'; } },
+  get() { return 'real'; }, // Discord 版全現實（10/20 比比）
   set(v) { try { localStorage.setItem(FIND_MODE, v === 'real' ? 'real' : 'story'); } catch { /* 存不了 */ } },
 };
 const hash = (s) => { let h = 2166136261; for (const c of String(s)) { h ^= c.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h; };
@@ -82,7 +82,7 @@ export function createFind({ screen }) {
   let map = null; // Leaflet 的地圖（現實模式）
   const dayOf = (ts) => { const d = new Date(ts); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
   const hm = (ts) => { const d = new Date(ts); return `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`; };
-  const seg = (mode) => `<div class="bp-find-seg">${[['story', '劇情'], ['real', '現實']].map(([v, n]) => `<b data-find="mode" data-v="${v}" class="${mode === v ? 'on' : ''}">${n}</b>`).join('')}</div>`;
+  const seg = () => '';
   const headFind = (mode) => `<div class="bp-ap-head"><span class="bp-back" data-ap="home">‹</span><b>尋找</b><span></span></div>${seg(mode)}`;
 
   // 卡片（兩個模式共用）：Find My 的樣子
