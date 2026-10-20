@@ -483,16 +483,37 @@
 .bp-ap-scroll { flex: 1; overflow-y: auto; padding: 6px 16px 20px; }
 .bp-ap-empty { text-align: center; color: #9a9389; font-size: 13px; line-height: 1.8; margin-top: 40px; }
 .bp-ap-hint { font-size: 12px; color: #a39b8f; margin: 8px 2px; }
-.bp-ap-fridge { background: linear-gradient(180deg, #e9ecef, #dde1e5); }
-.bp-ap-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding-top: 10px; }
-.bp-ap-note { position: relative; padding: 18px 12px 10px; min-height: 110px; transform: rotate(var(--r)); box-shadow: 0 4px 10px rgba(0, 0, 0, .12); cursor: pointer; display: flex; flex-direction: column; }
-.bp-ap-note.him { background: #fff1a8; }
-.bp-ap-note.me { background: #ffd9df; }
-.bp-ap-note p { margin: 0; flex: 1; font-size: 14.5px; line-height: 1.55; color: #3a362f; word-break: break-word; }
-.bp-ap-note small { font-size: 11px; color: #8a7f6c; margin-top: 8px; }
-.bp-ap-note.done p { text-decoration: line-through; opacity: .5; }
-.bp-ap-note .pin { position: absolute; top: -6px; left: 50%; width: 14px; height: 14px; margin-left: -7px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #f28b82, #c5453b); box-shadow: 0 2px 3px rgba(0, 0, 0, .25); }
-.bp-ap-note u { position: absolute; top: 4px; right: 7px; text-decoration: none; font-size: 12px; color: #b3a98f; }
+/* 冰箱門：霧面不鏽鋼、右邊一條把手；便條是紙，上面一截紙膠帶，偶爾一顆磁鐵（10/20 比比：便條做漂亮一點） */
+.bp-ap-fridge { background: linear-gradient(90deg, #dfe3e7 0%, #eef0f2 18%, #e4e7ea 50%, #eef0f2 82%, #d9dde2 100%); position: relative; }
+.bp-ap-fridge::before { content: ''; position: absolute; top: 22%; right: 6px; width: 5px; height: 38%; border-radius: 3px; background: linear-gradient(90deg, #c9ced4, #f4f6f8 45%, #b8bec5); box-shadow: 0 1px 2px rgba(0, 0, 0, .18); pointer-events: none; }
+.bp-ap-fridge .bp-ap-scroll { padding-right: 18px; }
+.bp-ap-notes { display: grid; grid-template-columns: 1fr 1fr; gap: 18px 14px; padding-top: 16px; }
+.bp-ap-note { position: relative; padding: 20px 13px 11px; min-height: 118px; transform: rotate(var(--r)); cursor: pointer; display: flex; flex-direction: column; border-radius: 2px;
+  background: var(--paper, #fff6b8); background-image: linear-gradient(180deg, rgba(255, 255, 255, .35), rgba(255, 255, 255, 0) 40%), repeating-linear-gradient(180deg, transparent 0 25px, rgba(0, 0, 0, .045) 25px 26px);
+  background-origin: content-box; box-shadow: 0 1px 1px rgba(0, 0, 0, .06), 0 6px 14px rgba(40, 44, 50, .16), inset 0 -1px 0 rgba(0, 0, 0, .04);
+  font-family: "Hannotate TC", "Wawati TC", "Yuanti TC", "Kaiti TC", "BiauKai", cursive, -apple-system, sans-serif; }
+.bp-ap-note::after { content: ''; position: absolute; left: 10px; right: 10px; bottom: 0; height: 10px; z-index: -1; filter: blur(5px); background: rgba(40, 44, 50, .22); transform: skewX(-6deg) translateY(4px); }
+.bp-ap-note.him { --paper: #fff3a6; }
+.bp-ap-note.him:nth-child(3n) { --paper: #fff8d6; }
+.bp-ap-note.him:nth-child(5n) { --paper: #ffe2b4; }
+.bp-ap-note.me { --paper: #ffd9df; }
+.bp-ap-note.me:nth-child(3n) { --paper: #ece0ff; }
+.bp-ap-note.me:nth-child(5n) { --paper: #d9f1e6; }
+.bp-ap-note p { margin: 0; flex: 1; font-size: 16px; line-height: 26px; color: #3a362f; word-break: break-word; }
+.bp-ap-note small { font-size: 11px; color: #8a7f6c; margin-top: 8px; letter-spacing: .02em; }
+.bp-ap-note.done { opacity: .72; }
+.bp-ap-note.done p { text-decoration: line-through; text-decoration-color: rgba(60, 120, 80, .7); text-decoration-thickness: 2px; color: #7c7568; }
+.bp-ap-note.done::before { content: '✓'; position: absolute; right: 10px; bottom: 8px; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; font: 700 14px/1 -apple-system, sans-serif; color: #fff; background: radial-gradient(circle at 35% 35%, #8fd3a8, #3f9a66); box-shadow: 0 2px 3px rgba(0, 0, 0, .25); transform: rotate(-8deg); }
+/* 紙膠帶：半透明、微微斜、壓在上緣 */
+.bp-ap-note .pin { position: absolute; top: -7px; left: 50%; width: 52px; height: 16px; margin-left: -26px; border-radius: 1px; background: rgba(255, 255, 255, .55); border: 1px solid rgba(255, 255, 255, .7); box-shadow: 0 1px 2px rgba(0, 0, 0, .12); transform: rotate(-3deg); backdrop-filter: blur(1px); -webkit-backdrop-filter: blur(1px);
+  background-image: repeating-linear-gradient(135deg, rgba(220, 120, 140, .35) 0 6px, transparent 6px 12px); }
+.bp-ap-note.him .pin { background-image: repeating-linear-gradient(135deg, rgba(90, 140, 200, .35) 0 6px, transparent 6px 12px); transform: rotate(4deg); }
+/* 偶爾換成一顆磁鐵 */
+.bp-ap-note:nth-child(4n+2) .pin { width: 18px; height: 18px; margin-left: -9px; top: -8px; border-radius: 50%; border: 0; transform: none; background: radial-gradient(circle at 35% 35%, #f28b82, #c5453b); box-shadow: 0 2px 3px rgba(0, 0, 0, .28), inset 0 -1px 2px rgba(0, 0, 0, .2); }
+.bp-ap-note.him:nth-child(4n+2) .pin { background: radial-gradient(circle at 35% 35%, #8fb8ec, #3d6fb6); }
+.bp-ap-note u { position: absolute; top: 5px; right: 7px; text-decoration: none; font: 12px/1 -apple-system, sans-serif; color: rgba(90, 80, 60, .45); padding: 3px; }
+.bp-ap-fridge .bp-ap-hint { color: #7d848c; text-align: center; margin: 14px 2px 6px; }
+.bp-ap-fridge .bp-ap-empty { color: #7d848c; }
 .bp-ap-add { display: flex; gap: 8px; padding: 10px 12px calc(10px + var(--bp-sab, env(safe-area-inset-bottom))); background: rgba(255, 255, 255, .7); margin: 0; }
 .bp-ap-add.inline { padding: 8px 0; background: none; }
 .bp-ap-add input { flex: 1; height: 38px; border: 0; border-radius: 10px; padding: 0 12px; background: #fff; font: inherit; font-size: 16px; color: #333; outline: none; }
