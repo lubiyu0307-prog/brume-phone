@@ -13,6 +13,10 @@
 }
 #bp-launcher svg { width: 22px; height: 22px; }
 
+/* 手機裡點兩下不要被 Safari 當成放大（只關點兩下，捏合照樣可以） */
+#bp-overlay { touch-action: manipulation; }
+.bp-shield { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2147483000; touch-action: manipulation; background: transparent; }
+
 /* ---------- 外框 ---------- */
 #bp-overlay, #bp-overlay *, #bp-overlay *::before, #bp-overlay *::after { box-sizing: border-box; }
 /* 酒館用 `* { text-shadow: 0 0 var(--shadowWidth) var(--SmartThemeShadowColor) }` 給每個元素上字影，

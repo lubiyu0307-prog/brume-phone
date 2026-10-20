@@ -20,7 +20,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.25.14';
+const VERSION = '0.25.15';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -877,7 +877,13 @@ function build() {
     refreshPrompt: () => life.refreshPrompt(),
   };
   return api;
-  function close(why = 'api') { dbg('close', why); overlay.classList.remove('bp-open'); tint(false); refreshNotices(); }
+  function close(why = 'api') { dbg('close', why); overlay.classList.remove('bp-open'); tint(false); refreshNotices(); shield(); }
+  // 10/20 比比：按叉叉收起手機後酒館的字變超大。那是 iPhone 的「點兩下放大」：叉叉點了一下、手機收掉後第二下落在正文上，Safari 當成點兩下把那段放大。
+  // 收起來的瞬間先鋪一層透明的擋 450ms，第二下落在它上面（它不給放大），不會傳到正文
+  function shield() {
+    const s = document.createElement('div'); s.className = 'bp-shield'; document.body.appendChild(s);
+    setTimeout(() => s.remove(), 450);
+  }
   // iPhone 最上面時間、電池那一條不是網頁的一部分，蓋不住；Safari 會照 theme-color 幫它上色。
   // 手機打開時換成黑色，跟手機外框融在一起，關掉再換回酒館原本的顏色（10/16 比比看到頂上一條酒館的藍灰色）
   // 10/16 除錯紀錄：她是從主畫面開的 App（pwa:true）、安全區 0——網頁從那條下面才開始，蓋不到，只能靠 theme-color 上色。
