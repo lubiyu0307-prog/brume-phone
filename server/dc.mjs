@@ -15,6 +15,12 @@
 //                                  （格的酒館橋，OpenAI 相容的 /v1/chat/completions，走 Railway 內網），這裡只代轉
 //   DELETE /dc/api/<phone>/img/<id>
 // 驗證：Authorization: Bearer <token>，或 ?t=<token>。
+//
+// 一次性貼金鑰（給侯愷 bot 用，金鑰不經過 Discord）：
+//   POST /dc/keydrop/new            { nonce, claimHash }：bot 先登記一個五分鐘的空格子
+//   GET  /dc/key/<nonce>            玩家開的那一頁：一格、貼了按送出
+//   POST /dc/keydrop/<nonce>        { key }：那一頁送進來，只收一次
+//   GET  /dc/keydrop/<nonce>?claim= bot 來拿：claim 對得上才給，給完就刪。全部只在記憶體，五分鐘自己消失
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,6 +55,19 @@ function flush(phone) {
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8' };
 const IMG = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
 
+// ---------- 一次性金鑰格子 ----------
+const drops = new Map(); // nonce → { claimHash, key, exp }
+const DROP_TTL = 5 * 60e3;
+setInterval(() => { const now = Date.now(); for (const [k, v] of drops) if (v.exp < now) drops.delete(k); }, 30e3).unref();
+const okNonce = (n) => /^[A-Za-z0-9_-]{16,64}$/.test(n);
+const KEY_PAGE = (ok) => `<!doctype html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>貼金鑰</title>
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:linear-gradient(180deg,#687484,#cec5b8);font-family:-apple-system,"PingFang TC","Noto Sans TC",sans-serif;color:#fff}main{width:min(360px,92vw);text-align:center}h1{font-weight:400;font-size:28px;margin:0 0 6px}p{font-size:14px;opacity:.9;line-height:1.6;margin:0 0 14px}input{width:100%;box-sizing:border-box;height:46px;border:0;border-radius:12px;padding:0 14px;font-size:16px;background:rgba(255,255,255,.92);color:#333}button{margin-top:10px;width:100%;height:46px;border:0;border-radius:12px;font-size:16px;font-weight:600;background:#2b2824;color:#fff}small{display:block;margin-top:14px;font-size:12px;opacity:.8}</style></head><body><main>
+${ok ? `<h1>貼給侯愷</h1><p>把你的 Google 金鑰（AI Studio 或 Vertex 的）貼在這裡。這一頁只收一次，送出後五分鐘內沒送也會失效，金鑰不會經過 Discord。</p>
+<form id="f"><input id="k" placeholder="AIza… 或 AQ.…" autocomplete="off" autocapitalize="none" spellcheck="false"><button>送出</button></form><small id="s"></small>
+<script>document.getElementById('f').onsubmit=async(e)=>{e.preventDefault();const k=document.getElementById('k').value.trim();if(k.length<20){s.textContent='這不像金鑰';return;}const r=await fetch(location.pathname.replace('/dc/key/','/dc/keydrop/'),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({key:k})});s.textContent=r.ok?'收到了，回 Discord 看他有沒有說通了。這一頁可以關掉。':'這個連結已經失效，回 Discord 再打一次 !金鑰。';if(r.ok){document.getElementById('f').hidden=true;}}</script>`
+: `<h1>連結失效了</h1><p>這個連結已經用過，或超過五分鐘。回 Discord 跟他打一次 !金鑰 拿新的。</p>`}
+</main></body></html>`;
+
 const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Max-Age': '86400' };
 
 async function readBody(req, max) {
@@ -74,8 +93,37 @@ export async function handle(req, res, u) {
     if (req.method === 'OPTIONS') { res.writeHead(204, CORS); res.end(); return true; }
     if (u.pathname === '/dc') { res.writeHead(302, { Location: '/dc/' }); res.end(); return true; }
 
+    // 一次性金鑰格子
+    if (u.pathname === '/dc/keydrop/new' && req.method === 'POST') {
+      const body = JSON.parse((await readBody(req, 2048)).toString() || '{}');
+      if (!okNonce(String(body.nonce || '')) || !/^[a-f0-9]{64}$/.test(String(body.claimHash || ''))) return send(400, { error: 'bad' });
+      if (drops.size > 500) return send(429, { error: 'too many' });
+      drops.set(body.nonce, { claimHash: body.claimHash, key: '', exp: Date.now() + DROP_TTL });
+      return send(200, { ok: true, exp: DROP_TTL });
+    }
+    let m = /^\/dc\/key\/([A-Za-z0-9_-]{16,64})$/.exec(u.pathname);
+    if (m && req.method === 'GET') { const d = drops.get(m[1]); const ok = !!d && d.exp > Date.now() && !d.key; res.writeHead(ok ? 200 : 410, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(KEY_PAGE(ok)); return true; }
+    m = /^\/dc\/keydrop\/([A-Za-z0-9_-]{16,64})$/.exec(u.pathname);
+    if (m) {
+      const d = drops.get(m[1]);
+      if (!d || d.exp < Date.now()) return send(410, { error: 'gone' });
+      if (req.method === 'POST') {
+        if (d.key) return send(410, { error: 'used' });
+        const body = JSON.parse((await readBody(req, 4096)).toString() || '{}');
+        const k = String(body.key || '').trim(); if (k.length < 20 || /\s/.test(k)) return send(400, { error: 'bad key' });
+        d.key = k; d.exp = Date.now() + DROP_TTL; return send(200, { ok: true });
+      }
+      if (req.method === 'GET') {
+        const claim = String(u.searchParams.get('claim') || '');
+        if (!claim || sha(claim) !== d.claimHash) return send(401, { error: 'bad claim' });
+        if (!d.key) return send(200, { pending: true });
+        drops.delete(m[1]); return send(200, { key: d.key });
+      }
+      return send(405, { error: 'method' });
+    }
+
     // 照片
-    let m = /^\/dc\/i\/([a-z0-9_-]+)\/([a-f0-9]{32})\.(jpg|png|webp|gif)$/.exec(u.pathname);
+    m = /^\/dc\/i\/([a-z0-9_-]+)\/([a-f0-9]{32})\.(jpg|png|webp|gif)$/.exec(u.pathname);
     if (m) {
       const p = path.join(ROOT(), m[1], 'img', `${m[2]}.${m[3]}`);
       if (!fs.existsSync(p)) return send(404, { error: 'not found' });
