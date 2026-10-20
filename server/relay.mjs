@@ -47,6 +47,26 @@ setInterval(() => { const now = Date.now(); for (const [k, v] of hits) if (now -
 const routes = new Map();
 await core.init({ get: (p, f) => routes.set(`GET ${p}`, f), post: (p, f) => routes.set(`POST ${p}`, f) });
 
+// /search：iTunes 搜尋的中繼（侯愷卡的黑膠試聽、音樂重選用）。有些裝置整個連不到 itunes.apple.com，
+// 原本放在 Zeabur 的 brume-preview，那台收掉之後搬來這裡（10/21）。只轉這幾個參數，結果快取一小時。
+const ITUNES_KEYS = ['term', 'media', 'entity', 'limit', 'country', 'attribute'];
+const itunesCache = new Map();
+async function itunes(sp) {
+  const q = new URLSearchParams();
+  for (const k of ITUNES_KEYS) if (sp.get(k)) q.set(k, String(sp.get(k)).slice(0, 200));
+  if (!q.get('term')) return [400, { error: 'no term' }];
+  const key = q.toString(); const hit = itunesCache.get(key);
+  if (hit && Date.now() - hit.t < 3600e3) return [200, hit.j];
+  try {
+    const r = await fetch(`https://itunes.apple.com/search?${key}`, { signal: AbortSignal.timeout(8000) });
+    if (!r.ok) return [502, { error: `itunes ${r.status}` }];
+    const j = await r.json();
+    if (itunesCache.size > 2000) itunesCache.clear();
+    itunesCache.set(key, { t: Date.now(), j });
+    return [200, j];
+  } catch { return [502, { error: 'itunes unreachable' }]; }
+}
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
@@ -63,6 +83,7 @@ const server = http.createServer(async (req, res) => {
     if (await dc.handle(req, res, u)) return; // /dc 自己管驗證與流量
     const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
     if (limited(ip)) return send(429, { error: 'too many requests' });
+    if (req.method === 'GET' && u.pathname === '/search') return send(...(await itunes(u.searchParams)));
     const f = routes.get(`${req.method} ${u.pathname}`);
     if (!f) return send(404, { error: 'not found' });
     const id = identify(req);
