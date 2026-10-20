@@ -495,17 +495,15 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
       : `<button data-line="locked" data-need="${stage.needFor(feature)}" class="muted">🔒 ${label}・${stage.needFor(feature)}後解鎖</button>`;
   }
 
+  // 10/20 比比：選單裡的情侶頭貼、收藏的字卡、搜尋對話拿掉（情侶頭貼在 LINE 主頁換、搜尋用上面的放大鏡）
   function moreMenu() {
     pop(`<div class="bp-line-list">
       <button data-line="sync" class="bp-line-switch">讓正文知道 LINE 聊了什麼<i class="${thread.sync !== false ? 'on' : ''}"></i></button>
       <button data-line="nowsync" class="bp-line-switch">現實時間聊的也讓劇情知道<i class="${thread.nowSync ? 'on' : ''}"></i></button>
       ${lockedBtn('sleep', thread.sleep ? '結束陪睡模式' : '🌙 陪睡模式')}
-      ${lockedBtn('couple', '💑 情侶頭貼')}
       <button data-line="memory">記憶書</button>
-      ${lockedBtn('cards', '收藏的字卡')}
       <button data-line="stickermgr">管理貼圖</button>
       <button data-line="alarmset">鬧鐘捷徑設定</button>
-      <button data-line="search">搜尋對話</button>
       <button data-line="bg">換聊天背景</button>
       ${bg ? '<button data-line="bgreset">拿掉聊天背景</button>' : ''}
       <button data-line="clear" class="danger">清除這段對話</button>
