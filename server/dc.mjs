@@ -1,0 +1,154 @@
+// 霧語 · Discord 版的站（2026-10-20）：腦子在 Discord 的小手機，住在推播站同一台。
+// 一支手機一個資料夾：/data/_wuyu-dc/<phone>/ 裡面 kv.json（所有鍵）、img/（照片）。
+// 頁面本身在 repo 的 dc/ 資料夾，這裡當靜態檔案送出去。
+//
+// 路由（全部在 /dc 底下）：
+//   GET  /dc/                      手機頁面（dc/index.html）；/dc/<檔名> 其他檔案
+//   GET  /dc/i/<phone>/<id>.jpg    照片（網址猜不到，不另外驗）
+//   POST /dc/api/register          { phone, token }：第一次來的 phone 記下 token 的雜湊，之後同一支一定要同一把
+//   GET  /dc/api/<phone>/kv        全部的鍵 { key: { v, t } }；帶 ?since=<t> 只給比它新的
+//   GET  /dc/api/<phone>/kv/<key>  一個鍵
+//   PUT  /dc/api/<phone>/kv/<key>  body { v, t }
+//   DELETE /dc/api/<phone>/kv/<key>
+//   POST /dc/api/<phone>/img       body 是圖片本體（Content-Type image/jpeg|png|webp|gif），回 { url, id }
+//   DELETE /dc/api/<phone>/img/<id>
+// 驗證：Authorization: Bearer <token>，或 ?t=<token>。
+
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { fileURLToPath } from 'node:url';
+
+const ROOT = () => path.join(globalThis.DATA_ROOT || '/data', '_wuyu-dc');
+const SITE = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'dc');
+const MAX_PHONES = Number(process.env.WUYU_MAX_PHONES) || 50;
+const PHONES = () => path.join(ROOT(), '_phones.json');
+const sha = (s) => crypto.createHash('sha256').update(String(s)).digest('hex');
+const readJSON = (p, fb) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fb; } };
+const writeJSON = (p, v) => { fs.mkdirSync(path.dirname(p), { recursive: true }); const tmp = `${p}.${process.pid}.tmp`; fs.writeFileSync(tmp, JSON.stringify(v)); fs.renameSync(tmp, p); };
+
+let phones = null;
+const loadPhones = () => (phones ||= readJSON(PHONES(), {}));
+const okPhone = (p) => /^[a-z0-9_-]{2,24}$/.test(p);
+const okKey = (k) => typeof k === 'string' && k.length > 0 && k.length <= 200;
+
+// 一支手機的 kv 全在記憶體，改了就整份寫回（幾百 KB，夠用）
+const kvs = new Map(); // phone → { map, dirty }
+function kvOf(phone) {
+  if (!kvs.has(phone)) kvs.set(phone, { map: readJSON(path.join(ROOT(), phone, 'kv.json'), {}), timer: null });
+  return kvs.get(phone);
+}
+function flush(phone) {
+  const k = kvs.get(phone); if (!k) return;
+  clearTimeout(k.timer);
+  k.timer = setTimeout(() => { try { writeJSON(path.join(ROOT(), phone, 'kv.json'), k.map); } catch (e) { console.error('[dc] kv write', e); } }, 300);
+}
+
+const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.webmanifest': 'application/manifest+json', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.gif': 'image/gif', '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.txt': 'text/plain; charset=utf-8' };
+const IMG = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/gif': 'gif' };
+
+const CORS = { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS', 'Access-Control-Allow-Headers': 'Content-Type, Authorization', 'Access-Control-Max-Age': '86400' };
+
+async function readBody(req, max) {
+  const chunks = []; let size = 0;
+  for await (const c of req) { size += c.length; if (size > max) throw Object.assign(new Error('too large'), { code: 413 }); chunks.push(c); }
+  return Buffer.concat(chunks);
+}
+
+function auth(req, u, phone) {
+  const h = String(req.headers.authorization || '');
+  const tok = h.startsWith('Bearer ') ? h.slice(7).trim() : String(u.searchParams.get('t') || '');
+  const rec = loadPhones()[phone];
+  if (!rec || !tok) return false;
+  const a = Buffer.from(rec.hash); const b = Buffer.from(sha(tok));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+/** 回 true 表示這個請求是 /dc 的、已經處理掉了 */
+export async function handle(req, res, u) {
+  if (!(u.pathname === '/dc' || u.pathname.startsWith('/dc/'))) return false;
+  const send = (code, obj, headers = {}) => { res.writeHead(code, { ...CORS, 'Content-Type': 'application/json; charset=utf-8', ...headers }); res.end(JSON.stringify(obj)); return true; };
+  try {
+    if (req.method === 'OPTIONS') { res.writeHead(204, CORS); res.end(); return true; }
+    if (u.pathname === '/dc') { res.writeHead(302, { Location: '/dc/' }); res.end(); return true; }
+
+    // 照片
+    let m = /^\/dc\/i\/([a-z0-9_-]+)\/([a-f0-9]{32})\.(jpg|png|webp|gif)$/.exec(u.pathname);
+    if (m) {
+      const p = path.join(ROOT(), m[1], 'img', `${m[2]}.${m[3]}`);
+      if (!fs.existsSync(p)) return send(404, { error: 'not found' });
+      res.writeHead(200, { ...CORS, 'Content-Type': MIME[`.${m[3]}`], 'Cache-Control': 'public, max-age=31536000, immutable' });
+      fs.createReadStream(p).pipe(res); return true;
+    }
+
+    // API
+    if (u.pathname === '/dc/api/register' && req.method === 'POST') {
+      const body = JSON.parse((await readBody(req, 4096)).toString() || '{}');
+      const phone = String(body.phone || '').toLowerCase(); const token = String(body.token || '');
+      if (!okPhone(phone) || token.length < 16) return send(400, { error: 'phone 要 2–24 個小寫英數，token 至少 16 個字' });
+      const all = loadPhones();
+      if (all[phone]) return auth(req, new URL(`http://x/?t=${encodeURIComponent(token)}`), phone) ? send(200, { ok: true, phone, existed: true }) : send(409, { error: "這支手機已經有通行碼了" });
+      if (Object.keys(all).length >= MAX_PHONES) return send(429, { error: '手機太多了' });
+      all[phone] = { hash: sha(token), at: Date.now() }; writeJSON(PHONES(), all);
+      fs.mkdirSync(path.join(ROOT(), phone, 'img'), { recursive: true });
+      return send(200, { ok: true, phone });
+    }
+    m = /^\/dc\/api\/([a-z0-9_-]+)\/(kv|img)(?:\/(.+))?$/.exec(u.pathname);
+    if (m) {
+      const phone = m[1]; const what = m[2]; const rest = m[3] ? decodeURIComponent(m[3]) : '';
+      if (!loadPhones()[phone]) return send(404, { error: 'no such phone' });
+      if (!auth(req, u, phone)) return send(401, { error: 'bad token' });
+      const kv = kvOf(phone);
+      if (what === 'kv') {
+        if (req.method === 'GET' && !rest) {
+          const since = Number(u.searchParams.get('since') || 0);
+          const out = {}; for (const [k, r] of Object.entries(kv.map)) if (!since || (r.t || 0) > since) out[k] = r;
+          return send(200, { now: Date.now(), kv: out });
+        }
+        if (!okKey(rest)) return send(400, { error: 'bad key' });
+        if (req.method === 'GET') return send(200, kv.map[rest] || { v: null, t: 0 });
+        if (req.method === 'PUT') {
+          const body = JSON.parse((await readBody(req, 4 * 1024 * 1024)).toString() || '{}');
+          const rec = { v: body.v === undefined ? null : body.v, t: Number(body.t) || Date.now() };
+          kv.map[rest] = rec; flush(phone);
+          return send(200, { ok: true, t: rec.t });
+        }
+        if (req.method === 'DELETE') { delete kv.map[rest]; flush(phone); return send(200, { ok: true }); }
+        return send(405, { error: 'method' });
+      }
+      // img
+      if (req.method === 'POST' && !rest) {
+        const type = String(req.headers['content-type'] || '').split(';')[0].trim();
+        const ext = IMG[type]; if (!ext) return send(415, { error: '只收 jpeg、png、webp、gif' });
+        const buf = await readBody(req, 12 * 1024 * 1024);
+        const id = crypto.randomBytes(16).toString('hex');
+        const dir = path.join(ROOT(), phone, 'img'); fs.mkdirSync(dir, { recursive: true });
+        fs.writeFileSync(path.join(dir, `${id}.${ext}`), buf);
+        return send(200, { ok: true, id, url: `/dc/i/${phone}/${id}.${ext}`, size: buf.length });
+      }
+      if (req.method === 'DELETE' && /^[a-f0-9]{32}(\.\w+)?$/.test(rest)) {
+        const id = rest.split('.')[0]; const dir = path.join(ROOT(), phone, 'img');
+        for (const ext of Object.values(IMG)) { const p = path.join(dir, `${id}.${ext}`); if (fs.existsSync(p)) fs.unlinkSync(p); }
+        return send(200, { ok: true });
+      }
+      return send(405, { error: 'method' });
+    }
+
+    // 靜態檔案：dc/ 資料夾
+    if (req.method !== 'GET' && req.method !== 'HEAD') return send(405, { error: 'method' });
+    let rel = u.pathname.slice('/dc/'.length) || 'index.html';
+    if (rel.endsWith('/')) rel += 'index.html';
+    const file = path.normalize(path.join(SITE, rel));
+    if (!file.startsWith(SITE) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) return send(404, { error: 'not found' });
+    const ext = path.extname(file).toLowerCase();
+    const cache = /\.(png|jpg|jpeg|webp|gif|ico|woff2?)$/.test(ext) ? 'public, max-age=86400' : 'no-cache';
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': cache });
+    if (req.method === 'HEAD') { res.end(); return true; }
+    fs.createReadStream(file).pipe(res); return true;
+  } catch (e) {
+    if (e?.code === 413) return send(413, { error: 'too large' });
+    console.error('[dc]', e);
+    if (!res.headersSent) return send(500, { error: 'server error' });
+    return true;
+  }
+}

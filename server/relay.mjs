@@ -14,6 +14,7 @@ import path from 'node:path';
 const DATA = process.env.BP_DATA || '/data';
 globalThis.DATA_ROOT = DATA;
 const core = await import('./index.mjs');
+const dc = await import('./dc.mjs'); // 霧語 Discord 版的站（/dc）
 
 const MAX_IDS = Number(process.env.BP_MAX_IDS) || 5000; // 防止被亂註冊塞爆
 const AUTH_FILE = path.join(DATA, '_brume-phone', '_auth.json');
@@ -59,6 +60,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
     const u = new URL(req.url, 'http://x');
     if (u.pathname === '/' || u.pathname === '/health') return send(200, { ok: true, name: '霧語推播站' });
+    if (await dc.handle(req, res, u)) return; // /dc 自己管驗證與流量
     const ip = String(req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
     if (limited(ip)) return send(429, { error: 'too many requests' });
     const f = routes.get(`${req.method} ${u.pathname}`);

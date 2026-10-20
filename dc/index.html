@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content">
+<title>霧語</title>
+<link rel="manifest" href="app.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Brume">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#000000">
+<link rel="stylesheet" href="style.css">
+<style>
+  /* 自己的站：手機就是整頁，不用酒館的外框邏輯 */
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  html { position: fixed; top: 0; left: 0; width: 100%; }
+  #app { position: fixed; inset: 0; }
+  #bp-overlay { position: fixed; top: var(--bp-top, 0px); left: 0; width: var(--bp-w, 100vw); height: var(--bp-h, 100vh); background: #000; z-index: 10; }
+  #bp-overlay .bp-phone { width: min(390px, var(--bp-w, 100vw)); height: min(844px, var(--bp-h, 100vh)); }
+  @media (max-width: 500px), (max-height: 900px) { #bp-overlay .bp-phone { position: fixed; top: 0; left: 0; width: var(--bp-w, 100vw); height: var(--bp-h, 100vh); border-radius: 0; box-shadow: none; } }
+  .bp-close { display: none !important; }
+  a.bp-app { text-decoration: none; color: inherit; }
+  .bp-app.bp-app-soon { opacity: 1; }
+  .bp-mu-ph { width: 48px; height: 48px; border-radius: 8px; background: #2a2a2a; color: #999; display: grid; place-items: center; flex: none; }
+  .bp-mu-ph svg { width: 22px; height: 22px; }
+  .bp-mu-ph.big { width: 70%; aspect-ratio: 1; height: auto; margin: 0 auto; border-radius: 16px; }
+  .bp-mu-ph.big svg { width: 40%; height: 40%; }
+  .bp-mu-yt { color: #1db954; text-decoration: none; font-weight: 600; }
+  .bp-checkup ul { list-style: none; padding: 0; margin: 0 0 10px; font-size: 13px; line-height: 1.7; }
+  .bp-checkup li.bad { color: #b4583c; }
+  /* 登入（通行碼） */
+  #bp-login { position: fixed; inset: 0; z-index: 2147483601; display: grid; place-items: center; background: linear-gradient(180deg, #687484 0%, #8d95a0 45%, #cec5b8 100%); color: #fff; font-family: -apple-system, "PingFang TC", "Noto Sans TC", sans-serif; padding: 24px; }
+  #bp-login form { width: min(340px, 100%); display: flex; flex-direction: column; gap: 10px; text-align: center; }
+  #bp-login b { font-family: Georgia, "Noto Serif TC", serif; font-weight: 400; font-size: 44px; letter-spacing: .04em; }
+  #bp-login p { margin: 0; font-size: 14px; opacity: .9; }
+  #bp-login input { height: 46px; border: 0; border-radius: 12px; padding: 0 14px; font: inherit; font-size: 16px; background: rgba(255,255,255,.92); color: #333; outline: none; }
+  #bp-login button { height: 46px; border: 0; border-radius: 12px; font: inherit; font-size: 16px; font-weight: 600; background: #2b2824; color: #fff; cursor: pointer; }
+  /* 開機畫面 */
+  #bp-splash { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; z-index: 2147483600; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: linear-gradient(180deg, #687484 0%, #8d95a0 45%, #cec5b8 100%); background-image: var(--bp-splash-bg, none), linear-gradient(180deg, #687484 0%, #8d95a0 45%, #cec5b8 100%);
+    background-size: cover; background-position: center; opacity: 0; transition: opacity .6s ease; overflow: hidden; color: #fff; font-family: Georgia, "Times New Roman", "Noto Serif TC", "Songti TC", serif; }
+  #bp-splash.on { opacity: 1; }
+  #bp-splash.has-bg::before { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, rgba(20,24,32,.15) 0%, rgba(20,24,32,.05) 40%, rgba(20,24,32,.55) 100%); }
+  #bp-splash .bp-splash-mist { position: absolute; left: -30%; right: -30%; bottom: -10%; height: 55%; background: radial-gradient(ellipse at 30% 60%, rgba(255,255,255,.55), transparent 60%), radial-gradient(ellipse at 75% 75%, rgba(255,255,255,.45), transparent 55%); filter: blur(18px); animation: bp-mist 9s ease-in-out infinite alternate; }
+  #bp-splash.has-bg .bp-splash-mist { opacity: .45; }
+  @keyframes bp-mist { from { transform: translateX(-6%); } to { transform: translateX(6%); } }
+  #bp-splash .bp-splash-txt { position: relative; text-align: center; transform: translateY(-6vh); }
+  #bp-splash .bp-splash-txt b { display: block; font-weight: 400; font-size: clamp(44px, 14vw, 72px); letter-spacing: .04em; text-shadow: 0 2px 18px rgba(30,34,44,.35); }
+  #bp-splash .bp-splash-txt span { display: block; margin-top: 8px; font-size: 16px; letter-spacing: .3em; opacity: .9; text-shadow: 0 1px 8px rgba(30,34,44,.4); }
+  #bp-splash .bp-splash-dots { position: absolute; bottom: calc(48px + env(safe-area-inset-bottom)); display: flex; gap: 8px; }
+  #bp-splash .bp-splash-dots u { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,.85); animation: bp-sdot 1.2s ease-in-out infinite; }
+  #bp-splash .bp-splash-dots u:nth-child(2) { animation-delay: .2s; }
+  #bp-splash .bp-splash-dots u:nth-child(3) { animation-delay: .4s; }
+  @keyframes bp-sdot { 0%, 100% { opacity: .25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-3px); } }
+  #bp-splash:not(.has-bg) .bp-splash-dots u { background: rgba(70,78,92,.55); }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="module" src="index.js"></script>
+</body>
+</html>
