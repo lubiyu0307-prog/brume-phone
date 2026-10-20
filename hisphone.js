@@ -503,12 +503,9 @@ export function createHisPhone({ host, say, onExit }) {
       ch = currentChar();
       if (!ch) { say('先在酒館選一個角色'); return false; }
       hp = (await store.get(key()).catch(() => null)) || {};
-      view = 'lock'; sub = null; typed = ''; fails = 0;
+      // 10/20 比比：密碼拿掉，怕玩家卡在鎖定畫面；拿起來直接是主畫面
+      view = 'home'; sub = null; typed = ''; fails = 0;
       host.classList.add('bp-show'); paint();
-      if (!hp.code) {
-        try { await GEN.setup(); save(); } catch (e) { hp.code = '0000'; hp.hint = '他好像沒設什麼特別的'; say(`密碼沒生出來，先用 0000（${e.message || e}）`); }
-        paint();
-      }
       return true;
     },
     close,
