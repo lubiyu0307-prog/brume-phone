@@ -108,9 +108,10 @@ function musicWidget() {
     <div><div class="bp-music-t">還沒有歌</div><div class="bp-music-a">讓他推薦一首吧</div></div>
     <div class="bp-music-ctl"><i data-mw="prev">${ICON.prev}</i><i data-mw="toggle">${ICON.play}</i><i data-mw="next">${ICON.next}</i></div></div>`;
 }
+const SOON = new Set(['game']); // 還沒開放的 App（10/20 比比：小遊戲先停掉）
 function appTile(a) {
   if (a.app === 'dc') return `<a class="bp-app" href="${DC_URL}" target="_blank" rel="noopener"><div class="bp-icon">${ICON.dc}</div><div class="bp-label">${a.name}</div></a>`;
-  return `<div class="bp-app" data-open="${a.app}"><div class="bp-icon">${ICON[a.app]}</div><div class="bp-label">${a.name}</div></div>`;
+  return `<div class="bp-app${SOON.has(a.app) ? ' bp-app-soon' : ''}" data-open="${a.app}"><div class="bp-icon">${ICON[a.app]}</div><div class="bp-label">${a.name}</div></div>`;
 }
 function tile(t) {
   if (t.app) return appTile(t);
@@ -364,6 +365,7 @@ function build() {
   const openByName = (name) => {
     if (name === 'settings') { showSettings(); sheet.classList.add('bp-show'); return; }
     if (name === 'notes') { stage.get(currentChar().key).then((cur) => { if (!stage.unlocked(cur, 'notes')) say(`冰箱門要${stage.needFor('notes')}之後才有`); else openApp(notes, 'notes'); }); return; }
+    if (SOON.has(name)) { say('這個還在準備中，之後開放 ☁︎'); return; }
     const app = APPS[name];
     if (app) { openApp(app, name); markRead(name === 'parcel' ? 'parcel' : name); } else say('這個 App 還在做 ☁︎');
   };
