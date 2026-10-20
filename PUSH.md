@@ -29,9 +29,9 @@
 
 ---
 
-## 架推播站（只有比比要做）
+## 架自己的推播站（想用預設的推播站就不用做）
 
-推播站是 `server/relay.mjs`，沒有任何外部套件，`npm start` 就會跑。
+預設走作者架的推播站（`push.js` 的 `DEFAULT_RELAY`），裝好就能用。想自己架一個，推播站是 `server/relay.mjs`，沒有任何外部套件，`npm start` 就會跑。
 
 Railway：
 1. 專案裡 **New → GitHub Repo → brume-phone**（會自己認出是 Node，跑 `npm start`）

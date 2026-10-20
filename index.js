@@ -20,7 +20,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.25.12';
+const VERSION = '0.25.13';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -238,7 +238,7 @@ function build() {
         <button data-act="mig-yes" class="bp-migbtn" hidden>把之前的紀錄搬進這個聊天</button>
         <button data-act="cardoff" class="bp-danger">這張卡不用小手機</button>
         <p class="bp-sheet-note">古風、奇幻這類沒有手機的故事用。要再打開：輸入框左邊的魔杖選單 → 霧語。</p>
-        <button data-act="dbg">複製除錯紀錄（給格看）</button>
+        <button data-act="dbg">複製除錯紀錄</button>
       </details>
       <button class="bp-cancel" data-act="close">完成</button>
       <div class="bp-ver">霧語 Brume Phone v${VERSION} · by Lubí</div>
@@ -501,7 +501,7 @@ function build() {
       await showPush();
       if (p.android) note.textContent += ' 安卓提醒：小米、OPPO、華為這些手機很會關掉背景，到「設定 → 電池」把 Chrome 設成「不受限制」，通知才不會晚到。';
       if (p.desktop) note.textContent += ' 電腦要瀏覽器開著才收得到。';
-    } catch (err) { note.textContent = `沒有開成功：${err.message || err}。重新整理後再試一次，還是不行就複製除錯紀錄給格。`; dbg('push-fail', String(err?.message || err)); }
+    } catch (err) { note.textContent = `沒有開成功：${err.message || err}。重新整理後再試一次，還是不行就複製除錯紀錄回報。`; dbg('push-fail', String(err?.message || err)); }
   }
 
   // 點圓點跳頁
@@ -591,7 +591,7 @@ function build() {
         };
         let txt = `Brume Phone v${VERSION} iOS${os} pwa=${last.pwa} safe=${last.safe} tc=${last.tc || ''}\nmeta=${last.meta || ''}\n`;
         txt += rows.slice(-20).map(line).join('\n');
-        try { await navigator.clipboard.writeText(txt); say('複製好了，貼給格'); } catch {
+        try { await navigator.clipboard.writeText(txt); say('複製好了'); } catch {
           sheet.insertAdjacentHTML('beforeend', '<textarea class="bp-dbgbox" readonly></textarea>');
           const box = sheet.querySelector('.bp-dbgbox'); box.value = txt; box.select(); say('自動複製不行，全選這格長按複製');
         }
