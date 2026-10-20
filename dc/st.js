@@ -82,10 +82,16 @@ export const textModelPref = {
   get() { try { return localStorage.getItem(TEXT_MODEL) || ''; } catch { return ''; } },
   set(v) { try { if (v) localStorage.setItem(TEXT_MODEL, v); else localStorage.removeItem(TEXT_MODEL); } catch { /* 存不了 */ } textModel = ''; },
 };
+// 金鑰兩種都吃：AI Studio（AIza 開頭）問 generativelanguage；Vertex 快速模式（AQ. 開頭）問 aiplatform 的 publishers 路徑
+// （10/20 用比比的 Vertex 金鑰驗過：gemini-2.5-flash 文字、gemini-3.1-flash-image 生圖都回得來，瀏覽器跨網域也放行）
 const G = 'https://generativelanguage.googleapis.com/v1beta';
+const isVertex = (k) => String(k).startsWith('AQ.');
+const modelUrl = (key, model) => (isVertex(key) ? `https://aiplatform.googleapis.com/v1/publishers/google/models/${model}:generateContent` : `${G}/models/${model}:generateContent`);
+const VERTEX_MODELS = ['gemini-3.1-flash', 'gemini-2.5-flash', 'gemini-3.1-flash-image', 'gemini-3-pro-image']; // 快速模式沒有列模型的 API，先寫死
 let allModels = null;
 async function listModels(key) {
   if (allModels) return allModels;
+  if (isVertex(key)) return (allModels = [...VERTEX_MODELS]);
   try {
     const r = await fetch(`${G}/models?pageSize=200`, { headers: { 'x-goog-api-key': key }, referrerPolicy: 'strict-origin-when-cross-origin' });
     allModels = ((await r.json()).models || []).filter((m) => (m.supportedGenerationMethods || []).includes('generateContent')).map((m) => m.name.replace(/^models\//, ''));
@@ -111,18 +117,23 @@ const inlinePart = (url) => ({ inline_data: { mime_type: url.slice(5, url.indexO
 /** 叫模型寫東西。image 是 dataURL */
 export async function generate(prompt, image) {
   const key = geminiKeyGet();
-  if (!key) throw new Error('還沒貼金鑰：設定 → 腦子，貼一把 AI Studio 的金鑰');
+  if (!key) throw new Error('還沒貼金鑰：設定 → 腦子，貼一把 AI Studio 或 Vertex 的金鑰');
   const system = await liteContext();
   const model = await pickTextModel(key);
   const parts = [...(image ? [inlinePart(image)] : []), { text: prompt }];
   let r;
   try {
-    r = await fetch(`${G}/models/${model}:generateContent`, {
+    r = await fetch(modelUrl(key, model), {
       method: 'POST', referrerPolicy: 'strict-origin-when-cross-origin', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({ systemInstruction: { parts: [{ text: system }] }, contents: [{ role: 'user', parts }], safetySettings: SAFETY, generationConfig: { temperature: 1, maxOutputTokens: 3000, ...(/gemini-(2\.5|3)/.test(model) ? { thinkingConfig: { thinkingBudget: 0 } } : {}) } }),
     });
   } catch (e) { throw new Error(`連不到 Google（${e.message || e}）`); }
-  if (!r.ok) { if (r.status === 404) { textModel = ''; } throw new Error(`${model} 回 ${r.status}${WHY[r.status] ? `（${WHY[r.status]}）` : ''}`); }
+  if (r.status === 404 && !textModelPref.get() && (allModels || []).includes(model) && !generate.retried) {
+    // 這把金鑰沒有這個模型（Vertex 各地區不一樣）：從名單拿掉，換下一個再試一次
+    allModels = allModels.filter((m) => m !== model); textModel = ''; generate.retried = true;
+    try { return await generate(prompt, image); } finally { generate.retried = false; }
+  }
+  if (!r.ok) throw new Error(`${model} 回 ${r.status}${WHY[r.status] ? `（${WHY[r.status]}）` : ''}`);
   const j = await r.json();
   const text = (j?.candidates?.[0]?.content?.parts || []).map((p) => p.text || '').join('').trim();
   if (!text) throw new Error(j?.candidates?.[0]?.finishReason === 'SAFETY' || j?.promptFeedback?.blockReason ? '這題被 Google 擋了' : '他什麼都沒寫');
@@ -224,12 +235,12 @@ async function refRequest(prompt, refs) {
 }
 async function viaKey(prompt, refs = [], aspect = '1:1') {
   const key = geminiKeyGet(); const prev = imageInfo.why;
-  if (!key) { imageInfo.why = (prev ? prev + '；' : '') + '沒有貼 AI Studio 金鑰（設定 → 腦子）'; return ''; }
+  if (!key) { imageInfo.why = (prev ? prev + '；' : '') + '沒有貼 Google 的金鑰（設定 → 腦子）'; return ''; }
   const req = await refRequest(prompt, refs);
   const parts = [...req.images.map(inlinePart), { text: req.text }];
   for (const model of byPref(await imageModels(key))) {
     try {
-      const r = await fetch(`${G}/models/${model}:generateContent`, {
+      const r = await fetch(modelUrl(key, model), {
         method: 'POST', referrerPolicy: 'strict-origin-when-cross-origin', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
         body: JSON.stringify({ contents: [{ role: 'user', parts }], safetySettings: SAFETY, generationConfig: { responseModalities: ['TEXT', 'IMAGE'], imageConfig: { aspectRatio: aspect, ...(/gemini-3/.test(model) ? { imageSize: imageResPref.get() } : {}) } } }),
       });
@@ -247,7 +258,7 @@ async function viaKey(prompt, refs = [], aspect = '1:1') {
 export async function lookAt(text, img) {
   const key = geminiKeyGet(); if (!key || !img) return '';
   try {
-    const r = await fetch(`${G}/models/${await pickTextModel(key)}:generateContent`, {
+    const r = await fetch(modelUrl(key, await pickTextModel(key)), {
       method: 'POST', referrerPolicy: 'strict-origin-when-cross-origin', headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
       body: JSON.stringify({ contents: [{ role: 'user', parts: [inlinePart(img), { text }] }], safetySettings: SAFETY, generationConfig: { temperature: 0.2, maxOutputTokens: 1024 } }),
     });
