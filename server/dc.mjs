@@ -11,6 +11,8 @@
 //   PUT  /dc/api/<phone>/kv/<key>  body { v, t }
 //   DELETE /dc/api/<phone>/kv/<key>
 //   POST /dc/api/<phone>/img       body 是圖片本體（Content-Type image/jpeg|png|webp|gif），回 { url, id }
+//   POST /dc/api/<phone>/ask       { system, prompt, image? }：請這支手機的「腦子」寫字。腦子是 kv 的 brain { url, key, model }
+//                                  （格的酒館橋，OpenAI 相容的 /v1/chat/completions，走 Railway 內網），這裡只代轉
 //   DELETE /dc/api/<phone>/img/<id>
 // 驗證：Authorization: Bearer <token>，或 ?t=<token>。
 
@@ -93,7 +95,7 @@ export async function handle(req, res, u) {
       fs.mkdirSync(path.join(ROOT(), phone, 'img'), { recursive: true });
       return send(200, { ok: true, phone });
     }
-    m = /^\/dc\/api\/([a-z0-9_-]+)\/(kv|img)(?:\/(.+))?$/.exec(u.pathname);
+    m = /^\/dc\/api\/([a-z0-9_-]+)\/(kv|img|ask)(?:\/(.+))?$/.exec(u.pathname);
     if (m) {
       const phone = m[1]; const what = m[2]; const rest = m[3] ? decodeURIComponent(m[3]) : '';
       if (!loadPhones()[phone]) return send(404, { error: 'no such phone' });
@@ -115,6 +117,27 @@ export async function handle(req, res, u) {
         }
         if (req.method === 'DELETE') { delete kv.map[rest]; flush(phone); return send(200, { ok: true }); }
         return send(405, { error: 'method' });
+      }
+      if (what === 'ask') {
+        if (req.method !== 'POST') return send(405, { error: 'method' });
+        const brain = kv.map.brain?.v;
+        if (!brain?.url) return send(503, { error: '這支手機還沒接腦子（kv 的 brain）' });
+        const body = JSON.parse((await readBody(req, 12 * 1024 * 1024)).toString() || '{}');
+        const prompt = String(body.prompt || ''); if (!prompt) return send(400, { error: 'no prompt' });
+        const content = body.image ? [{ type: 'text', text: prompt }, { type: 'image_url', image_url: { url: String(body.image) } }] : prompt;
+        const messages = [...(body.system ? [{ role: 'system', content: String(body.system) }] : []), { role: 'user', content }];
+        const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), 320e3);
+        try {
+          const r = await fetch(String(brain.url).replace(/\/$/, '') + '/v1/chat/completions', {
+            method: 'POST', signal: ctl.signal, headers: { 'Content-Type': 'application/json', ...(brain.key ? { Authorization: `Bearer ${brain.key}` } : {}) },
+            body: JSON.stringify({ model: brain.model || 'ge', messages, stream: false, max_tokens: 3000 }),
+          });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok) return send(502, { error: `腦子回 ${r.status}`, detail: String(j?.error?.message || j?.error || '').slice(0, 200) });
+          const text = String(j?.choices?.[0]?.message?.content || '').trim();
+          return send(200, { text });
+        } catch (e) { return send(e?.name === 'AbortError' ? 504 : 502, { error: e?.name === 'AbortError' ? '腦子太久沒回' : `連不到腦子（${e?.message || e}）` }); }
+        finally { clearTimeout(timer); }
       }
       // img
       if (req.method === 'POST' && !rest) {

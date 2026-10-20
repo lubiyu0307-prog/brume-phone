@@ -121,11 +121,30 @@ const WHY = { 400: '金鑰或參數不對', 401: '金鑰不對', 403: '金鑰沒
 export function canSeeImages() { return !!geminiKeyGet(); }
 const inlinePart = (url) => ({ inline_data: { mime_type: url.slice(5, url.indexOf(';')), data: url.slice(url.indexOf(',') + 1) } });
 
+// 腦子：kv 的 brain 有設（格的酒館橋）就先問他本人，推播站代轉；他沒接到才退回手機裡的 Gemini（10/20 比比：字要從格那邊來）
+export const brain = { on: false, why: '' };
+store.whenReady().then(async () => { brain.on = !!(await store.get('brain').catch(() => null))?.url; });
+window.addEventListener('bp-store-late', async (e) => { if (e.detail === 'brain') brain.on = !!(await store.get('brain').catch(() => null))?.url; });
+async function askBrain(system, prompt, image) {
+  const r = await fetch(store.api('ask'), { method: 'POST', headers: { ...store.headers(), 'Content-Type': 'application/json' }, body: JSON.stringify({ system, prompt, ...(image ? { image } : {}) }) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j?.error || `腦子回 ${r.status}`);
+  if (!j.text) throw new Error('他什麼都沒寫');
+  return j.text;
+}
+
 /** 叫模型寫東西。image 是 dataURL */
 export async function generate(prompt, image) {
   const key = geminiKeyGet();
-  if (!key) throw new Error('還沒貼金鑰：設定 → 腦子，貼一把 AI Studio 或 Vertex 的金鑰');
   const system = await liteContext();
+  if (brain.on) {
+    try { return stripBlocks(await askBrain(system, prompt, image)); } catch (e) {
+      brain.why = e.message || String(e);
+      if (!key) throw new Error(`格沒接到（${brain.why}）`);
+      window.dispatchEvent(new CustomEvent('bp-hint', { detail: `格沒接到（${brain.why}），這句先讓 Gemini 寫` }));
+    }
+  }
+  if (!key) throw new Error('還沒貼金鑰：設定 → 腦子，貼一把 AI Studio 或 Vertex 的金鑰');
   const model = await pickTextModel(key);
   const parts = [...(image ? [inlinePart(image)] : []), { text: prompt }];
   let r;

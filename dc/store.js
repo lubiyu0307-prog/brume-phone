@@ -13,8 +13,8 @@ export const auth = {
   get() { try { return JSON.parse(localStorage.getItem(AUTH) || 'null'); } catch { return null; } },
   set(v) { try { if (v) localStorage.setItem(AUTH, JSON.stringify(v)); else localStorage.removeItem(AUTH); } catch { /* 存不了 */ } },
 };
-const api = (p) => `${BASE}/api/${auth.get()?.phone}/${p}`;
-const headers = () => ({ Authorization: `Bearer ${auth.get()?.token || ''}` });
+export const api = (p) => `${BASE}/api/${auth.get()?.phone}/${p}`;
+export const headers = () => ({ Authorization: `Bearer ${auth.get()?.token || ''}` });
 
 /** 通行碼長這樣：phone.token */
 export function parsePass(s) {
