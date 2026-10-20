@@ -116,7 +116,8 @@ export function createThreads({ screen, say }) {
     }
     feed = (await store.get(key()).catch(() => null)) || { posts: [] };
     if (view === 'post' && find(openId)) renderPost(); else if (view === 'profile') renderProfile(); else renderFeed();
-    if (view === 'feed' && !feed.posts.length && !loading) refresh();
+    // 河道還沒有路人、配角（只有他自己或她的）就自己更新一次：格先放進來的那幾篇不算有河道（10/20 比比：路人留言要跟酒館版一樣豐富）
+    if (view === 'feed' && !feed.posts.some((p) => p.author.kind === 'npc' || p.author.kind === 'side') && !loading) refresh();
   }
 
   function renderFeed() {

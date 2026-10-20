@@ -94,7 +94,7 @@ export function createIG({ screen, say }) {
     d.me.handle ||= ch.user; d.him.handle ||= ch.name;
     people = await loadCast(ch.charKey);
     if (view === 'post' && find(openId)) renderPost(); else if (view === 'profile') renderProfile(); else renderFeed();
-    if (view === 'feed' && !d.posts.some((p) => p.author.kind !== 'me') && !loading) refresh();
+    if (view === 'feed' && !d.posts.some((p) => p.author.kind === 'other') && !loading) refresh(); // 還沒有配角、路人的貼文就自己更新一次（他自己的不算）
   }
 
   // 重畫動態或個人頁時留在原本捲到的位置：長按生完圖整頁重畫會跳回第一張（10/19 比比）
