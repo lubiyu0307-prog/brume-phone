@@ -101,6 +101,8 @@ function herPositions(msgs) {
 // 劇情／現實兩種時間：m.now = 現實時間傳的；m.story = 劇情時間傳的（m.st 是劇情裡的時刻）。
 // 舊紀錄兩個都沒有，照原本的現實時間顯示。現實聊天預設不給劇情看，t.nowSync 打開才給。
 const storySees = (m, t) => !m.now || !!t.nowSync;
+// 記憶書裡標「現實」的那幾條：開關關著時只給現實時間的他看，正文和世界書不送（10/21 椰子：開關沒開，現實聊的咖哩還是進了劇情）
+const storyMem = (m, t) => m.kind !== 'now' || !!t.nowSync;
 
 // 禮物看品項猜一個圖示
 const GIFT_EMOJI = [[/咖啡|拿鐵|美式|卡布/, '☕'], [/奶茶|珍珠|茶/, '🧋'], [/蛋糕|甜點|布丁|塔/, '🍰'], [/花/, '💐'], [/電影/, '🎬'], [/冰淇淋|霜淇淋/, '🍦'], [/巧克力/, '🍫'], [/餅乾/, '🍪'], [/書/, '📚'], [/便當|宵夜|晚餐|午餐|拉麵|火鍋|飯/, '🍱'], [/酒/, '🍷'], [/戒指|項鍊|手鍊|耳環/, '💍'], [/香水/, '🌸'], [/票/, '🎫']];
@@ -127,7 +129,7 @@ export async function syncMain() {
   if (!ch) return off();
   const t = await loadThread(ch.key);
   if (t.sync === false) return off(); // 預設打開
-  const mem = await data.memory.all(ch.key);
+  const mem = (await data.memory.all(ch.key)).filter((x) => storyMem(x, t));
   const recent = t.msgs.filter((m) => !m.err && storySees(m, t)).slice(-20)
     .map((m) => `${m.me ? ch.user : ch.name}：${msgText(m)}${m.now ? '（現實裡傳的）' : ''}`).join('\n');
   const text = [
@@ -145,6 +147,7 @@ function buildPrompt(ch, msgs, x = {}) {
   const byId = new Map(msgs.map((m) => [m.id, m]));
   const nowMode = x.mode === 'now';
   const shown = msgs.filter((m) => !m.err && (nowMode ? m.now : (!m.now || x.nowSync)));
+  const memShown = (x.memory || []).filter((m) => nowMode || x.nowSync || m.kind !== 'now'); // 劇情時間、開關關著：現實的記憶不給
   const log = shown.slice(-40).map((m) => {
     const q = m.quote && byId.get(m.quote);
     const quoted = q ? `（回覆「${msgText(q).slice(0, 40)}」）` : '';
@@ -167,7 +170,7 @@ function buildPrompt(ch, msgs, x = {}) {
       : `故事裡現在的天氣：${x.weather.city} ${x.weather.sky}${x.weather.temp != null ? ` ${x.weather.temp}°` : ''}`) : '',
     x.where ? `你現在人在：${x.where.place}${x.where.line ? `，${x.where.line}` : ''}（${x.where.auto ? '照你平常的作息' : '你剛剛傳給她的位置'}；她手機的「尋找」看得到你在哪，講到人在哪、在幹嘛要跟這個一致）` : '',
     x.sleep ? `\n【陪睡模式】${ch.user} 躺在床上準備睡了，要你陪她入睡。講話輕、短、慢，像在耳邊說；不問問題、不開新話題、不要讓她更清醒。她說晚安就溫柔收尾。` : '',
-    x.memory?.length ? `\n${ch.name} 記得的事：\n${x.memory.map((m) => '- ' + (m.kind ? `（${m.kind === 'now' ? '現實' : '劇情'}）` : '') + m.text).join('\n')}` : '',
+    memShown.length ? `\n${ch.name} 記得的事：\n${memShown.map((m) => '- ' + (m.kind ? `（${m.kind === 'now' ? '現實' : '劇情'}）` : '') + m.text).join('\n')}` : '',
     x.notes?.length ? `\n她冰箱上的便條（你貼過的也在裡面）：\n${x.notes.map((n) => `- ${n.text}${n.date ? `（${n.date}）` : ''}${n.done ? '（已完成）' : ''}`).join('\n')}` : '',
     x.couple ? `\n你們的 LINE 現在用情侶頭貼（${x.couple}）。` : (x.stage && stage.unlocked(x.stage, 'couple') ? `\n你們還沒有情侶頭貼。很偶爾、氣氛對的時候，你可以提議換一組（她在 LINE 主頁換）。` : ''),
     x.pin ? `\n聊天室公告（釘在最上面的）：${x.pin}` : '',
@@ -707,7 +710,7 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
       const lines = items.map((x) => x.text);
       for (const x of items) {
         const m = await data.memory.add(who.key, x.text, { kind: x.kind, keys: x.keys });
-        if (loreOn()) {
+        if (loreOn() && storyMem(m, t)) {
           const r = await writeLore(loreText(who, m), loreKeys(who, x.keys));
           if (r.ok) await data.memory.update(who.key, m.id, { lore: { book: r.book, uid: r.uid } }); else if (manual) say(`沒寫進世界書：${r.why}`);
         }
@@ -909,7 +912,7 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
       if (a === 'memo') { // 10/19 比比：不用等它每三十則自己挑
         unpop(); const txt = String(m.text).trim().slice(0, 60);
         const mm = await data.memory.add(ch.key, txt, { kind: m.now ? 'now' : 'story', keys: [ch.name] });
-        if (loreOn()) {
+        if (loreOn() && storyMem(mm, thread)) {
           const r = await writeLore(loreText(ch, mm), loreKeys(ch, [ch.name])).catch(() => ({ ok: false }));
           if (r.ok) { await data.memory.update(ch.key, mm.id, { lore: { book: r.book, uid: r.uid } }); say('記進記憶書了，世界書也有'); } else say('記進記憶書了（世界書沒寫進去）');
         } else say('記進記憶書了');
@@ -1036,6 +1039,15 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
     if (a === 'nowsync') {
       thread.nowSync = !thread.nowSync; save(); unpop(); await syncMain();
       say(thread.nowSync ? '打開了，劇情會知道現實時間聊了什麼' : '關掉了，現實時間聊的只留在手機裡');
+      // 世界書跟著開關走：打開就把現實的記憶補寫進去，關掉就把那幾條拿掉（記憶書本身不動）
+      if (loreOn()) {
+        const mem = (await data.memory.all(ch.key)).filter((m) => m.kind === 'now');
+        for (const m of mem) {
+          if (thread.nowSync && !m.lore) { const r = await writeLore(loreText(ch, m), loreKeys(ch, m.keys?.length ? m.keys : [ch.name])).catch(() => ({ ok: false })); if (r.ok) await data.memory.update(ch.key, m.id, { lore: { book: r.book, uid: r.uid } }); }
+          if (!thread.nowSync && m.lore) { await deleteLore(m.lore.book, m.lore.uid).catch(() => false); await data.memory.update(ch.key, m.id, { lore: null }); }
+        }
+        if (view === 'memory') renderMemory();
+      }
     }
     if (a === 'locked') { say(`關係到「${e.target.closest('[data-need]').dataset.need}」才會打開`); return; }
     if (a === 'sleep') { thread.sleep = !thread.sleep; save(); unpop(); renderRoom(); say(thread.sleep ? '陪睡模式，他會講話輕一點' : '陪睡模式結束了'); }
@@ -1047,7 +1059,7 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
     if (a === 'loreall') {
       const mem = await data.memory.all(ch.key); let n = 0; let why = '';
       for (const m of mem) {
-        if (m.lore) continue; // 已經在世界書裡
+        if (m.lore || !storyMem(m, thread)) continue; // 已經在世界書裡；現實的記憶要開關打開才寫
         const r = await writeLore(loreText(ch, m), loreKeys(ch, m.keys?.length ? m.keys : [ch.name]));
         if (r.ok) { n++; await data.memory.update(ch.key, m.id, { lore: { book: r.book, uid: r.uid } }); } else { why = r.why; break; }
       }
