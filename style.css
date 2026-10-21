@@ -1067,6 +1067,20 @@
 }
 .bp-toast.bp-show { opacity: 1; transform: translate(-50%, 0); }
 
+/* 生圖中的小藥丸：浮在手機底下，不蓋畫面（10/21） */
+.bp-genpill {
+  position: absolute; left: 50%; bottom: calc(var(--bp-sab, 0px) + 52px); z-index: 26; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; max-width: 86%; padding: 8px 14px; border-radius: 18px;
+  background: rgba(20, 18, 16, .78); color: #fff; border: 1px solid rgba(255, 255, 255, .25);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); pointer-events: none; white-space: nowrap;
+  animation: bp-genpill-in .25s ease-out;
+}
+.bp-genpill b { font-size: 13px; font-weight: 600; }
+.bp-genpill small { font-size: 11px; color: rgba(255, 255, 255, .7); overflow: hidden; text-overflow: ellipsis; }
+.bp-genpill .bp-app-wait { margin: 0; transform: scale(.7); }
+.bp-genpill.bp-done { background: rgba(52, 120, 72, .85); }
+@keyframes bp-genpill-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+
 /* ---------- 設定面板 ---------- */
 .bp-sheet {
   position: absolute; left: 0; right: 0; bottom: 0; z-index: 15;

@@ -9,17 +9,27 @@ import { imagine, imageInfo, imageCountPref, imageModelPref, imageEnginePref, sh
  * 玩家按「生成」時問用哪家畫：兩家都有才問（只有一家直接回那家）。回傳 'gemini'｜'gpt'，取消回傳 null。
  * 按了哪家就記成預設，之後背景自動生的也用那家
  */
-/** 只生一張：畫面上蓋一層「生圖中⋯」，不然玩家不知道有沒有按到（10/19 比比）。生完就收掉 */
+/** 只生一張：手機底下浮一顆「生圖中⋯」的小藥丸，不蓋畫面，玩家可以先去滑別的（10/21 比比：要能跑在背景）。
+ *  生好了藥丸變成「照片好了」一下再收掉；叫它的那頁自己判斷還在不在畫面上再重畫 */
+let pill = null; let pillN = 0;
 export async function imagineWithWait(screen, prompt, opts = {}) {
-  const box = document.createElement('div');
-  box.className = 'bp-pick bp-pick-wait';
-  box.innerHTML = `<div class="bp-pick-in"><b>生圖中⋯</b><small>${opts.engine === 'gpt' || imageEnginePref.get() === 'gpt' ? 'GPT 大概十到二十秒' : 'Gemini 大概十幾秒'}</small><div class="bp-app-wait"><i></i><i></i><i></i></div></div>`;
-  screen.appendChild(box);
-  let done = false;
-  // 畫面在生圖途中被重畫（innerHTML 換掉）時把它放回去
-  const keep = setInterval(() => { if (done) clearInterval(keep); else if (!box.isConnected) screen.appendChild(box); }, 400);
-  try { return await imagine(prompt, opts); }
-  finally { done = true; clearInterval(keep); box.remove(); }
+  const host = screen.closest('.bp-phone') || screen;
+  if (!pill) { pill = document.createElement('div'); pill.className = 'bp-genpill'; }
+  pillN++;
+  pill.innerHTML = `<div class="bp-app-wait"><i></i><i></i><i></i></div><b>生圖中⋯</b><small>${opts.engine === 'gpt' || imageEnginePref.get() === 'gpt' ? 'GPT 十到二十秒' : 'Gemini 十幾秒'}，可以先去滑別的</small>`;
+  pill.classList.remove('bp-done'); host.appendChild(pill);
+  let url = '';
+  try { url = await imagine(prompt, opts); return url; }
+  finally {
+    pillN--;
+    if (pillN <= 0) {
+      pillN = 0;
+      const p = pill; pill = null;
+      p.classList.add('bp-done');
+      p.innerHTML = url ? '<b>照片好了</b>' : `<b>沒有出圖</b><small>${imageInfo.why || '這次失敗了'}</small>`;
+      setTimeout(() => p.remove(), url ? 1800 : 3200);
+    }
+  }
 }
 
 export function chooseEngine(screen) {
