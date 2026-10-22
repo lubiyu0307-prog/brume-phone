@@ -5,7 +5,8 @@
   "main": "server/index.mjs",
   "scripts": {
     "start": "node server/relay.mjs",
-    "test": "node server/test-push.mjs"
+    "test": "node server/test-push.mjs",
+    "bump": "node tools/bump.mjs"
   },
   "engines": {
     "node": ">=18"
