@@ -187,6 +187,33 @@ export function rememberChat(ch) {
   if (ks.length > 30) for (const k of ks.sort((a, b) => (map[a].t || 0) - (map[b].t || 0)).slice(0, ks.length - 30)) delete map[k];
   c.saveSettingsDebounced?.();
 }
+// 聊天改名、還原、刪掉之後，舊名字那支手機在推播站排的訊息沒人收，會一直用同一個名字跳通知、點進去是空的（11/3 椰子：兩個賀以崴）。
+// 開酒館、換聊天時對一次：記過的聊天已經不在那張卡底下了，就叫推播站把那支手機忘掉。拿不到聊天清單就不動，寧可多跳幾次也不要誤刪
+let ghostAt = 0;
+export async function forgetGhosts() {
+  const c = ctx(); const map = c?.extensionSettings?.['brume-phone']?.pushChats;
+  if (!map || !c.getRequestHeaders || !relay() || Date.now() - ghostAt < 60000) return;
+  ghostAt = Date.now();
+  const byChar = {};
+  for (const [hash, v] of Object.entries(map)) if (v?.char && v.chat) (byChar[v.char] ||= []).push([hash, v.chat]);
+  let changed = false;
+  for (const [avatar, list] of Object.entries(byChar)) {
+    let names;
+    try {
+      const r = await fetch('/api/characters/chats', { method: 'POST', headers: c.getRequestHeaders(), body: JSON.stringify({ avatar_url: avatar }) });
+      if (!r.ok) continue;
+      const j = await r.json();
+      if (!j || typeof j !== 'object' || j.error) continue;
+      names = new Set(Object.values(j).map((x) => String(x?.file_name || '').replace(/\.jsonl$/, '')).filter(Boolean));
+    } catch { continue; }
+    if (!names.size) continue;
+    for (const [hash, chat] of list) {
+      if (names.has(chat)) continue;
+      try { await call('/forget', { chat: hash }); delete map[hash]; changed = true; } catch { /* 推播站還沒升級或連不上，下次再試 */ }
+    }
+  }
+  if (changed) c.saveSettingsDebounced?.();
+}
 export function lookupChat(hash) { const m = ctx()?.extensionSettings?.['brume-phone']?.pushChats; return (hash && m?.[hash]) || null; }
 let wanted = '';
 /** 從通知點進來時要去的聊天代號（開機畫面那段用，切完就清掉） */

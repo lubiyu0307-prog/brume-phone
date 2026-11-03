@@ -58,6 +58,11 @@ await call('POST', '/cancel', { body: { chat: 'c1' } });
 q = await call('GET', '/queue', { query: { chat: 'c1' } });
 ok(!q.items.some((i) => i.status === 'pending'), '作廢後沒有待送的');
 
+await call('POST', '/queue', { body: { chat: 'ghost', title: '阿愷', fallback: ['在嗎'], items: [{ id: 'g', at: Date.now() + 3600e3, title: '阿愷', body: '在嗎', lines: [{ text: '在嗎' }] }] } });
+await call('POST', '/forget', { body: { chat: 'ghost' } });
+q = await call('GET', '/queue', { query: { chat: 'ghost' } });
+ok(!q.items.length && q.fallbackLeft === 0, '忘掉的手機：排的跟備用短訊都清掉');
+
 // 假裝她 21 小時沒碰：備用短訊（避開安靜時段才送）
 const u = plugin._internal.users.get('tester');
 u.meta.c1.touched = now - 21 * 3600e3; u.queue.c1.forEach((i) => { i.sentAt = now - 21 * 3600e3; });

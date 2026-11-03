@@ -20,7 +20,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.25.19';
+const VERSION = '0.25.20';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -1153,5 +1153,6 @@ function wandEntry(phone) {
     const t = setInterval(() => { if (wandEntry(phone) || ++n > 40) { clearInterval(t); syncOff(); } }, 500);
   }
   syncOff();
-  const c = ctx(); c?.eventSource?.on?.(c.eventTypes?.CHAT_CHANGED || c.event_types?.CHAT_CHANGED || 'chat_id_changed', () => { syncOff(); const ch = currentChar(); if (ch && phoneOff.is(ch.charKey)) phone.close?.('cardoff'); });
+  setTimeout(() => push.forgetGhosts().catch(() => {}), 8000);
+  const c = ctx(); c?.eventSource?.on?.(c.eventTypes?.CHAT_CHANGED || c.event_types?.CHAT_CHANGED || 'chat_id_changed', () => { syncOff(); const ch = currentChar(); if (ch && phoneOff.is(ch.charKey)) phone.close?.('cardoff'); push.forgetGhosts().catch(() => {}); });
 })();

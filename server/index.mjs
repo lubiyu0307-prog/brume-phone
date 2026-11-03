@@ -188,6 +188,15 @@ export async function init(router) {
     res.json({ ok: true });
   });
 
+  // 聊天已經不在了（改名、還原、刪掉）：那支手機排的、備用短訊全部忘掉，不然會一直用同一個名字跳通知（11/3 椰子：兩個賀以崴）
+  router.post('/forget', (req, res) => {
+    const chat = String(req.body?.chat || '');
+    const handle = who(req); const u = user(handle);
+    delete u.queue[chat]; delete u.meta[chat];
+    save(handle);
+    res.json({ ok: true });
+  });
+
   // 送出的已經收進 LINE 了
   router.post('/ack', (req, res) => {
     const chat = String(req.body?.chat || ''); const ids = new Set((req.body?.ids || []).map(String));
