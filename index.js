@@ -20,7 +20,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.25.20';
+const VERSION = '0.25.21';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -946,7 +946,13 @@ async function switchToChat(hash) {
   if (i < 0) return false;
   const wait = (go) => new Promise((res) => { c.eventSource?.once?.(c.eventTypes?.CHAT_CHANGED || 'chat_id_changed', res); setTimeout(res, 8000); Promise.resolve().then(go).catch(() => res()); });
   if (String(c.characterId) !== String(i)) await wait(() => c.selectCharacterById?.(String(i)));
-  if (want.chat && typeof c.openCharacterChat === 'function' && (ctx()?.getCurrentChatId?.() || '') !== want.chat) await wait(() => c.openCharacterChat(want.chat));
+  if (want.chat && typeof c.openCharacterChat === 'function' && (ctx()?.getCurrentChatId?.() || '') !== want.chat) {
+    // 那串已經不在了（改名、還原、刪掉）：不要照舊名字開，酒館會用那個名字生一串只有開場白的新聊天（11/3 玩家：刪了又長回來）。
+    // 叫推播站忘掉那支手機，停在這張卡現在的聊天
+    const names = await push.chatNames(want.char);
+    if (names && !names.has(want.chat)) await push.forgetChat(hash).catch(() => {});
+    else await wait(() => c.openCharacterChat(want.chat));
+  }
   dbg('switch-chat', want.char);
   return true;
 }
