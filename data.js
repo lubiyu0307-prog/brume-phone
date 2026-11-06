@@ -31,9 +31,17 @@ export const cal = {
   async add(key, e) {
     const a = await list('cal', key);
     // 同一天同一件事只記一次（重新生成時不會重複落地）
-    if (a.some((x) => x.date === e.date && x.title === e.title && calKind(x) === calKind(e))) return;
+    if (a.some((x) => x.date === e.date && x.title === e.title && calKind(x) === calKind(e))) return false;
     a.push({ id: uid(), ts: Date.now(), ...e }); a.sort((x, y) => x.date.localeCompare(y.date));
     await save('cal', key, a);
+    return true;
+  },
+  // 他自己記的（劇情、LINE）走這條：今天以前（含今天）那一天已經有一筆，就不再記。
+  // 11/7 比比：6/15 一天被記了十一筆，每一幕都上行事曆。之後日期的約定不受限
+  async addByHim(key, e, today) {
+    const a = await list('cal', key);
+    if (today && e.date <= today && a.some((x) => x.date === e.date && x.by === 'him' && calKind(x) === calKind(e))) return false;
+    return !!(await cal.add(key, e));
   },
   async remove(key, id) { await save('cal', key, (await list('cal', key)).filter((x) => x.id !== id)); },
 };

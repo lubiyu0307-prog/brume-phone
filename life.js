@@ -59,7 +59,8 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
       `行事曆｜YYYY-MM-DD｜標題（日期用劇情裡的日子；就是劇情裡的今天就省略，寫成 行事曆｜標題）`,
       notesOn ? `便條｜${ch.name} 貼在冰箱上給她的叮嚀（20 字內）` : '',
       '</phone>',
-      `行事曆要勤勞記：劇情裡真的發生、值得記住的「第一次」和轉折（第一次說出口的話、第一次一起做的事）、約好的事、紀念日、回診檢查這類跟兩人生活有關的日子。標題 12 字內，像他會寫的字。`,
+      // 11/7 比比：原本寫「勤勞記」，一天被記十一筆、每一幕都上行事曆。改成很少記
+      `行事曆很少記：只記之後還會想翻回來看的日子——約好的事（有日期的約定）、紀念日、回診檢查，還有真的很重大的第一次（告白、開始交往、求婚）。約會、吃飯、親熱、聊天、今天做了什麼都不記。一則最多一筆，大部分回覆都不寫。標題 12 字內，像他會寫的字。`,
       // 10/18 比比：冰箱門一整片、每則都跳出來。改成偶爾一張
       notesOn ? `便條偶爾才貼：只有他要出門、她要自己待一陣子，而且真的有放不下心的事（身體、要吃的藥、天氣）才寫，內容要接得上劇情。一次最多一張，大部分回覆都不寫。` : '',
       have.length ? `手機上已經有的，不要再寫一次（同一件事換個說法也算重複）：\n${have.map((h) => '- ' + h).join('\n')}` : '',
@@ -127,7 +128,7 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
       else if (mode === '便條') notes.push(text.replace(/^[「『"]+|[」』"]+$/g, '').slice(0, 40));
       else lines.push(text.replace(/^[「『"]+|[」』"]+$/g, ''));
     }
-    await landData(ch, cals, notes);
+    await landData(ch, cals, notes, storyToday);
     const now = Date.now();
     // 不是一說完就傳：LINE 等一分鐘手機才響（原本兩到五分鐘，10/19 改短）
     if (lines.length) pending.push({ id: uid(), key: ch.key, type: 'line', lines: lines.slice(0, 4), at: now + 60000 }); // 10/19 比比：壓一分鐘就好，玩家剛好把劇情讀完
@@ -167,13 +168,11 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
   }
 
   // 行事曆和便條不用等：劇情一寫完就落地，手機響一下
-  async function landData(ch, cals, notes) {
+  async function landData(ch, cals, notes, today) {
     if (!cals.length && !notes.length) return;
     const cur = await stage.get(ch.key);
-    for (const e of cals.slice(0, 3)) {
-      const before = (await data.cal.all(ch.key)).length;
-      await data.cal.add(ch.key, { ...e, by: 'him' });
-      if ((await data.cal.all(ch.key)).length > before) onNotify?.({ app: 'calendar', who: ch.name, text: `記上行事曆：${e.date.slice(5).replace('-', '/')} ${e.title}` });
+    for (const e of cals.slice(0, 1)) {
+      if (await data.cal.addByHim(ch.key, { ...e, by: 'him' }, today)) onNotify?.({ app: 'calendar', who: ch.name, text: `記上行事曆：${e.date.slice(5).replace('-', '/')} ${e.title}` });
     }
     if (stage.unlocked(cur, 'notes')) {
       const all = await data.notes.all(ch.key);

@@ -201,7 +201,7 @@ function buildPrompt(ch, msgs, x = {}) {
     x.stickerTags?.length ? `- 傳貼圖：在回覆最後獨立一行寫 [[STICKER|標籤]]，只寫標籤（括號裡是那張圖畫什麼，幫你挑，不用寫進去）。可以用的有：${x.stickerTags.join('、')}。一次最多一張` : '',
     '- 她明確請你設鬧鐘或提醒時（例如「明天六點叫我」），先答應，再在最後獨立一行寫 [[ALARM|HH:MM|鬧鐘名稱]]，24 小時制，名稱是你留給她的一句話，10 字內、不用 emoji。她沒要求就不要寫',
     x.notesOn ? '- 在她冰箱上貼便條：最後獨立一行寫 [[NOTE|內容]] 或 [[NOTE|內容|YYYY-MM-DD]]，20 字內。她提到身體、作息、天氣、要吃的藥或補品、要帶的東西，你放不下心就貼一張，貼了在訊息裡順口提一下' : '',
-    `- 記上你們共用的行事曆：最後獨立一行寫 [[CAL|YYYY-MM-DD|標題]]，標題 12 字內。約好的事、紀念日、回診檢查、兩人之間的「第一次」都記；行事曆上已經有的不要再記（同一件事換個說法也算重複）。${nowMode
+    `- 記上你們共用的行事曆：最後獨立一行寫 [[CAL|YYYY-MM-DD|標題]]，標題 12 字內。很少寫：只記約好的事（有日期的約定）、紀念日、回診檢查，一般聊天不記；行事曆上已經有的不要再記（同一件事換個說法也算重複）。${nowMode
       ? `日期用現實的日子，今天是 ${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}（週${WEEK[now.getDay()]}）`
       : `日期用劇情裡的日子${x.storyDay ? `，劇情裡的今天是 ${x.storyDay}` : '，照劇情判斷是哪一天'}`}`,
     '- 想送她小禮物（她說累了、餓了、心情不好、值得慶祝，或你單純想寵她）：最後獨立一行寫 [[GIFT|品項|附一句話]]，品項像「一杯熱拿鐵」「電影票兩張」，一句話 20 字內。偶爾才送，送了不用在訊息裡再講一次',
@@ -829,7 +829,8 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
     }
     for (const mo of out.moments) extras.push({ moment: mo });
     for (const n of out.notes) { await data.notes.add(who.key, { ...n, by: 'him' }); extras.push({ notice: `📌 ${who.name}在便條上寫了：${n.text}`, goto: 'notes' }); }
-    for (const c of out.cals) { await data.cal.add(who.key, { ...c, by: 'him', kind: t.mode === 'now' ? 'real' : 'story' }); extras.push({ notice: `📅 ${who.name}記上行事曆：${c.date.slice(5).replace('-', '/')} ${c.title}`, goto: 'calendar' }); }
+    const calToday = t.mode === 'now' ? data.today() : ((await data.storyDay.get(who.key)) || data.today());
+    for (const c of out.cals.slice(0, 1)) { if (await data.cal.addByHim(who.key, { ...c, by: 'him', kind: t.mode === 'now' ? 'real' : 'story' }, calToday)) extras.push({ notice: `📅 ${who.name}記上行事曆：${c.date.slice(5).replace('-', '/')} ${c.title}`, goto: 'calendar' }); }
     for (const p of out.parcels.slice(0, 1)) { if (await onParcel?.(who, p)) extras.push({ notice: `📦 ${who.name}幫妳寄了東西，配送中`, goto: 'parcel' }); }
     for (const x of extras) {
       if (x.sticker || x.alarm || x.gift || x.loc) { busy = 'typing'; if (view === 'room') refreshLog(); await sleep(700); }
