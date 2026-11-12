@@ -25,6 +25,8 @@ function when(ts) {
   if (diff < 7) return `星期${WEEK[d.getDay()]}`;
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
+// 聊天室裡哪則是他自己傳的：模型會寫「他」「我」、他的名字，也會寫 me
+function isHim(from, name) { const f = String(from || '').trim(); return /^(他|我|自己|本人|me|self)$/i.test(f) || f === name; }
 function hue(s) { let h = 0; for (const c of String(s)) h = (h * 31 + c.charCodeAt(0)) % 360; return h; }
 
 // 模型回的 JSON 常常包在 ```json 裡或前後多講話，抓第一個 { 或 [ 開始的那一段
@@ -140,7 +142,7 @@ export function createHisPhone({ host, say, onExit }) {
         }
       }
       function msg(m, base) {
-        const me = /^他$|^我$/.test(String(m.from || '').trim()) || String(m.from || '').trim() === ch.name;
+        const me = isHim(m.from, ch.name);
         return { me, from: String(m.from || ''), text: String(m.text || ''), ts: base - Math.max(0, +m.hoursAgo || 0) * 3600e3 };
       }
     },
@@ -289,7 +291,8 @@ export function createHisPhone({ host, say, onExit }) {
     }
     const c = hp.line.chats.find((x) => x.name === id);
     if (!c) return '';
-    return `<div class="bp-hp-chat">${c.msgs.map((m) => bubble(m.me, m.text, m.ts, m.me ? '' : m.from)).join('')}</div>
+    // 舊的聊天室存的時候沒認出 me（11/12 阿嬤那串：他自己的話跑到左邊、名字寫 me），畫的時候再認一次
+    return `<div class="bp-hp-chat">${c.msgs.map((m) => { const me = m.me || isHim(m.from, ch.name); return bubble(me, m.text, m.ts, me ? '' : m.from); }).join('')}</div>
       <div class="bp-hp-pacts"><button data-hp="rechat" ${rewriting ? 'disabled' : ''}>${rewriting ? '重寫中⋯' : '重寫這個聊天室'}</button></div>`;
   }
   function bubble(mine, text, ts, from = '') {

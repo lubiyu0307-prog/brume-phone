@@ -951,7 +951,7 @@
 .bp-his { position: absolute; inset: 0; z-index: 10; display: none; }
 .bp-his.bp-show { display: flex; }
 .bp-hp {
-  flex: 1; display: flex; flex-direction: column; min-height: 0; color: #e8ecf2;
+  flex: 1; display: flex; flex-direction: column; min-height: 0; min-width: 0; color: #e8ecf2; /* min-width 0：不換行的長預覽會把整頁撐出手機（11/12 備忘錄） */
   background: radial-gradient(120% 80% at 20% 0%, #3a4658 0%, #1d232e 55%, #12161d 100%);
   font-family: -apple-system, "Helvetica Neue", "PingFang TC", sans-serif;
   padding-top: env(safe-area-inset-top);
