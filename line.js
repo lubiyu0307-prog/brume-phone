@@ -842,7 +842,7 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
     for (const n of out.notes) { await data.notes.add(who.key, { ...n, by: 'him' }); extras.push({ notice: `📌 ${who.name}在便條上寫了：${n.text}`, goto: 'notes' }); }
     const calToday = t.mode === 'now' ? data.today() : ((await data.storyDay.get(who.key)) || data.today());
     for (const c of out.cals.slice(0, 1)) { if (await data.cal.addByHim(who.key, { ...c, by: 'him', kind: t.mode === 'now' ? 'real' : 'story' }, calToday)) extras.push({ notice: `📅 ${who.name}記上行事曆：${c.date.slice(5).replace('-', '/')} ${c.title}`, goto: 'calendar' }); }
-    for (const p of out.parcels.slice(0, 1)) { if (await onParcel?.(who, p)) extras.push({ notice: `📦 ${who.name}幫妳寄了東西，配送中`, goto: 'parcel' }); }
+    for (const p of out.parcels.slice(0, 1)) { if (await onParcel?.(who, { ...p, kind: t.mode === 'now' ? 'real' : 'story' })) extras.push({ notice: `📦 ${who.name}幫妳寄了東西，配送中`, goto: 'parcel' }); }
     for (const x of extras) {
       if (x.sticker || x.alarm || x.gift || x.loc) { busy = 'typing'; if (view === 'room') refreshLog(); await sleep(700); }
       t.msgs.push({ id: uid(), me: false, text: '', ts: Date.now(), ...flag, ...x });
@@ -1286,18 +1286,20 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
     return out;
   }
 
-  // 她拆開了他寄的包裹：他接著問一兩句（合不合用、好不好吃），照目前的模式寫（10/19 比比）
+  // 她拆開了他寄的包裹：他接著問一兩句（合不合用、好不好吃）（10/19 比比）
+  // 照「寄出那時」的模式寫，不是拆開這時聊天室停在哪：現實寄的回現實、劇情寄的回劇情（11/12 黎黎洛：現實寄的外送，在包裹 App 拆開跑進劇情）
+  // 舊包裹沒記 kind 的照目前的模式
   async function parcelOpened(p) {
     const who = await useCurrent(); if (!who || busy || !p?.item) return;
-    const t = thread; const cur = curStage;
+    const base = thread; const t = p.kind ? { ...base, mode: p.kind === 'real' ? 'now' : 'story' } : base; const cur = curStage;
     const instr = `【她剛拆開你寄的包裹】東西是「${p.item}」${p.note ? `，你附的小卡寫「${p.note}」` : ''}。她現在拆開了，你傳 1～2 則給她：問她收到的樣子、合不合用、好不好吃，或撒嬌要她回報一下。一則一行，不要把小卡上的話再講一次。`;
     let raw;
     try { raw = await generate(buildPrompt(who, t.msgs, { mode: t.mode === 'now' ? 'now' : 'story', nowSync: !!t.nowSync, stage: cur, proactive: instr })); } catch { return; }
     const lines = raw.split('\n').map((l) => parseReply(l.replace(/^\s*(\d{1,2}[:：]\d{2}\s*[｜|]|[-・*]|\d+[.、])\s*/, '').trim(), who).lines[0]).filter(Boolean).slice(0, 2);
     if (!lines.length) return;
     const now = Date.now(); const flag = t.mode === 'now' ? { now: true } : { story: true };
-    lines.forEach((text, i) => t.msgs.push({ id: uid(), me: false, text, ts: now + i, first: true, ...flag }));
-    await saveThread(who.key, t); if (showing() && view === 'room') refreshLog(); onUnread?.(unreadCount()); syncMain();
+    lines.forEach((text, i) => base.msgs.push({ id: uid(), me: false, text, ts: now + i, first: true, ...flag }));
+    await saveThread(who.key, base); if (showing() && view === 'room') refreshLog(); onUnread?.(unreadCount()); syncMain();
     onHim?.(who, lines[lines.length - 1]);
   }
 

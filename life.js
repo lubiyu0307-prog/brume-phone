@@ -133,7 +133,7 @@ export function createLife({ line, say, onNotify, onStageHint, onData }) {
     // 不是一說完就傳：LINE 等一分鐘手機才響（原本兩到五分鐘，10/19 改短）
     if (lines.length) pending.push({ id: uid(), key: ch.key, type: 'line', lines: lines.slice(0, 4), at: now + 60000 }); // 10/19 比比：壓一分鐘就好，玩家剛好把劇情讀完
     if (posts.length) pending.push({ id: uid(), key: ch.key, type: 'post', posts: posts.slice(0, 2), at: now + (6 + Math.random() * 10) * 60000 });
-    for (const p of parcels.slice(0, 1)) await shipParcel(ch, p, now);
+    for (const p of parcels.slice(0, 1)) await shipParcel(ch, { ...p, kind: 'story' }, now);
     savePending();
     if (rel && !stage.atLeast(await stage.get(ch.key), rel)) onStageHint?.(ch.key, rel);
   }
