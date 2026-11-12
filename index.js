@@ -20,7 +20,7 @@ import * as data from './data.js';
 import { createMusic, nowPlaying } from './music.js';
 
 const KEY = 'brume-phone:v1';
-const VERSION = '0.25.22';
+const VERSION = '0.25.23';
 
 // ---------- 除錯紀錄：手機在某些裝置上會不見，記下當時的畫面數字，設定裡可以複製給格看 ----------
 const DBG_KEY = 'brume-phone:dbg';
@@ -795,7 +795,11 @@ function build() {
   setTimeout(refreshNotices, 1500);
 
   // LINE 裡點「他貼了便條／記上行事曆」那行小字，直接跳到那個 App
-  appScreen.addEventListener('bp-openapp', (e) => { const app = { notes, calendar, parcel: parcels }[e.detail]; if (app) openApp(app); });
+  appScreen.addEventListener('bp-openapp', async (e) => {
+    // 「照片沒送到」那則灰字點下去：打開設定、直接跑體檢（11/12 比比：玩家不知道有這顆按鈕）
+    if (e.detail === 'settings') { await showSettings(); sheet.classList.add('bp-show'); await checkup(); return; }
+    const app = { notes, calendar, parcel: parcels }[e.detail]; if (app) openApp(app);
+  });
 
   // 主畫面日曆小工具：有安排的日子底下點一個小點
   async function calDots() {

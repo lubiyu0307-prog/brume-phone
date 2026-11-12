@@ -773,7 +773,18 @@ export function createLine({ screen, say, onUnread, onData, onParcel, onHim }) {
       for (let i = t.msgs.length - 1; i >= 0 && t.msgs[i].me; i--) if (t.msgs[i].img) roundPhotos.unshift(t.msgs[i]);
       roundPhotos = roundPhotos.slice(-4);
       const seeing = roundPhotos.length > 0 && canSeeImages();
-      if (roundPhotos.length && !seeing) say(photoWhy()); // 10/19 比比：不用等他回「轉圈圈沒跑出來」才知道
+      if (roundPhotos.length && !seeing) {
+        // 10/19 比比：不用等他回「轉圈圈沒跑出來」才知道。
+        // 11/12 比比：toast 一秒半就沒了，玩家沒看到也不知道有體檢——改成留一則灰字在對話裡，點一下直接跳設定體檢
+        const why = photoWhy();
+        say(why);
+        // 同一輪（失敗重試）不要再貼一次：這輪第一張照片之後已經有一則就跳過
+        const sameRound = t.msgs.findIndex((m) => m.notice && m.photoWhy && m.ts >= roundPhotos[0].ts) >= 0;
+        if (!sameRound) {
+          t.msgs.push({ id: uid(), me: false, text: '', ts: Date.now(), ...(t.mode === 'now' ? { now: true } : { story: true }), notice: `📷 ${why}（點這裡去體檢）`, goto: 'settings', photoWhy: true });
+          saveThread(who.key, t); if (view === 'room') refreshLog();
+        }
+      }
       const image = seeing ? await collage(roundPhotos.map((m) => m.img)) : null;
       // 行事曆分兩本：現實時間聊天看現實那本，劇情聊天看劇情那本（「今天」也各自算）
       const calKind = t.mode === 'now' ? 'real' : 'story';
